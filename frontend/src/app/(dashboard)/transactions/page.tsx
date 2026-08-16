@@ -14,7 +14,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Search, Filter, Printer, Loader2, Eye } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Search, Filter, Printer, Loader2, Eye, Receipt } from "lucide-react"
 
 interface TransactionItem {
   id: number
@@ -53,6 +60,9 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const [isReceiptMode, setIsReceiptMode] = useState(false)
 
   const fetchData = async () => {
     try {
@@ -116,13 +126,13 @@ export default function TransactionsPage() {
         </Button>
       </div>
 
-      <div className="bg-background rounded-xl border border-default-200 shadow-sm overflow-hidden">
+      <div className="bg-background rounded-xl border border-default-200 shadow-sm overflow-x-auto w-full">
         {isLoading ? (
           <div className="flex justify-center p-8">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : (
-          <Table className="w-full">
+          <Table className="min-w-[800px] w-full">
             <TableHeader>
               <TableRow>
                 <TableHead>RECEIPT NO</TableHead>
@@ -160,11 +170,29 @@ export default function TransactionsPage() {
                     </TableCell>
                     <TableCell className="py-3 px-4">
                       <div className="flex justify-end gap-2">
-                        <Button isIconOnly variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
+                        <Button 
+                          isIconOnly 
+                          variant="ghost" 
+                          size="sm"
+                          onPress={() => {
+                            setSelectedTransaction(trx)
+                            setIsReceiptMode(false)
+                            setIsDetailsOpen(true)
+                          }}
+                        >
+                          <Eye className="h-4 w-4 text-default-500 hover:text-primary" />
                         </Button>
-                        <Button isIconOnly variant="ghost" size="sm">
-                          <Printer className="h-4 w-4" />
+                        <Button 
+                          isIconOnly 
+                          variant="ghost" 
+                          size="sm"
+                          onPress={() => {
+                            setSelectedTransaction(trx)
+                            setIsReceiptMode(true)
+                            setIsDetailsOpen(true)
+                          }}
+                        >
+                          <Printer className="h-4 w-4 text-default-500 hover:text-primary" />
                         </Button>
                       </div>
                     </TableCell>
@@ -175,6 +203,174 @@ export default function TransactionsPage() {
           </Table>
         )}
       </div>
+
+      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <DialogContent className="sm:max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
+          {isReceiptMode && selectedTransaction ? (
+            <div className="flex flex-col items-center">
+              <div id="printable-receipt" className="w-full p-5 print:p-0 bg-white text-black text-sm print:text-xs font-mono flex flex-col gap-2 rounded-xl border print:border-none print:shadow-none mb-2 print:m-0 print:w-[300px] print:absolute print:top-0 print:left-0">
+                <div className="text-center font-bold text-lg print:text-base mb-1">
+                  KIVO POS
+                </div>
+                <div className="text-center text-xs print:text-[10px] font-normal text-gray-600 print:text-black mb-3">
+                  Jl. Teknologi No. 1, Jakarta<br />
+                  Telp: 0812-3456-7890
+                </div>
+
+                <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2"></div>
+
+                <div className="flex justify-between text-xs print:text-[10px] mb-2 font-medium text-gray-600 print:text-black">
+                  <span>{formatDate(selectedTransaction.created_at)}</span>
+                  <span>{selectedTransaction.transaction_number}</span>
+                </div>
+                <div className="text-left text-xs print:text-[10px] mb-2 font-medium text-gray-600 print:text-black">
+                  Customer: {selectedTransaction.customer?.name || 'Walk-in'}
+                </div>
+
+                <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 flex flex-col gap-2">
+                  {selectedTransaction.items?.map((item: any, i: number) => (
+                    <div key={i} className="flex flex-col">
+                      <div className="flex justify-between font-bold print:font-semibold print:text-black">
+                        <span className="truncate pr-2">{item.product?.name}</span>
+                        <span className="whitespace-nowrap">Rp {Number(item.subtotal).toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="text-xs print:text-[10px] text-gray-500 print:text-black">
+                        {item.quantity} x Rp {Number(item.price).toLocaleString("id-ID")}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-between text-xs print:text-[10px] print:text-black">
+                  <span>Subtotal</span>
+                  <span>Rp {Number(selectedTransaction.subtotal).toLocaleString("id-ID")}</span>
+                </div>
+                <div className="flex justify-between text-xs print:text-[10px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
+                  <span>Tax</span>
+                  <span>Rp {Number(selectedTransaction.tax).toLocaleString("id-ID")}</span>
+                </div>
+                
+                <div className="flex justify-between font-black text-lg print:text-base mb-2 print:text-black">
+                  <span>TOTAL</span>
+                  <span>Rp {Number(selectedTransaction.total_amount).toLocaleString("id-ID")}</span>
+                </div>
+
+                <div className="flex justify-between text-xs print:text-[10px] print:text-black">
+                  <span>Pay ({selectedTransaction.payment_method})</span>
+                  <span>Rp {Number(selectedTransaction.payment_amount).toLocaleString("id-ID")}</span>
+                </div>
+                <div className="flex justify-between text-xs print:text-[10px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
+                  <span>Change</span>
+                  <span className="font-bold">Rp {(Number(selectedTransaction.payment_amount) - Number(selectedTransaction.total_amount)).toLocaleString("id-ID")}</span>
+                </div>
+
+                <div className="text-center text-xs print:text-[10px] mt-2 print:mt-1 italic text-gray-500 print:text-black">
+                  Thank you for your purchase!<br/>
+                  Please come again.
+                </div>
+                
+                <div className="print:hidden border-t border-dashed mt-4 pt-4 text-center text-xs text-muted-foreground">
+                  This is a preview of the printed receipt.
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Receipt className="w-5 h-5 text-primary" /> 
+                  Transaction Details
+                </DialogTitle>
+              </DialogHeader>
+              
+              {selectedTransaction && (
+                <div className="space-y-6 py-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm bg-slate-50 p-4 rounded-xl border">
+                    <div>
+                      <p className="text-muted-foreground mb-1">Receipt No</p>
+                      <p className="font-bold">{selectedTransaction.transaction_number}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground mb-1">Date</p>
+                      <p className="font-medium">{formatDate(selectedTransaction.created_at)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground mb-1">Customer</p>
+                      <p className="font-medium">{selectedTransaction.customer?.name || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground mb-1">Status</p>
+                      <Chip 
+                        color={selectedTransaction.status === 'COMPLETED' ? 'success' : selectedTransaction.status === 'CANCELLED' ? 'danger' : 'warning'} 
+                        variant="soft" 
+                        size="sm"
+                      >
+                        {selectedTransaction.status}
+                      </Chip>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold mb-3">Order Items</h4>
+                    <div className="space-y-3">
+                      {selectedTransaction.items?.map((item) => (
+                        <div key={item.id} className="flex justify-between items-center text-sm border-b pb-2">
+                          <div>
+                            <p className="font-medium">{item.product?.name}</p>
+                            <p className="text-muted-foreground text-xs">{item.quantity} x Rp {Number(item.price).toLocaleString('id-ID')}</p>
+                          </div>
+                          <p className="font-bold">Rp {Number(item.subtotal).toLocaleString('id-ID')}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 bg-slate-50 p-4 rounded-xl border">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal</span>
+                      <span className="font-medium">Rp {Number(selectedTransaction.subtotal).toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Tax</span>
+                      <span className="font-medium">Rp {Number(selectedTransaction.tax).toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Discount</span>
+                      <span className="font-medium">Rp {Number(selectedTransaction.discount).toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="flex justify-between text-base font-bold pt-2 border-t mt-2">
+                      <span>Total Amount</span>
+                      <span className="text-primary">Rp {Number(selectedTransaction.total_amount).toLocaleString('id-ID')}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          <DialogFooter className="sm:justify-between">
+            <Button variant="ghost" onPress={() => setIsDetailsOpen(false)}>
+              Close
+            </Button>
+            {isReceiptMode ? (
+              <Button 
+                variant="primary"
+                onPress={() => window.print()}
+              >
+                Print Now
+              </Button>
+            ) : (
+              <Button 
+                variant="secondary"
+                onPress={() => setIsReceiptMode(true)}
+              >
+                <Printer className="w-4 h-4 mr-2 inline" />
+                Print Receipt
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
