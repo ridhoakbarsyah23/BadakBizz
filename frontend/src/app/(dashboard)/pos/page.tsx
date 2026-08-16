@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -12,9 +12,9 @@ import {
   Plus, 
   Minus, 
   Trash2, 
-  CreditCard,
   Banknote,
-  QrCode
+  QrCode,
+  Loader2
 } from "lucide-react"
 import {
   Dialog,
@@ -26,28 +26,53 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
-// Dummy Data
-const DUMMY_PRODUCTS = [
-  { id: "1", name: "Kopi Susu Aren", price: 18000, category: "Beverage", image: "☕" },
-  { id: "2", name: "Americano", price: 15000, category: "Beverage", image: "☕" },
-  { id: "3", name: "Roti Bakar Coklat", price: 20000, category: "Food", image: "🍞" },
-  { id: "4", name: "Indomie Telur", price: 12000, category: "Food", image: "🍜" },
-  { id: "5", name: "Es Teh Manis", price: 5000, category: "Beverage", image: "🍹" },
-  { id: "6", name: "Kentang Goreng", price: 15000, category: "Snack", image: "🍟" },
-]
-
 export default function POSPage() {
+  const [products, setProducts] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [cart, setCart] = useState<any[]>([])
   const [search, setSearch] = useState("")
+  const [activeCategory, setActiveCategory] = useState("All")
+  const [cashAmount, setCashAmount] = useState("")
+  
+  // Dialog open states
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
+  const [isCashOpen, setIsCashOpen] = useState(false)
+  const [isQrisOpen, setIsQrisOpen] = useState(false)
 
-  const filteredProducts = DUMMY_PRODUCTS.filter(p => 
-    p.name.toLowerCase().includes(search.toLowerCase())
+  const fetchProducts = async () => {
+    setIsLoading(true)
+    try {
+      const res = await fetch("http://localhost:8000/api/products")
+      const data = await res.json()
+      setProducts(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error("Failed to fetch products:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchProducts()
+  }, [])
+
+  const filteredProducts = products.filter(p => 
+    p.name.toLowerCase().includes(search.toLowerCase()) && 
+    p.is_active && 
+    p.stock > 0 &&
+    (activeCategory === "All" || p.category?.name === activeCategory)
   )
+
+  const categories = Array.from(new Set(products.map(p => p.category?.name).filter(Boolean))) as string[]
 
   const addToCart = (product: any) => {
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id)
       if (existing) {
+        if (existing.qty >= product.stock) {
+          alert(`Stock for ${product.name} is only ${product.stock}`)
+          return prev
+        }
         return prev.map(item => 
           item.id === product.id 
             ? { ...item, qty: item.qty + 1 } 
@@ -61,7 +86,8 @@ export default function POSPage() {
   const updateQty = (id: string, delta: number) => {
     setCart(prev => prev.map(item => {
       if (item.id === id) {
-        const newQty = Math.max(1, item.qty + delta)
+        const product = products.find(p => p.id === id)
+        const newQty = Math.max(1, Math.min(item.qty + delta, product?.stock || 999))
         return { ...item, qty: newQty }
       }
       return item
@@ -72,9 +98,43 @@ export default function POSPage() {
     setCart(prev => prev.filter(item => item.id !== id))
   }
 
-  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0)
+  const subtotal = cart.reduce((sum, item) => sum + (item.selling_price * item.qty), 0)
   const tax = subtotal * 0.11 // 11% tax
   const total = subtotal + tax
+
+  const handleCheckout = async (paymentMethod: string, paymentAmount: number) => {
+    try {
+      const res = await fetch("http://localhost:8000/api/transactions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          items: cart.map(item => ({
+            product_id: item.id,
+            quantity: item.qty
+          })),
+          payment_method: paymentMethod,
+          payment_amount: paymentAmount
+        })
+      })
+
+      const data = await res.json()
+      if (res.ok) {
+        alert("Transaction Success! \nTrx No: " + data.data.transaction_number)
+        setCart([])
+        setIsCashOpen(false)
+        setIsQrisOpen(false)
+        setIsCheckoutOpen(false)
+        fetchProducts() // refresh stock
+      } else {
+        alert("Error: " + (data.message || "Failed"))
+      }
+    } catch (error) {
+      alert("Network error, please try again.")
+    }
+  }
 
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-6">
@@ -92,28 +152,54 @@ export default function POSPage() {
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-2">
-          <Badge variant="default" className="px-4 py-1 text-sm cursor-pointer">All</Badge>
-          <Badge variant="outline" className="px-4 py-1 text-sm cursor-pointer">Beverage</Badge>
-          <Badge variant="outline" className="px-4 py-1 text-sm cursor-pointer">Food</Badge>
-          <Badge variant="outline" className="px-4 py-1 text-sm cursor-pointer">Snack</Badge>
+          <Badge 
+            variant={activeCategory === "All" ? "default" : "outline"} 
+            className="px-4 py-1 text-sm cursor-pointer transition-colors"
+            onClick={() => setActiveCategory("All")}
+          >
+            All
+          </Badge>
+          {categories.map(cat => (
+            <Badge 
+              key={cat}
+              variant={activeCategory === cat ? "default" : "outline"} 
+              className="px-4 py-1 text-sm cursor-pointer transition-colors"
+              onClick={() => setActiveCategory(cat)}
+            >
+              {cat}
+            </Badge>
+          ))}
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 overflow-y-auto pr-2 pb-4">
-          {filteredProducts.map(product => (
-            <Card 
-              key={product.id} 
-              className="cursor-pointer hover:border-primary transition-colors flex flex-col"
-              onClick={() => addToCart(product)}
-            >
-              <CardContent className="p-4 flex flex-col items-center justify-center flex-1 text-center gap-2">
-                <div className="text-4xl mb-2">{product.image}</div>
-                <div className="font-medium line-clamp-2 leading-tight">{product.name}</div>
-                <div className="text-primary font-bold mt-auto">
-                  Rp {product.price.toLocaleString("id-ID")}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {isLoading ? (
+            <div className="col-span-full flex justify-center py-10">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="col-span-full text-center py-10 text-muted-foreground">
+              No active products with stock found.
+            </div>
+          ) : (
+            filteredProducts.map(product => (
+              <Card 
+                key={product.id} 
+                className="cursor-pointer hover:border-primary transition-colors flex flex-col"
+                onClick={() => addToCart(product)}
+              >
+                <CardContent className="p-4 flex flex-col items-center justify-center flex-1 text-center gap-2">
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl mb-2">
+                    {product.name.charAt(0)}
+                  </div>
+                  <div className="font-medium line-clamp-2 leading-tight">{product.name}</div>
+                  <div className="text-xs text-muted-foreground">Stock: {product.stock}</div>
+                  <div className="text-primary font-bold mt-auto">
+                    Rp {Number(product.selling_price).toLocaleString("id-ID")}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       </div>
 
@@ -139,7 +225,7 @@ export default function POSPage() {
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{item.name}</div>
                   <div className="text-sm text-primary font-semibold">
-                    Rp {(item.price * item.qty).toLocaleString("id-ID")}
+                    Rp {(item.selling_price * item.qty).toLocaleString("id-ID")}
                   </div>
                 </div>
                 
@@ -178,12 +264,10 @@ export default function POSPage() {
             </div>
           </div>
 
-          <Dialog>
-            <DialogTrigger render={
-              <Button className="w-full h-12 text-lg font-bold" disabled={cart.length === 0}>
-                Pay Rp {total.toLocaleString("id-ID")}
-              </Button>
-            } />
+          <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
+            <DialogTrigger render={<Button className="w-full h-12 text-lg font-bold" disabled={cart.length === 0} />}>
+              Pay Rp {total.toLocaleString("id-ID")}
+            </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Checkout</DialogTitle>
@@ -193,13 +277,11 @@ export default function POSPage() {
               </DialogHeader>
               
               <div className="grid grid-cols-2 gap-4 py-4">
-                <Dialog>
-                  <DialogTrigger render={
-                    <Button variant="outline" className="h-24 flex flex-col gap-2">
-                      <Banknote className="h-8 w-8 text-green-500" />
-                      <span>Cash</span>
-                    </Button>
-                  } />
+                <Dialog open={isCashOpen} onOpenChange={setIsCashOpen}>
+                  <DialogTrigger render={<Button variant="outline" className="h-24 flex flex-col gap-2" />}>
+                    <Banknote className="h-8 w-8 text-green-500" />
+                    <span>Cash</span>
+                  </DialogTrigger>
                   <DialogContent className="sm:max-w-sm">
                     <DialogHeader>
                       <DialogTitle>Cash Payment</DialogTitle>
@@ -211,27 +293,31 @@ export default function POSPage() {
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Cash Received</label>
-                        <Input type="number" placeholder="Enter amount" defaultValue={total} className="text-lg font-bold h-12" />
+                        <Input 
+                          type="number" 
+                          placeholder="Enter amount" 
+                          value={cashAmount}
+                          onChange={(e) => setCashAmount(e.target.value)}
+                          className="text-lg font-bold h-12" 
+                        />
                       </div>
                     </div>
                     <DialogFooter>
-                      <Button className="w-full h-12 text-lg" onClick={() => {
-                        alert("Transaction Success! Showing receipt...")
-                        setCart([])
-                      }}>
+                      <Button 
+                        className="w-full h-12 text-lg" 
+                        onClick={() => handleCheckout('CASH', Number(cashAmount) || total)}
+                      >
                         Complete Transaction
                       </Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
 
-                <Dialog>
-                  <DialogTrigger render={
-                    <Button variant="outline" className="h-24 flex flex-col gap-2">
-                      <QrCode className="h-8 w-8 text-blue-500" />
-                      <span>QRIS</span>
-                    </Button>
-                  } />
+                <Dialog open={isQrisOpen} onOpenChange={setIsQrisOpen}>
+                  <DialogTrigger render={<Button variant="outline" className="h-24 flex flex-col gap-2" />}>
+                    <QrCode className="h-8 w-8 text-blue-500" />
+                    <span>QRIS</span>
+                  </DialogTrigger>
                   <DialogContent className="sm:max-w-sm text-center">
                     <DialogHeader>
                       <DialogTitle className="text-center">QRIS Payment</DialogTitle>
@@ -244,10 +330,10 @@ export default function POSPage() {
                       <div className="text-2xl font-bold text-primary">Rp {total.toLocaleString("id-ID")}</div>
                     </div>
                     <DialogFooter>
-                      <Button className="w-full" onClick={() => {
-                        alert("Payment Received! Showing receipt...")
-                        setCart([])
-                      }}>
+                      <Button 
+                        className="w-full" 
+                        onClick={() => handleCheckout('QRIS', total)}
+                      >
                         Verify Payment
                       </Button>
                     </DialogFooter>

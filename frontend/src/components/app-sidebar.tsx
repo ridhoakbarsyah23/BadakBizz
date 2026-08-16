@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, 
   ShoppingBag, 
@@ -30,6 +30,7 @@ const navItems = [
 
 export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (val: boolean) => void }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [roleId, setRoleId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -73,11 +74,12 @@ export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: 
           return (
             <Button
               key={item.title}
-              as={Link}
-              href={item.url}
               variant={isActive ? "secondary" : "tertiary"}
               className="w-full justify-start font-medium h-11"
-              onPress={() => setIsOpen(false)}
+              onPress={() => {
+                router.push(item.url);
+                setIsOpen(false);
+              }}
             >
               <item.icon className="w-5 h-5 mr-2" />
               {item.title}
@@ -89,11 +91,12 @@ export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: 
       <div className="p-4 border-t border-default-200 shrink-0 space-y-2">
         {roleId !== '2' && (
           <Button
-            as={Link}
-            href="/settings"
             variant="tertiary"
             className="w-full justify-start font-medium h-11"
-            onPress={() => setIsOpen(false)}
+            onPress={() => {
+              router.push("/settings");
+              setIsOpen(false);
+            }}
           >
             <Settings className="w-5 h-5 mr-2" />
             Settings
