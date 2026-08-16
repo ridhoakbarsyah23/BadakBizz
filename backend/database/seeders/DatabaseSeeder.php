@@ -3,23 +3,39 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Role;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
      * Seed the application's database.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // Create Roles
+        $adminRole = Role::firstOrCreate(['slug' => 'admin'], ['name' => 'Administrator']);
+        $cashierRole = Role::firstOrCreate(['slug' => 'cashier'], ['name' => 'Cashier']);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // Create Admin User
+        User::firstOrCreate(
+            ['email' => 'admin@kivo.com'],
+            [
+                'name' => 'Super Admin',
+                'password' => Hash::make('password'),
+                'role_id' => $adminRole->id,
+            ]
+        );
+
+        // Create Cashier User
+        User::firstOrCreate(
+            ['email' => 'cashier@kivo.com'],
+            [
+                'name' => 'Cashier Staff',
+                'password' => Hash::make('password'),
+                'role_id' => $cashierRole->id,
+            ]
+        );
     }
 }
