@@ -34,3 +34,8 @@ Route::get('/user', function (Request $request) {
 // Basic API Routes without auth middleware for easy development
 Route::apiResource('categories', CategoryController::class);
 Route::apiResource('products', ProductController::class);
+
+// Inventory API Routes
+use App\Http\Controllers\InventoryController;
+Route::get('/inventory/movements', [InventoryController::class, 'movements']);
+Route::post('/inventory/restock', [InventoryController::class, 'restock']);
