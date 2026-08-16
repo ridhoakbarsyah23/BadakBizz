@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { 
   Card,
   CardContent,
@@ -9,15 +10,8 @@ import {
 } from "@/components/ui/card"
 import { Bar, BarChart, CartesianGrid, XAxis, ResponsiveContainer, LineChart, Line } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-
-const salesData = [
-  { month: "Jan", sales: 12000000, profit: 4500000 },
-  { month: "Feb", sales: 15000000, profit: 5800000 },
-  { month: "Mar", sales: 18000000, profit: 7200000 },
-  { month: "Apr", sales: 14000000, profit: 5100000 },
-  { month: "May", sales: 22000000, profit: 9000000 },
-  { month: "Jun", sales: 25000000, profit: 10500000 },
-]
+import { useAuth } from "@/context/AuthContext"
+import { Loader2 } from "lucide-react"
 
 const salesConfig = {
   sales: {
@@ -31,6 +25,54 @@ const salesConfig = {
 }
 
 export default function ReportsPage() {
+  const [data, setData] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
+  const { token } = useAuth()
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        const res = await fetch('http://localhost:8000/api/reports', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        })
+        
+        if (!res.ok) throw new Error('Failed to fetch reports data')
+        
+        const jsonData = await res.json()
+        setData(jsonData)
+      } catch (err: any) {
+        setError(err.message)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    if (token) fetchReports()
+  }, [token])
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[80vh] items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-[80vh] items-center justify-center text-red-500 font-semibold">
+        {error}
+      </div>
+    )
+  }
+
+  // Ensure chart data is chronological for Recharts (reverse the reversed array from backend)
+  const chartData = [...(data?.chartData || [])].reverse()
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
@@ -46,9 +88,11 @@ export default function ReportsPage() {
             <CardTitle className="text-sm font-medium">Total Revenue (YTD)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Rp 106M</div>
+            <div className="text-2xl font-bold">
+              Rp {Number(data?.totalRevenueYTD || 0).toLocaleString("id-ID")}
+            </div>
             <p className="text-xs text-muted-foreground">
-              +24% from last year
+              Based on this year
             </p>
           </CardContent>
         </Card>
@@ -57,7 +101,9 @@ export default function ReportsPage() {
             <CardTitle className="text-sm font-medium">Average Transaction</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Rp 45.500</div>
+            <div className="text-2xl font-bold">
+              Rp {Number(data?.averageTransaction || 0).toLocaleString("id-ID")}
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -65,9 +111,11 @@ export default function ReportsPage() {
             <CardTitle className="text-sm font-medium">Top Selling Item</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Kopi Susu Aren</div>
+            <div className="text-2xl font-bold truncate">
+              {data?.topSellingItem?.name || "N/A"}
+            </div>
             <p className="text-xs text-muted-foreground">
-              420 units sold
+              {data?.topSellingItem ? `${data.topSellingItem.sold} units sold` : "No sales yet"}
             </p>
           </CardContent>
         </Card>
@@ -76,7 +124,7 @@ export default function ReportsPage() {
             <CardTitle className="text-sm font-medium">Busiest Hour</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12:00 - 13:00</div>
+            <div className="text-2xl font-bold">{data?.busiestHour || "N/A"}</div>
           </CardContent>
         </Card>
       </div>
@@ -91,7 +139,7 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <ChartContainer config={salesConfig} className="min-h-[300px] w-full">
-              <BarChart data={salesData}>
+              <BarChart data={chartData}>
                 <CartesianGrid vertical={false} />
                 <XAxis 
                   dataKey="month" 
@@ -116,7 +164,7 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <ChartContainer config={salesConfig} className="min-h-[300px] w-full">
-              <LineChart data={salesData}>
+              <LineChart data={chartData}>
                 <CartesianGrid vertical={false} />
                 <XAxis 
                   dataKey="month" 

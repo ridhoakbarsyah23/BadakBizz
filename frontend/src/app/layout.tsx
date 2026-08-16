@@ -14,6 +14,8 @@ export const metadata: Metadata = {
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 
+import { AuthProvider } from "@/context/AuthContext";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
@@ -21,9 +23,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${outfit.variable} font-sans h-full antialiased`}
     >
       <body className="min-h-full">
-        <TooltipProvider>
-          {children}
-        </TooltipProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            {children}
+          </TooltipProvider>
+        </AuthProvider>
       </body>
     </html>
   );

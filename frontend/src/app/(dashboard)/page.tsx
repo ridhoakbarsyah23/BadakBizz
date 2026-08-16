@@ -1,140 +1,180 @@
 "use client"
 
-import { Card } from "@heroui/react"
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from "recharts"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-
-const chartData = [
-  { day: "Mon", sales: 1200000 },
-  { day: "Tue", sales: 1500000 },
-  { day: "Wed", sales: 900000 },
-  { day: "Thu", sales: 2100000 },
-  { day: "Fri", sales: 2800000 },
-  { day: "Sat", sales: 3500000 },
-  { day: "Sun", sales: 3200000 },
-]
-
-const chartConfig = {
-  sales: {
-    label: "Sales",
-    color: "hsl(var(--primary))",
-  },
-}
+import { useState, useEffect } from "react"
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Loader2, DollarSign, CreditCard, Package, Users } from "lucide-react"
 
 export default function Dashboard() {
+  const [data, setData] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const res = await fetch('http://localhost:8000/api/dashboard')
+        const result = await res.json()
+        setData(result)
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchDashboard()
+  }, [])
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-12 h-12 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (!data) return null
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight text-default-900">Dashboard</h1>
-        <p className="text-default-500">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard Analytics</h1>
+        <p className="text-muted-foreground">
           Welcome to Kivo POS. Here is your business overview.
         </p>
       </div>
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-none shadow-sm">
-          <Card.Header className="flex flex-row items-center justify-between pb-2 px-4 pt-4">
-            <h3 className="text-sm font-medium text-default-700">Total Sales (Today)</h3>
-          </Card.Header>
-          <Card.Content className="px-4 pb-4">
-            <div className="text-2xl font-bold text-default-900">Rp 3.200.000</div>
-            <p className="text-xs text-default-500 mt-1">
-              +12% from yesterday
-            </p>
-          </Card.Content>
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Total Revenue (Today)
+            </CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              Rp {Number(data.revenueToday || 0).toLocaleString("id-ID")}
+            </div>
+          </CardContent>
         </Card>
         
-        <Card className="border-none shadow-sm">
-          <Card.Header className="flex flex-row items-center justify-between pb-2 px-4 pt-4">
-            <h3 className="text-sm font-medium text-default-700">Transactions</h3>
-          </Card.Header>
-          <Card.Content className="px-4 pb-4">
-            <div className="text-2xl font-bold text-default-900">48</div>
-            <p className="text-xs text-default-500 mt-1">
-              +4 from yesterday
-            </p>
-          </Card.Content>
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Transactions (Today)
+            </CardTitle>
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {data.transactionsToday}
+            </div>
+          </CardContent>
         </Card>
         
-        <Card className="border-none shadow-sm">
-          <Card.Header className="flex flex-row items-center justify-between pb-2 px-4 pt-4">
-            <h3 className="text-sm font-medium text-default-700">Products Sold</h3>
-          </Card.Header>
-          <Card.Content className="px-4 pb-4">
-            <div className="text-2xl font-bold text-default-900">124</div>
-            <p className="text-xs text-default-500 mt-1">
-              +18% from yesterday
-            </p>
-          </Card.Content>
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Total Customers
+            </CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {data.totalCustomers}
+            </div>
+          </CardContent>
         </Card>
         
-        <Card className="border-none shadow-sm">
-          <Card.Header className="flex flex-row items-center justify-between pb-2 px-4 pt-4">
-            <h3 className="text-sm font-medium text-default-700">Low Stock Items</h3>
-          </Card.Header>
-          <Card.Content className="px-4 pb-4">
-            <div className="text-2xl font-bold text-danger">3</div>
-            <p className="text-xs text-default-500 mt-1">
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Low Stock Items
+            </CardTitle>
+            <Package className="h-4 w-4 text-destructive" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-destructive">
+              {data.lowStockProducts?.length || 0}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
               Needs your attention
             </p>
-          </Card.Content>
+          </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-4 md:grid-cols-7 lg:grid-cols-7">
-        <Card className="col-span-4 border-none shadow-sm">
-          <Card.Header className="px-6 pt-6 pb-2">
-            <h3 className="font-semibold text-lg text-default-900">Sales Overview (This Week)</h3>
-            <p className="text-sm text-default-500">
-              Your store revenue in the last 7 days.
-            </p>
-          </Card.Header>
-          <Card.Content className="px-6 pb-6">
-            <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
-              <BarChart data={chartData}>
-                <CartesianGrid vertical={false} stroke="hsl(var(--nextui-default-200))" />
-                <XAxis 
-                  dataKey="day" 
-                  tickLine={false} 
-                  axisLine={false}
-                  tickMargin={10} 
-                  stroke="hsl(var(--nextui-default-500))"
-                />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="sales" fill="var(--color-sales)" radius={4} />
-              </BarChart>
-            </ChartContainer>
-          </Card.Content>
+        <Card className="col-span-4 shadow-sm">
+          <CardHeader>
+            <CardTitle>Sales Overview (Last 7 Days)</CardTitle>
+            <CardDescription>
+              Your store revenue trend.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pl-2">
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.salesTrend}>
+                  <CartesianGrid vertical={false} stroke="#e5e7eb" strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="date" 
+                    tickLine={false} 
+                    axisLine={false}
+                    tickMargin={10} 
+                    fontSize={12}
+                    stroke="#6b7280"
+                  />
+                  <YAxis 
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => `Rp ${(value / 1000)}k`}
+                    fontSize={12}
+                    stroke="#6b7280"
+                  />
+                  <Tooltip 
+                    formatter={(value: any) => [`Rp ${Number(value).toLocaleString("id-ID")}`, "Revenue"]}
+                    cursor={{fill: 'transparent'}}
+                  />
+                  <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
         </Card>
         
-        <Card className="col-span-3 border-none shadow-sm">
-          <Card.Header className="px-6 pt-6 pb-2">
-            <h3 className="font-semibold text-lg text-default-900">Recent Transactions</h3>
-            <p className="text-sm text-default-500">
-              You made 48 sales today.
-            </p>
-          </Card.Header>
-          <Card.Content className="px-6 pb-6">
-            <div className="space-y-4">
-              {[
-                { time: "10:24", amount: 45000, items: 2 },
-                { time: "10:15", amount: 120000, items: 5 },
-                { time: "09:48", amount: 18000, items: 1 },
-                { time: "09:30", amount: 35000, items: 2 },
-              ].map((tx, i) => (
-                <div key={i} className="flex items-center justify-between border-b border-default-200 pb-4 last:border-0 last:pb-0">
-                  <div>
-                    <p className="text-sm font-medium leading-none text-default-900">Order #{1000 - i}</p>
-                    <p className="text-sm text-default-500 mt-1">{tx.items} items</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-default-900">Rp {tx.amount.toLocaleString("id-ID")}</p>
-                    <p className="text-xs text-default-500 mt-1">{tx.time}</p>
-                  </div>
+        <Card className="col-span-3 shadow-sm">
+          <CardHeader>
+            <CardTitle>Top Selling Products</CardTitle>
+            <CardDescription>
+              Most popular items by quantity sold.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {data.topProducts?.length === 0 ? (
+                <div className="text-center text-muted-foreground py-10">
+                  No sales data yet.
                 </div>
-              ))}
+              ) : (
+                data.topProducts?.map((item: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                        #{i + 1}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium leading-none">{item.name}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium">{item.total_sold} sold</p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
-          </Card.Content>
+          </CardContent>
         </Card>
       </div>
     </div>

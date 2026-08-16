@@ -2,27 +2,30 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
-  // Simple check for MVP: if there's no auth token cookie, redirect to /login
-  // Once Laravel login API is fully integrated, you can set this cookie in the frontend
-  const authToken = request.cookies.get('kivo_auth_token')
-  const roleId = request.cookies.get('kivo_role_id')?.value
-  const isLoginPage = request.nextUrl.pathname === '/login'
+  const token = request.cookies.get('token')?.value
+  const role = request.cookies.get('user_role')?.value
+  const path = request.nextUrl.pathname
 
-  // Not logged in -> must go to /login
-  if (!authToken && !isLoginPage) {
+  // Public paths that don't require authentication
+  const isPublicPath = path === '/login'
+
+  // If user is logged in and tries to access login page, redirect to dashboard/pos
+  if (isPublicPath && token) {
+    if (role === 'cashier') {
+      return NextResponse.redirect(new URL('/pos', request.url))
+    }
+    return NextResponse.redirect(new URL('/', request.url))
+  }
+
+  // If user is not logged in and tries to access protected routes, redirect to login
+  if (!isPublicPath && !token) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Already logged in -> cannot go to /login
-  if (authToken && isLoginPage) {
-    const destination = roleId === '1' ? '/' : '/pos'
-    return NextResponse.redirect(new URL(destination, request.url))
-  }
-
-  // Role based protection
-  if (authToken && roleId === '2') { // Cashier
-    const adminOnlyRoutes = ['/', '/settings', '/inventory', '/products', '/categories', '/customers', '/reports']
-    if (adminOnlyRoutes.includes(request.nextUrl.pathname)) {
+  // Restrict cashier from accessing admin pages
+  if (role === 'cashier') {
+    const adminRoutes = ['/', '/products', '/categories', '/settings']
+    if (adminRoutes.some(route => path === route || path.startsWith(`${route}/`))) {
       return NextResponse.redirect(new URL('/pos', request.url))
     }
   }
@@ -30,6 +33,7 @@ export function middleware(request: NextRequest) {
   return NextResponse.next()
 }
 
+// See "Matching Paths" below to learn more
 export const config = {
   matcher: [
     /*

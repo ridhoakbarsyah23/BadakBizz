@@ -16,32 +16,40 @@ import {
   X
 } from "lucide-react";
 import { Button } from "@heroui/react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+
+import { useAuth } from "@/context/AuthContext";
 
 const navItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard, adminOnly: true },
-  { title: "POS", url: "/pos", icon: ShoppingBag, adminOnly: false },
-  { title: "Transactions", url: "/transactions", icon: ArrowRightLeft, adminOnly: false },
-  { title: "Products", url: "/products", icon: Package, adminOnly: true },
-  { title: "Categories", url: "/categories", icon: Tags, adminOnly: true },
-  { title: "Inventory", url: "/inventory", icon: ArrowRightLeft, adminOnly: true },
-  { title: "Customers", url: "/customers", icon: Users, adminOnly: true },
-  { title: "Reports", url: "/reports", icon: BarChart3, adminOnly: true },
+  { title: "Dashboard", url: "/", icon: LayoutDashboard, roles: ['admin'] },
+  { title: "POS", url: "/pos", icon: ShoppingBag, roles: ['admin', 'cashier'] },
+  { title: "Transactions", url: "/transactions", icon: ArrowRightLeft, roles: ['admin', 'cashier'] },
+  { title: "Products", url: "/products", icon: Package, roles: ['admin', 'cashier'] },
+  { title: "Categories", url: "/categories", icon: Tags, roles: ['admin', 'cashier'] },
+  { title: "Inventory", url: "/inventory", icon: ArrowRightLeft, roles: ['admin', 'cashier'] },
+  { title: "Customers", url: "/customers", icon: Users, roles: ['admin'] },
+  { title: "Reports", url: "/reports", icon: BarChart3, roles: ['admin'] },
 ];
 
 export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (val: boolean) => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [roleId, setRoleId] = React.useState<string | null>(null);
+  const { user, logout } = useAuth();
 
-  React.useEffect(() => {
-    const match = document.cookie.match(new RegExp('(^| )kivo_role_id=([^;]+)'));
-    if (match) setRoleId(match[2]);
-  }, []);
+  const userRole = user?.role?.slug || 'cashier'; // Default to cashier if undefined to be safe
 
-  const filteredItems = navItems.filter(item => {
-    if (roleId === '2' && item.adminOnly) return false;
-    return true;
-  });
+  const filteredItems = navItems.filter(item => item.roles.includes(userRole));
+
+  const [isLogoutOpen, setIsLogoutOpen] = React.useState(false);
 
   return (
     <aside 
@@ -89,7 +97,11 @@ export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: 
       </div>
 
       <div className="p-4 border-t border-default-200 shrink-0 space-y-2">
-        {roleId !== '2' && (
+        <div className="mb-4 px-2">
+          <p className="text-sm font-bold text-slate-800">{user?.name}</p>
+          <p className="text-xs font-medium text-slate-500 capitalize">{user?.role?.name}</p>
+        </div>
+        {userRole === 'admin' && (
           <Button
             variant="tertiary"
             className="w-full justify-start font-medium h-11"
@@ -105,16 +117,30 @@ export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: 
         <Button 
           variant="danger-soft" 
           className="w-full justify-start font-medium h-11"
-          onPress={() => {
-            document.cookie = "kivo_auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-            document.cookie = "kivo_role_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-            window.location.href = "/login";
-          }}
+          onPress={() => setIsLogoutOpen(true)}
         >
           <LogOut className="w-5 h-5 mr-2" />
           Sign Out
         </Button>
       </div>
+
+      <AlertDialog open={isLogoutOpen} onOpenChange={setIsLogoutOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sign Out</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to sign out? You will need to log in again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              setIsLogoutOpen(false)
+              logout()
+            }}>Sign Out</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </aside>
   );
 }
