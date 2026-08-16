@@ -11,17 +11,42 @@ import {
 import { Label } from "@/components/ui/label"
 import { Store, Receipt, Coins } from "lucide-react"
 
+import Link from "next/link"
+
 export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground">
-          Manage your store preferences, receipt formats, and tax rules.
+          Manage your store preferences, receipt formats, and staff access.
         </p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
+        
+        {/* Staff Management */}
+        <Card className="border-primary/20 shadow-md shadow-primary/5 bg-primary/5">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-primary/20 rounded-lg">
+                <Store className="w-5 h-5 text-primary" />
+              </div>
+              <CardTitle>Staff & Users</CardTitle>
+            </div>
+            <CardDescription>
+              Add cashiers, reset passwords, and revoke access.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-slate-600 mb-4">
+              Control who can access your POS system. Each cashier will have their name printed on the receipt for accountability.
+            </p>
+            <Link href="/settings/staff">
+              <Button className="w-full">Manage Staff Accounts</Button>
+            </Link>
+          </CardContent>
+        </Card>
         
         {/* General Information */}
         <Card>

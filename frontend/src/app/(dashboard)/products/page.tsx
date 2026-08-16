@@ -4,6 +4,16 @@ import React, { useState, useEffect } from "react"
 import { 
   Button, 
 } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -24,7 +34,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Edit2, Trash2, Loader2, AlertTriangle, Search, Filter } from "lucide-react"
+import { Plus, Edit2, Trash2, Loader2, AlertTriangle, Search, Filter, Wand2 } from "lucide-react"
 
 interface Category {
   id: number
@@ -67,6 +77,7 @@ export default function ProductsPage() {
   const [formData, setFormData] = useState(initialForm)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, action: null as any, title: "", desc: "" })
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null)
   const [error, setError] = useState("")
 
@@ -94,8 +105,17 @@ export default function ProductsPage() {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    setConfirmConfig({
+      isOpen: true,
+      title: "Save Changes",
+      desc: `Are you sure you want to ${editingId ? 'update' : 'add'} this product?`,
+      action: executeSubmit
+    })
+  }
+
+  const executeSubmit = async () => {
     setIsSubmitting(true)
     setError("")
 
@@ -107,6 +127,10 @@ export default function ProductsPage() {
       const payload = {
         ...formData,
         category_id: formData.category_id || null,
+        purchase_price: parseFloat(formData.purchase_price) || 0,
+        selling_price: parseFloat(formData.selling_price) || 0,
+        stock: parseInt(formData.stock) || 0,
+        minimum_stock: parseInt(formData.minimum_stock) || 0,
       }
         
       const res = await fetch(url, {
@@ -168,9 +192,40 @@ export default function ProductsPage() {
 
   const openCreate = () => {
     setEditingId(null)
-    setFormData(initialForm)
+    const randomSuffix = Math.floor(100000 + Math.random() * 900000);
+    setFormData({
+      ...initialForm,
+      sku: `PRD-${randomSuffix}`
+    })
     setError("")
     setIsFormOpen(true)
+  }
+
+  const handleGenerateSKU = () => {
+    let catStr = "PRD";
+    let nameStr = "ITM";
+    
+    if (formData.category_id) {
+      const cat = categories.find(c => c.id.toString() === formData.category_id.toString());
+      if (cat && cat.name) {
+        catStr = cat.name.replace(/[^a-zA-Z0-9]/g, '').substring(0, 3).toUpperCase();
+      }
+    }
+    
+    if (formData.name) {
+      const words = formData.name.trim().split(' ');
+      if (words.length > 1) {
+        nameStr = words.map(w => w[0]).join('').substring(0, 3).toUpperCase();
+      } else {
+        nameStr = formData.name.replace(/[^a-zA-Z0-9]/g, '').substring(0, 3).toUpperCase();
+      }
+    }
+    
+    catStr = catStr || "PRD";
+    nameStr = nameStr || "ITM";
+    
+    const randomNum = String(Math.floor(1 + Math.random() * 999)).padStart(3, '0');
+    setFormData(prev => ({ ...prev, sku: `${catStr}-${nameStr}-${randomNum}` }));
   }
 
   const openDelete = (product: Product) => {
@@ -206,13 +261,25 @@ export default function ProductsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="sku">SKU <span className="text-destructive">*</span></Label>
-                  <Input 
-                    id="sku"
-                    required
-                    placeholder="PROD-001"
-                    value={formData.sku}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                  />
+                  <div className="flex gap-2">
+                    <Input 
+                      id="sku"
+                      required
+                      placeholder="e.g. MIN-KOP-001"
+                      value={formData.sku}
+                      onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="icon" 
+                      className="shrink-0"
+                      onClick={handleGenerateSKU}
+                      title="Generate Smart SKU"
+                    >
+                      <Wand2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="name">Product Name <span className="text-destructive">*</span></Label>
@@ -315,13 +382,13 @@ export default function ProductsPage() {
         </Button>
       </div>
 
-      <div className="bg-background rounded-lg border shadow-sm overflow-hidden">
+      <div className="bg-background rounded-lg border shadow-sm overflow-x-auto w-full">
         {isLoading ? (
           <div className="flex justify-center p-8">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : (
-          <Table className="w-full">
+          <Table className="min-w-[800px] w-full">
             <TableHeader>
               <TableRow>
                 <TableHead>SKU</TableHead>
@@ -403,6 +470,24 @@ export default function ProductsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <AlertDialog open={confirmConfig.isOpen} onOpenChange={(open) => setConfirmConfig(prev => ({ ...prev, isOpen: open }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmConfig.title}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmConfig.desc}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => {
+              e.preventDefault();
+              setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+              if (confirmConfig.action) {
+                setTimeout(() => confirmConfig.action(), 100);
+              }
+            }}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

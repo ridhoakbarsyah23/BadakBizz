@@ -4,6 +4,16 @@ import React, { useState, useEffect } from "react"
 import { 
   Button, 
 } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -44,6 +54,7 @@ export default function CategoriesPage() {
   const [formData, setFormData] = useState({ name: "" })
   const [editingId, setEditingId] = useState<number | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, action: null as any, title: "", desc: "" })
   const [deleteCategory, setDeleteCategory] = useState<Category | null>(null)
   const [error, setError] = useState("")
 
@@ -64,8 +75,17 @@ export default function CategoriesPage() {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    setConfirmConfig({
+      isOpen: true,
+      title: "Save Changes",
+      desc: `Are you sure you want to ${editingId ? 'update' : 'add'} this category?`,
+      action: executeSubmit
+    })
+  }
+
+  const executeSubmit = async () => {
     setIsSubmitting(true)
     setError("")
 
@@ -187,13 +207,13 @@ export default function CategoriesPage() {
         </Dialog>
       </div>
 
-      <div className="bg-background rounded-lg border shadow-sm overflow-hidden">
+      <div className="bg-background rounded-lg border shadow-sm overflow-x-auto w-full">
         {isLoading ? (
           <div className="flex justify-center p-8">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : (
-          <Table className="w-full">
+          <Table className="min-w-[800px] w-full">
             <TableHeader>
               <TableRow>
                 <TableHead>ID</TableHead>
@@ -256,6 +276,24 @@ export default function CategoriesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <AlertDialog open={confirmConfig.isOpen} onOpenChange={(open) => setConfirmConfig(prev => ({ ...prev, isOpen: open }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmConfig.title}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmConfig.desc}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => {
+              e.preventDefault();
+              setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+              if (confirmConfig.action) {
+                setTimeout(() => confirmConfig.action(), 100);
+              }
+            }}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
