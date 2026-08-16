@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
 use App\Models\InventoryMovement;
+use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -28,7 +29,7 @@ class TransactionController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
@@ -68,11 +69,17 @@ class TransactionController extends Controller
                 ];
             }
 
-            // Tax calculation (e.g. 11%)
+            // Discount calculation (Flat 5% for Members)
+            $discount = 0;
+            if (isset($validated['customer_id']) && $validated['customer_id']) {
+                $discount = $subtotal * 0.05; // 5% discount
+            }
+
+            // Tax calculation (e.g. 11% on price after discount)
             $taxRate = 0.11;
-            $tax = $subtotal * $taxRate;
-            $discount = 0; // Assuming 0 for now
-            $totalAmount = $subtotal + $tax - $discount;
+            $tax = ($subtotal - $discount) * $taxRate;
+            
+            $totalAmount = $subtotal - $discount + $tax;
 
             // Generate Transaction Number (e.g., TRX-20231024-ABC1)
             $transactionNumber = 'TRX-' . date('Ymd') . '-' . strtoupper(Str::random(4));
@@ -80,15 +87,15 @@ class TransactionController extends Controller
             // 2. Create Transaction
             $transaction = Transaction::create([
                 'transaction_number' => $transactionNumber,
-                'customer_id' => $request->customer_id,
-                'cashier_id' => $request->cashier_id,
+                'customer_id' => $validated['customer_id'] ?? null,
+                'cashier_id' => $request->user() ? $request->user()->id : null,
                 'subtotal' => $subtotal,
                 'tax' => $tax,
                 'discount' => $discount,
                 'total_amount' => $totalAmount,
-                'payment_amount' => $request->payment_amount,
-                'payment_method' => $request->payment_method,
-                'status' => 'COMPLETED',
+                'payment_amount' => $validated['payment_amount'],
+                'payment_method' => $validated['payment_method'],
+                'status' => 'COMPLETED'
             ]);
 
             // 3. Create Items, Update Stock, Create Inventory Movements
@@ -112,8 +119,17 @@ class TransactionController extends Controller
                     'type' => 'OUT',
                     'quantity' => $item['quantity'],
                     'notes' => 'Sales Transaction ' . $transaction->transaction_number,
-                    'user_id' => $request->cashier_id,
+                    'user_id' => $request->user() ? $request->user()->id : null,
                 ]);
+            }
+
+            // 4. Update Customer Spending
+            if (isset($validated['customer_id']) && $validated['customer_id']) {
+                $customer = Customer::find($validated['customer_id']);
+                if ($customer) {
+                    $customer->increment('total_transactions');
+                    $customer->increment('total_spending', $totalAmount);
+                }
             }
 
             DB::commit();
