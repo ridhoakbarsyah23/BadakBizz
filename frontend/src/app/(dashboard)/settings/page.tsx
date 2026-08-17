@@ -39,13 +39,15 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-slate-600 mb-4">
+            <p className="text-sm text-slate-600">
               Control who can access your POS system. Each cashier will have their name printed on the receipt for accountability.
             </p>
-            <Link href="/settings/staff">
-              <Button className="w-full">Manage Staff Accounts</Button>
-            </Link>
           </CardContent>
+          <CardFooter>
+            <Link href="/staff" className="w-full sm:w-auto">
+              <Button className="w-full sm:w-auto">Manage Staff Accounts</Button>
+            </Link>
+          </CardFooter>
         </Card>
         
         {/* General Information */}
