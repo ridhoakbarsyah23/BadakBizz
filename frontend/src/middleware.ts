@@ -24,7 +24,7 @@ export function middleware(request: NextRequest) {
 
   // Restrict cashier from accessing admin pages
   if (role === 'cashier') {
-    const adminRoutes = ['/', '/settings']
+    const adminRoutes = ['/', '/settings', '/staff', '/shifts', '/reports', '/customers']
     if (adminRoutes.some(route => path === route || path.startsWith(`${route}/`))) {
       return NextResponse.redirect(new URL('/pos', request.url))
     }

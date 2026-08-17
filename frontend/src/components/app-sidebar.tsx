@@ -13,7 +13,8 @@ import {
   BarChart3, 
   Settings,
   LogOut,
-  X
+  X,
+  UserCog
 } from "lucide-react";
 import { Button } from "@heroui/react";
 import {
@@ -37,6 +38,7 @@ const navItems = [
   { title: "Categories", url: "/categories", icon: Tags, roles: ['admin', 'cashier'] },
   { title: "Inventory", url: "/inventory", icon: ArrowRightLeft, roles: ['admin', 'cashier'] },
   { title: "Customers", url: "/customers", icon: Users, roles: ['admin'] },
+  { title: "Staff", url: "/staff", icon: UserCog, roles: ['admin'] },
   { title: "Shift Reports", url: "/shifts", icon: BarChart3, roles: ['admin'] },
   { title: "Reports", url: "/reports", icon: BarChart3, roles: ['admin'] },
 ];
