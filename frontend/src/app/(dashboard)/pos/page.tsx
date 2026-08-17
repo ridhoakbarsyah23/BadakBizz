@@ -16,7 +16,8 @@ import {
   Banknote,
   QrCode,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  Clock
 } from "lucide-react"
 import {
   Dialog,
@@ -48,13 +49,23 @@ export default function POSPage() {
   const [receiptData, setReceiptData] = useState<any>(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
+  // Shift states
+  const [shift, setShift] = useState<any>(null)
+  const [isCheckingShift, setIsCheckingShift] = useState(true)
+  const [startingCash, setStartingCash] = useState("")
+  const [isCloseShiftOpen, setIsCloseShiftOpen] = useState(false)
+  const [endingCash, setEndingCash] = useState("")
+  const [isShiftProcessing, setIsShiftProcessing] = useState(false)
+
   const fetchProductsAndCustomers = async () => {
     setIsLoading(true)
     try {
+      const headers = { "Authorization": `Bearer ${token}` }
       const [productsRes, customersRes] = await Promise.all([
-        fetch("http://localhost:8000/api/products"),
-        fetch("http://localhost:8000/api/customers")
+        fetch("http://localhost:8000/api/products", { headers }),
+        fetch("http://localhost:8000/api/customers", { headers })
       ])
+      
       const productsData = await productsRes.json()
       const customersData = await customersRes.json()
       setProducts(Array.isArray(productsData) ? productsData : [])
@@ -66,9 +77,119 @@ export default function POSPage() {
     }
   }
 
+  const fetchCurrentShift = async () => {
+    setIsCheckingShift(true)
+    try {
+      const res = await fetch("http://localhost:8000/api/shifts/current", {
+        headers: { "Authorization": `Bearer ${token}` }
+      })
+      const data = await res.json()
+      setShift(data.shift)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setIsCheckingShift(false)
+    }
+  }
+
   useEffect(() => {
-    fetchProductsAndCustomers()
-  }, [])
+    if (token) {
+      fetchProductsAndCustomers()
+      fetchCurrentShift()
+    }
+  }, [token])
+
+  // --- BARCODE SCANNER LISTENER ---
+  useEffect(() => {
+    let scannedStr = ""
+    let timeoutId: NodeJS.Timeout
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is explicitly typing in an input field (like Search or Checkout Cash)
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA"
+      ) {
+        return
+      }
+
+      if (e.key === "Enter") {
+        if (scannedStr.trim().length > 0) {
+          e.preventDefault()
+          const matchedProduct = products.find(p => p.sku === scannedStr)
+          if (matchedProduct) {
+            addToCart(matchedProduct)
+          } else {
+            alert(`Produk dengan SKU / Barcode "${scannedStr}" tidak ditemukan!`)
+          }
+          scannedStr = ""
+        }
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        scannedStr += e.key
+      }
+
+      // Barcode scanners type very fast. Clear buffer if typing stops for > 50ms.
+      clearTimeout(timeoutId)
+      timeoutId = setTimeout(() => {
+        scannedStr = ""
+      }, 50) 
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+      clearTimeout(timeoutId)
+    }
+  }, [products]) // Depends on products so it can find the matched product
+  // ---------------------------------
+
+  const handleOpenShift = async () => {
+    setIsShiftProcessing(true)
+    try {
+      const res = await fetch("http://localhost:8000/api/shifts/open", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ starting_cash: Number(startingCash.replace(/\D/g, "")) || 0 })
+      })
+      if (res.ok) {
+        fetchCurrentShift()
+      } else {
+        const errorData = await res.json()
+        alert(errorData.message || 'Failed to open shift')
+      }
+    } catch (error) {
+      alert("Network error")
+    } finally {
+      setIsShiftProcessing(false)
+    }
+  }
+
+  const handleCloseShift = async () => {
+    setIsShiftProcessing(true)
+    try {
+      const res = await fetch("http://localhost:8000/api/shifts/close", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ ending_cash: Number(endingCash.replace(/\D/g, "")) || 0 })
+      })
+      if (res.ok) {
+        window.location.href = "/" // Redirect to dashboard or login
+      } else {
+        const errorData = await res.json()
+        alert(errorData.message || 'Failed to close shift')
+      }
+    } catch (error) {
+      alert("Network error")
+    } finally {
+      setIsShiftProcessing(false)
+    }
+  }
 
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(search.toLowerCase()) && 
@@ -186,7 +307,59 @@ export default function POSPage() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-8rem)] gap-4 lg:gap-6">
+    <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-8rem)] gap-4 lg:gap-6 relative">
+      <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+          @page {
+            margin: 0;
+            size: 58mm 200mm;
+          }
+          body * {
+            visibility: hidden;
+          }
+          #printable-receipt, #printable-receipt * {
+            visibility: visible;
+          }
+          #printable-receipt {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 58mm;
+            padding: 0;
+            margin: 0;
+            font-size: 11px !important;
+            color: #000 !important;
+            box-shadow: none !important;
+            border: none !important;
+          }
+        }
+      `}} />
+      {/* Shift Overlay (Blocking) */}
+      {!isCheckingShift && !shift && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-xl">
+          <Card className="w-full max-w-md shadow-2xl border-none">
+            <CardContent className="p-8 space-y-6">
+              <div className="flex flex-col items-center text-center space-y-2">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center text-primary mb-2">
+                  <Clock className="w-8 h-8" />
+                </div>
+                <h2 className="text-2xl font-bold tracking-tight">Open Cashier Shift</h2>
+                <p className="text-muted-foreground">Ready to start your shift? Click the button below to begin processing transactions.</p>
+              </div>
+              <div className="pt-2">
+                <Button 
+                  className="w-full h-14 text-xl font-bold shadow-lg shadow-primary/25 rounded-xl transition-transform hover:scale-[1.02] active:scale-[0.98]" 
+                  onClick={handleOpenShift}
+                  disabled={isShiftProcessing}
+                >
+                  {isShiftProcessing ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+                  Start Shift
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
       
       {/* LEFT: Product Grid */}
       <div className="lg:flex-1 flex flex-col min-w-0 gap-4 lg:gap-6 overflow-hidden h-[70vh] lg:h-auto">
@@ -270,15 +443,62 @@ export default function POSPage() {
 
       {/* RIGHT: Cart */}
       <div className="w-full lg:w-[400px] shrink-0 border-none shadow-lg rounded-2xl flex flex-col bg-white overflow-hidden h-[60vh] lg:h-auto lg:flex-none">
-        <div className="p-5 bg-slate-50 border-b flex items-center gap-3 font-bold text-lg text-default-900">
-          <div className="p-2 bg-primary/10 rounded-xl text-primary">
-            <ShoppingCart className="w-5 h-5" />
+        <div className="p-5 bg-slate-50 border-b flex items-center justify-between font-bold text-lg text-default-900">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-xl text-primary">
+              <ShoppingCart className="w-5 h-5" />
+            </div>
+            Current Order
           </div>
-          Current Order
-          <Badge variant="default" className="ml-auto rounded-full px-3 py-1 bg-primary">
-            {cart.reduce((sum, item) => sum + item.qty, 0)} items
-          </Badge>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setIsCloseShiftOpen(true)} className="text-xs h-8 text-destructive hover:bg-destructive/10 border-destructive/20">
+              Close Shift
+            </Button>
+            <Badge variant="default" className="rounded-full px-3 py-1 bg-primary">
+              {cart.reduce((sum, item) => sum + item.qty, 0)} items
+            </Badge>
+          </div>
         </div>
+
+        {/* Close Shift Dialog */}
+        <Dialog open={isCloseShiftOpen} onOpenChange={setIsCloseShiftOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Close Shift</DialogTitle>
+              <DialogDescription>
+                Count the cash in your drawer and enter the final amount.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <div className="p-4 bg-slate-50 rounded-xl border space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Starting Cash</span>
+                  <span className="font-semibold">Rp {shift ? Number(shift.starting_cash).toLocaleString("id-ID") : 0}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Shift Started</span>
+                  <span className="font-semibold">{shift ? new Date(shift.start_time).toLocaleTimeString("id-ID") : '-'}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">Ending Cash (Cash di Laci)</label>
+                <Input 
+                  placeholder="e.g. 1.500.000" 
+                  value={endingCash ? Number(endingCash).toLocaleString("id-ID") : ""}
+                  onChange={(e) => setEndingCash(e.target.value.replace(/\D/g, ""))}
+                  className="h-12 text-lg font-bold"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCloseShiftOpen(false)}>Cancel</Button>
+              <Button variant="destructive" onClick={handleCloseShift} disabled={isShiftProcessing || !endingCash}>
+                {isShiftProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Confirm Close Shift
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-3 bg-slate-50/50">
           <AnimatePresence>
