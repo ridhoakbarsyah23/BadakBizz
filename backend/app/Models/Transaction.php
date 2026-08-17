@@ -12,6 +12,7 @@ class Transaction extends Model
         'transaction_number',
         'customer_id',
         'cashier_id',
+        'cashier_shift_id',
         'subtotal',
         'tax',
         'discount',
@@ -29,6 +30,11 @@ class Transaction extends Model
     public function cashier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cashier_id');
+    }
+
+    public function cashierShift(): BelongsTo
+    {
+        return $this->belongsTo(CashierShift::class);
     }
 
     public function items(): HasMany

@@ -84,11 +84,20 @@ class TransactionController extends Controller
             // Generate Transaction Number (e.g., TRX-20231024-ABC1)
             $transactionNumber = 'TRX-' . date('Ymd') . '-' . strtoupper(Str::random(4));
 
+            // Find active shift
+            $activeShift = null;
+            if ($request->user()) {
+                $activeShift = \App\Models\CashierShift::where('user_id', $request->user()->id)
+                    ->where('status', 'open')
+                    ->first();
+            }
+
             // 2. Create Transaction
             $transaction = Transaction::create([
                 'transaction_number' => $transactionNumber,
                 'customer_id' => $validated['customer_id'] ?? null,
                 'cashier_id' => $request->user() ? $request->user()->id : null,
+                'cashier_shift_id' => $activeShift ? $activeShift->id : null,
                 'subtotal' => $subtotal,
                 'tax' => $tax,
                 'discount' => $discount,
