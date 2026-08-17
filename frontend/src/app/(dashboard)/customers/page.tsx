@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
+import { useAuth } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -43,6 +44,7 @@ interface Customer {
 }
 
 export default function CustomersPage() {
+  const { token } = useAuth()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -66,7 +68,11 @@ export default function CustomersPage() {
   const fetchData = async () => {
     try {
       setIsLoading(true)
-      const res = await fetch('http://localhost:8000/api/customers')
+      const res = await fetch('http://localhost:8000/api/customers', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       if (!res.ok) throw new Error('Failed to fetch data')
       const data = await res.json()
       setCustomers(Array.isArray(data) ? data : [])
@@ -78,8 +84,10 @@ export default function CustomersPage() {
   }
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (token) {
+      fetchData()
+    }
+  }, [token])
 
   // Filtered data
   const filteredCustomers = customers.filter(customer => {
@@ -134,7 +142,10 @@ export default function CustomersPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(formData)
       })
 
@@ -155,7 +166,10 @@ export default function CustomersPage() {
     try {
       setIsSubmitting(true)
       const res = await fetch(`http://localhost:8000/api/customers/${selectedCustomer.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       })
 
       if (!res.ok) throw new Error('Failed to delete customer')

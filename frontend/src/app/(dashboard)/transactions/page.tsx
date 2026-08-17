@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
+import { useAuth } from "@/context/AuthContext"
 import { 
   Button, 
   Input,
@@ -57,6 +58,7 @@ interface Transaction {
 }
 
 export default function TransactionsPage() {
+  const { token } = useAuth()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -67,7 +69,9 @@ export default function TransactionsPage() {
   const fetchData = async () => {
     try {
       setIsLoading(true)
-      const res = await fetch('http://localhost:8000/api/transactions')
+      const res = await fetch('http://localhost:8000/api/transactions', {
+        headers: { "Authorization": `Bearer ${token}` }
+      })
       if (!res.ok) throw new Error('Failed to fetch data')
       const data = await res.json()
       setTransactions(data)
@@ -79,8 +83,10 @@ export default function TransactionsPage() {
   }
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (token) {
+      fetchData()
+    }
+  }, [token])
 
   const filteredTransactions = transactions.filter(trx => 
     trx.transaction_number.toLowerCase().includes(searchQuery.toLowerCase()) ||

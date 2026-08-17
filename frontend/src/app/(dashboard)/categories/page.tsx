@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
+import { useAuth } from "@/context/AuthContext"
 import { 
   Button, 
 } from "@/components/ui/button"
@@ -43,6 +44,7 @@ interface Category {
 }
 
 export default function CategoriesPage() {
+  const { token } = useAuth()
   const [categories, setCategories] = useState<Category[]>([])
   const [isLoading, setIsLoading] = useState(true)
   
@@ -59,13 +61,17 @@ export default function CategoriesPage() {
   const [error, setError] = useState("")
 
   useEffect(() => {
-    fetchCategories()
-  }, [])
+    if (token) {
+      fetchCategories()
+    }
+  }, [token])
 
   const fetchCategories = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch("http://localhost:8000/api/categories")
+      const res = await fetch("http://localhost:8000/api/categories", {
+        headers: { "Authorization": `Bearer ${token}` }
+      })
       const data = await res.json()
       setCategories(Array.isArray(data) ? data : [])
     } catch (error) {
@@ -98,7 +104,8 @@ export default function CategoriesPage() {
         method: editingId ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json"
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify(formData)
       })
@@ -123,7 +130,8 @@ export default function CategoriesPage() {
     setIsSubmitting(true)
     try {
       const res = await fetch(`http://localhost:8000/api/categories/${deleteCategory.id}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
       })
       if (!res.ok) throw new Error("Failed to delete category")
       

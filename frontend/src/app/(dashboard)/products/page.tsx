@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
+import { useAuth } from "@/context/AuthContext"
 import { 
   Button, 
 } from "@/components/ui/button"
@@ -65,6 +66,7 @@ const initialForm = {
 }
 
 export default function ProductsPage() {
+  const { token } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -82,15 +84,18 @@ export default function ProductsPage() {
   const [error, setError] = useState("")
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (token) {
+      fetchData()
+    }
+  }, [token])
 
   const fetchData = async () => {
     setIsLoading(true)
     try {
+      const headers = { "Authorization": `Bearer ${token}` }
       const [prodRes, catRes] = await Promise.all([
-        fetch("http://localhost:8000/api/products"),
-        fetch("http://localhost:8000/api/categories")
+        fetch("http://localhost:8000/api/products", { headers }),
+        fetch("http://localhost:8000/api/categories", { headers })
       ])
       
       const prodData = await prodRes.json()
@@ -137,7 +142,8 @@ export default function ProductsPage() {
         method: editingId ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json"
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify(payload)
       })
@@ -162,7 +168,8 @@ export default function ProductsPage() {
     setIsSubmitting(true)
     try {
       const res = await fetch(`http://localhost:8000/api/products/${deleteProduct.id}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
       })
       if (!res.ok) throw new Error("Failed to delete product")
       

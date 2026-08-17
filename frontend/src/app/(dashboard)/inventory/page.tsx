@@ -1,19 +1,55 @@
-import { Suspense } from "react"
-import { Package, ArrowRightLeft, AlertTriangle, CheckCircle2 } from "lucide-react"
+"use client"
+
+import React, { useState, useEffect } from "react"
+import { Package, ArrowRightLeft, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RestockDialog } from "./restock-dialog"
+import { useAuth } from "@/context/AuthContext"
 
-export default async function InventoryPage() {
-  // Fetch data on the server
-  const productsRes = await fetch('http://127.0.0.1:8000/api/products', { cache: 'no-store' })
-  const movementsRes = await fetch('http://127.0.0.1:8000/api/inventory/movements', { cache: 'no-store' })
-  
-  const products = productsRes.ok ? await productsRes.json() : []
-  const movements = movementsRes.ok ? await movementsRes.json() : []
+export default function InventoryPage() {
+  const { token } = useAuth()
+  const [products, setProducts] = useState<any[]>([])
+  const [movements, setMovements] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  const fetchData = async () => {
+    setIsLoading(true)
+    try {
+      const headers = { "Authorization": `Bearer ${token}` }
+      const [productsRes, movementsRes] = await Promise.all([
+        fetch('http://127.0.0.1:8000/api/products', { headers }),
+        fetch('http://127.0.0.1:8000/api/inventory/movements', { headers })
+      ])
+      
+      const prodData = productsRes.ok ? await productsRes.json() : []
+      const movData = movementsRes.ok ? await movementsRes.json() : []
+
+      setProducts(Array.isArray(prodData) ? prodData : [])
+      setMovements(Array.isArray(movData) ? movData : [])
+    } catch (error) {
+      console.error("Error fetching inventory data:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (token) {
+      fetchData()
+    }
+  }, [token])
 
   const lowStockCount = products.filter((p: any) => p.stock <= p.minimum_stock).length
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[80vh] items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-primary" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
