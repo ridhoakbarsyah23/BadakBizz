@@ -34,7 +34,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Reports endpoint
     Route::get('/reports', [ReportController::class, 'index']);
 
-    // Staff Management endpoints
+    // Settings endpoints
+    Route::get('/settings', [\App\Http\Controllers\SettingController::class, 'show']);
+    Route::put('/settings', [\App\Http\Controllers\SettingController::class, 'update']);
     Route::get('/staff', [\App\Http\Controllers\StaffController::class, 'index']);
     Route::post('/staff', [\App\Http\Controllers\StaffController::class, 'store']);
     Route::put('/staff/{id}', [\App\Http\Controllers\StaffController::class, 'update']);

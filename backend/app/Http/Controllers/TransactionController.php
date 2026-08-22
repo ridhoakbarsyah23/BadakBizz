@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\Store;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
 use App\Models\InventoryMovement;
@@ -75,11 +76,14 @@ class TransactionController extends Controller
                 $discount = $subtotal * 0.05; // 5% discount
             }
 
-            // Tax calculation (e.g. 11% on price after discount)
-            $taxRate = 0.11;
-            $tax = ($subtotal - $discount) * $taxRate;
-            
-            $totalAmount = $subtotal - $discount + $tax;
+            $store = Store::first();
+            $taxRatePercent = $store?->tax_rate ?? 11;
+            $serviceChargeRatePercent = $store?->service_charge_rate ?? 0;
+
+            $netAfterDiscount = $subtotal - $discount;
+            $serviceCharge = $netAfterDiscount * ($serviceChargeRatePercent / 100);
+            $tax = ($netAfterDiscount + $serviceCharge) * ($taxRatePercent / 100);
+            $totalAmount = $netAfterDiscount + $serviceCharge + $tax;
 
             // Generate Transaction Number (e.g., TRX-20231024-ABC1)
             $transactionNumber = 'TRX-' . date('Ymd') . '-' . strtoupper(Str::random(4));
@@ -100,6 +104,7 @@ class TransactionController extends Controller
                 'cashier_shift_id' => $activeShift ? $activeShift->id : null,
                 'subtotal' => $subtotal,
                 'tax' => $tax,
+                'service_charge' => $serviceCharge,
                 'discount' => $discount,
                 'total_amount' => $totalAmount,
                 'payment_amount' => $validated['payment_amount'],
