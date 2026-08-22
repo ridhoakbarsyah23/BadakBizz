@@ -15,6 +15,7 @@ class Transaction extends Model
         'cashier_shift_id',
         'subtotal',
         'tax',
+        'service_charge',
         'discount',
         'total_amount',
         'payment_amount',
