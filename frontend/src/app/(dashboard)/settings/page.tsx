@@ -1,3 +1,7 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useAuth } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -9,11 +13,89 @@ import {
   CardFooter,
 } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Store, Receipt, Coins } from "lucide-react"
+import { Store, Receipt, Coins, Loader2 } from "lucide-react"
 
 import Link from "next/link"
 
 export default function SettingsPage() {
+  const { token } = useAuth()
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [settings, setSettings] = useState({
+    name: "",
+    phone: "",
+    address: "",
+    tax_rate: "11",
+    service_charge_rate: "0",
+    receipt_header: "",
+    receipt_footer: "",
+  })
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/settings", {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        })
+        const data = await res.json()
+        if (res.ok) {
+          setSettings({
+            name: data.name || "",
+            phone: data.phone || "",
+            address: data.address || "",
+            tax_rate: data.tax_rate?.toString() || "11",
+            service_charge_rate: data.service_charge_rate?.toString() || "0",
+            receipt_header: data.receipt_header || "",
+            receipt_footer: data.receipt_footer || "",
+          })
+        }
+      } catch (error) {
+        console.error("Failed to fetch settings:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    
+    if (token) fetchSettings()
+  }, [token])
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    try {
+      const res = await fetch("http://localhost:8000/api/settings", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(settings)
+      })
+
+      if (res.ok) {
+        alert("Pengaturan berhasil disimpan!")
+      } else {
+        const err = await res.json()
+        alert("Gagal menyimpan: " + (err.message || "Unknown error"))
+      }
+    } catch (error) {
+      console.error("Save error:", error)
+      alert("Terjadi kesalahan jaringan.")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[80vh] items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-primary" />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
@@ -64,19 +146,34 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="storeName">Store Name</Label>
-              <Input id="storeName" defaultValue="Kivo Coffee & Eatery" />
+              <Input 
+                id="storeName" 
+                value={settings.name} 
+                onChange={(e) => setSettings({...settings, name: e.target.value})} 
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone Number</Label>
-              <Input id="phone" defaultValue="081234567890" />
+              <Input 
+                id="phone" 
+                value={settings.phone} 
+                onChange={(e) => setSettings({...settings, phone: e.target.value})} 
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="address">Store Address</Label>
-              <Input id="address" defaultValue="Jl. Sudirman No. 42, Jakarta" />
+              <Input 
+                id="address" 
+                value={settings.address} 
+                onChange={(e) => setSettings({...settings, address: e.target.value})} 
+              />
             </div>
           </CardContent>
           <CardFooter>
-            <Button>Save Changes</Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save Changes
+            </Button>
           </CardFooter>
         </Card>
 
@@ -95,20 +192,33 @@ export default function SettingsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="currency">Currency</Label>
-                <Input id="currency" defaultValue="IDR (Rp)" disabled />
+                <Input id="currency" value="IDR (Rp)" disabled />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="tax">Default Tax (%)</Label>
-                <Input id="tax" type="number" defaultValue="11" />
+                <Input 
+                  id="tax" 
+                  type="number" 
+                  value={settings.tax_rate} 
+                  onChange={(e) => setSettings({...settings, tax_rate: e.target.value})} 
+                />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="serviceCharge">Service Charge (%)</Label>
-              <Input id="serviceCharge" type="number" defaultValue="5" />
+              <Input 
+                id="serviceCharge" 
+                type="number" 
+                value={settings.service_charge_rate} 
+                onChange={(e) => setSettings({...settings, service_charge_rate: e.target.value})} 
+              />
             </div>
           </CardContent>
           <CardFooter>
-            <Button>Save Changes</Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save Changes
+            </Button>
           </CardFooter>
         </Card>
 
@@ -127,18 +237,29 @@ export default function SettingsPage() {
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="receiptHeader">Receipt Header</Label>
-                <Input id="receiptHeader" defaultValue="Kivo Coffee & Eatery" />
+                <Input 
+                  id="receiptHeader" 
+                  value={settings.receipt_header} 
+                  onChange={(e) => setSettings({...settings, receipt_header: e.target.value})} 
+                />
                 <p className="text-xs text-muted-foreground">Appears at the very top of the printed receipt.</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="receiptFooter">Receipt Footer / Thank You Message</Label>
-                <Input id="receiptFooter" defaultValue="Terima kasih atas kunjungan Anda!" />
+                <Input 
+                  id="receiptFooter" 
+                  value={settings.receipt_footer} 
+                  onChange={(e) => setSettings({...settings, receipt_footer: e.target.value})} 
+                />
                 <p className="text-xs text-muted-foreground">Appears at the very bottom.</p>
               </div>
             </div>
           </CardContent>
           <CardFooter>
-            <Button>Save Changes</Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save Changes
+            </Button>
           </CardFooter>
         </Card>
 

@@ -40,6 +40,13 @@ export default function POSPage() {
   const [cashAmount, setCashAmount] = useState("")
   const [customers, setCustomers] = useState<any[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("")
+  const [storeSettings, setStoreSettings] = useState<any>({
+    name: "Kivo POS",
+    tax_rate: 11,
+    service_charge_rate: 0,
+    receipt_header: "Kivo POS",
+    receipt_footer: "Thank you!"
+  })
   
   // Dialog open states
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
@@ -61,15 +68,21 @@ export default function POSPage() {
     setIsLoading(true)
     try {
       const headers = { "Authorization": `Bearer ${token}` }
-      const [productsRes, customersRes] = await Promise.all([
+      const [productsRes, customersRes, settingsRes] = await Promise.all([
         fetch("http://localhost:8000/api/products", { headers }),
-        fetch("http://localhost:8000/api/customers", { headers })
+        fetch("http://localhost:8000/api/customers", { headers }),
+        fetch("http://localhost:8000/api/settings", { headers })
       ])
       
       const productsData = await productsRes.json()
       const customersData = await customersRes.json()
+      const settingsData = await settingsRes.json()
+      
       setProducts(Array.isArray(productsData) ? productsData : [])
       setCustomers(Array.isArray(customersData) ? customersData : [])
+      if (settingsData && settingsData.name) {
+        setStoreSettings(settingsData)
+      }
     } catch (error) {
       console.error("Failed to fetch data:", error)
     } finally {
@@ -238,8 +251,12 @@ export default function POSPage() {
   const subtotal = cart.reduce((sum, item) => sum + (item.selling_price * item.qty), 0)
   const selectedCustomer = customers.find(c => c.id.toString() === selectedCustomerId)
   const discount = selectedCustomer ? subtotal * 0.05 : 0
-  const tax = (subtotal - discount) * 0.11 // 11% tax
-  const total = subtotal - discount + tax
+  const netAfterDiscount = subtotal - discount
+  const serviceChargeRate = storeSettings.service_charge_rate ? (Number(storeSettings.service_charge_rate) / 100) : 0
+  const serviceCharge = netAfterDiscount * serviceChargeRate
+  const taxRate = storeSettings.tax_rate ? (Number(storeSettings.tax_rate) / 100) : 0
+  const tax = (netAfterDiscount + serviceCharge) * taxRate
+  const total = netAfterDiscount + serviceCharge + tax
 
   const handleCheckout = async (paymentMethod: string, paymentAmount: number) => {
     setIsProcessing(true)
@@ -264,16 +281,18 @@ export default function POSPage() {
 
       const data = await res.json()
       if (res.ok) {
+        const txn = data.data
         setReceiptData({
-          transaction_number: data.data?.transaction_number || "TRX-" + Date.now(),
+          transaction_number: txn?.transaction_number || "TRX-" + Date.now(),
           items: [...cart],
-          subtotal,
-          discount,
-          tax,
-          total,
+          subtotal: Number(txn?.subtotal ?? subtotal),
+          discount: Number(txn?.discount ?? discount),
+          service_charge: Number(txn?.service_charge ?? serviceCharge),
+          tax: Number(txn?.tax ?? tax),
+          total: Number(txn?.total_amount ?? total),
           paymentMethod,
           paymentAmount,
-          change: paymentAmount - total,
+          change: paymentAmount - Number(txn?.total_amount ?? total),
           date: new Date().toLocaleString("id-ID"),
           cashierName: user?.name || 'Unknown',
           customerName: selectedCustomer ? selectedCustomer.name : 'Walk-in'
@@ -576,8 +595,14 @@ export default function POSPage() {
                 <span>- Rp {discount.toLocaleString("id-ID")}</span>
               </div>
             )}
+            {serviceCharge > 0 && (
+              <div className="flex justify-between text-sm font-medium text-default-600">
+                <span>Service Charge ({storeSettings.service_charge_rate}%)</span>
+                <span>Rp {serviceCharge.toLocaleString("id-ID")}</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm font-medium text-default-600">
-              <span>Tax (11%)</span>
+              <span>Tax ({storeSettings.tax_rate}%)</span>
               <span>Rp {tax.toLocaleString("id-ID")}</span>
             </div>
             <Separator className="my-3 border-dashed" />
@@ -737,11 +762,11 @@ export default function POSPage() {
               {/* Printable Receipt Area */}
               <div id="printable-receipt" className="p-5 print:p-0 bg-white text-black text-sm print:text-xs font-mono flex flex-col gap-2 rounded-xl border print:border-none print:shadow-none mx-2 mb-2 print:m-0 print:w-[300px] print:absolute print:top-0 print:left-0">
                 <div className="text-center font-bold text-lg print:text-base mb-1">
-                  KIVO POS
+                  {storeSettings.receipt_header || storeSettings.name || 'Kivo POS'}
                 </div>
                 <div className="text-center text-xs print:text-[10px] font-normal text-gray-600 print:text-black mb-3">
-                  Jl. Teknologi No. 1, Jakarta<br />
-                  Telp: 0812-3456-7890
+                  {storeSettings.address || 'Alamat Toko'}<br />
+                  Telp: {storeSettings.phone || '-'}
                 </div>
 
                 <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2"></div>
@@ -779,8 +804,14 @@ export default function POSPage() {
                     <span>- Rp {receiptData?.discount.toLocaleString("id-ID")}</span>
                   </div>
                 )}
+                {receiptData?.service_charge > 0 && (
+                  <div className="flex justify-between text-xs print:text-[10px] print:text-black">
+                    <span>Service Charge ({storeSettings.service_charge_rate}%)</span>
+                    <span>Rp {receiptData?.service_charge.toLocaleString("id-ID")}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-xs print:text-[10px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
-                  <span>Tax (11%)</span>
+                  <span>Tax ({storeSettings.tax_rate}%)</span>
                   <span>Rp {receiptData?.tax.toLocaleString("id-ID")}</span>
                 </div>
                 
@@ -799,8 +830,7 @@ export default function POSPage() {
                 </div>
 
                 <div className="text-center text-xs print:text-[10px] mt-2 print:mt-1 italic text-gray-500 print:text-black">
-                  Thank you for your purchase!<br/>
-                  Please come again.
+                  {storeSettings.receipt_footer || 'Thank you for your purchase!'}
                 </div>
                 
                 <div className="print:hidden border-t border-dashed mt-4 pt-4 text-center text-xs text-muted-foreground">

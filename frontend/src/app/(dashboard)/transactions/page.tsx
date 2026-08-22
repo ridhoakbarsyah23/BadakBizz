@@ -44,6 +44,7 @@ interface Transaction {
   cashier_id: number | null
   subtotal: string
   tax: string
+  service_charge: string
   discount: string
   total_amount: string
   payment_amount: string
@@ -251,6 +252,18 @@ export default function TransactionsPage() {
                   <span>Subtotal</span>
                   <span>Rp {Number(selectedTransaction.subtotal).toLocaleString("id-ID")}</span>
                 </div>
+                {Number(selectedTransaction.discount) > 0 && (
+                  <div className="flex justify-between text-xs print:text-[10px] print:text-black">
+                    <span>Discount</span>
+                    <span>- Rp {Number(selectedTransaction.discount).toLocaleString("id-ID")}</span>
+                  </div>
+                )}
+                {Number(selectedTransaction.service_charge) > 0 && (
+                  <div className="flex justify-between text-xs print:text-[10px] print:text-black">
+                    <span>Service Charge</span>
+                    <span>Rp {Number(selectedTransaction.service_charge).toLocaleString("id-ID")}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-xs print:text-[10px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
                   <span>Tax</span>
                   <span>Rp {Number(selectedTransaction.tax).toLocaleString("id-ID")}</span>

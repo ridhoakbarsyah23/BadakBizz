@@ -4,15 +4,20 @@ import { useState, useEffect } from "react"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Loader2, DollarSign, CreditCard, Package, Users } from "lucide-react"
+import { useAuth } from "@/context/AuthContext"
 
 export default function Dashboard() {
+  const { token } = useAuth()
   const [data, setData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const fetchDashboard = async () => {
+      if (!token) return
       try {
-        const res = await fetch('http://localhost:8000/api/dashboard')
+        const res = await fetch('http://localhost:8000/api/dashboard', {
+          headers: { "Authorization": `Bearer ${token}` }
+        })
         const result = await res.json()
         setData(result)
       } catch (error) {
@@ -22,7 +27,7 @@ export default function Dashboard() {
       }
     }
     fetchDashboard()
-  }, [])
+  }, [token])
 
   if (isLoading) {
     return (
