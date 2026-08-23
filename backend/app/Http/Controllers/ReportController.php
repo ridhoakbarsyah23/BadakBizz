@@ -127,4 +127,62 @@ class ReportController extends Controller
             'chartData' => $chartData
         ]);
     }
+
+    public function export(Request $request)
+    {
+        $startDateStr = $request->query('start_date');
+        $endDateStr = $request->query('end_date');
+
+        if ($startDateStr && $endDateStr) {
+            $startDate = Carbon::parse($startDateStr)->startOfDay();
+            $endDate = Carbon::parse($endDateStr)->endOfDay();
+        } else {
+            // Default to Year-to-Date if no dates provided
+            $startDate = Carbon::now()->startOfYear();
+            $endDate = Carbon::now()->endOfDay();
+        }
+
+        $transactions = Transaction::with('items.product', 'customer', 'cashier')
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->orderBy('created_at', 'ASC')
+            ->get();
+
+        $headers = [
+            "Content-type"        => "text/csv",
+            "Content-Disposition" => "attachment; filename=KivoPOS_Report_" . $startDate->format('Ymd') . "_to_" . $endDate->format('Ymd') . ".csv",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        $columns = [
+            'Date', 'Transaction Number', 'Cashier', 'Customer', 'Payment Method',
+            'Subtotal', 'Discount', 'Tax', 'Service Charge', 'Total Amount', 'Status'
+        ];
+
+        $callback = function() use($transactions, $columns) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+
+            foreach ($transactions as $tx) {
+                $row = [
+                    $tx->created_at->format('Y-m-d H:i:s'),
+                    $tx->transaction_number,
+                    $tx->cashier ? $tx->cashier->name : 'N/A',
+                    $tx->customer ? $tx->customer->name : 'Walk-in',
+                    $tx->payment_method,
+                    $tx->subtotal,
+                    $tx->discount,
+                    $tx->tax,
+                    $tx->service_charge,
+                    $tx->total_amount,
+                    $tx->status,
+                ];
+                fputcsv($file, $row);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
 }

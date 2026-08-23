@@ -41,6 +41,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Dashboard & Reports
         Route::get('/dashboard', [DashboardController::class, 'index']);
         Route::get('/reports', [ReportController::class, 'index']);
+        Route::get('/reports/export', [ReportController::class, 'export']);
         
         // Settings
         Route::get('/settings', [\App\Http\Controllers\SettingController::class, 'show']);
