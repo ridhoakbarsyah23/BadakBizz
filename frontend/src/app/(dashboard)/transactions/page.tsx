@@ -22,7 +22,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { Search, Filter, Printer, Loader2, Eye, Receipt } from "lucide-react"
+import { Search, Filter, Printer, Loader2, Eye, Receipt, Download } from "lucide-react"
 
 interface TransactionItem {
   id: number
@@ -66,6 +66,13 @@ export default function TransactionsPage() {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [isReceiptMode, setIsReceiptMode] = useState(false)
+  const [storeSettings, setStoreSettings] = useState<any>({
+    name: "Kivo POS",
+    address: "",
+    phone: "",
+    receipt_header: "Kivo POS",
+    receipt_footer: "Thank you!"
+  })
 
   const fetchData = async () => {
     try {
@@ -76,8 +83,18 @@ export default function TransactionsPage() {
       if (!res.ok) throw new Error('Failed to fetch data')
       const data = await res.json()
       setTransactions(data)
+
+      const settingsRes = await fetch('http://localhost:8000/api/settings', {
+        headers: { "Authorization": `Bearer ${token}` }
+      })
+      if (settingsRes.ok) {
+        const settingsData = await settingsRes.json()
+        if (settingsData && settingsData.name) {
+          setStoreSettings(settingsData)
+        }
+      }
     } catch (error) {
-      console.error('Error fetching transactions:', error)
+      console.error('Error fetching data:', error)
     } finally {
       setIsLoading(false)
     }
@@ -105,6 +122,68 @@ export default function TransactionsPage() {
     })
   }
 
+  const exportToCSV = () => {
+    const headers = ["RECEIPT NO", "DATE", "CUSTOMER", "PAYMENT", "SUBTOTAL", "DISCOUNT", "SERVICE CHARGE", "TAX", "TOTAL", "STATUS"]
+    const rows = filteredTransactions.map(trx => [
+      trx.transaction_number,
+      formatDate(trx.created_at),
+      trx.customer?.name || "Walk-in",
+      trx.payment_method,
+      trx.subtotal,
+      trx.discount,
+      trx.service_charge,
+      trx.tax,
+      trx.total_amount,
+      trx.status
+    ])
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(e => e.join(","))].join("\n")
+    
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement("a")
+    link.setAttribute("href", encodedUri)
+    link.setAttribute("download", `transactions_export_${new Date().getTime()}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+  }
+
+  const handleVoidTransaction = async () => {
+    if (!selectedTransaction) return;
+    
+    if (!window.confirm("Are you sure you want to void this transaction? This action cannot be undone and stock will be restored.")) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`http://localhost:8000/api/transactions/${selectedTransaction.id}/void`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` }
+      })
+      
+      const data = await res.json()
+      
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to void transaction')
+      }
+      
+      // Update local state
+      setTransactions(prev => prev.map(trx => 
+        trx.id === selectedTransaction.id ? { ...trx, status: 'CANCELLED' } : trx
+      ))
+      
+      // Update selectedTransaction so the UI reflects the change immediately
+      setSelectedTransaction(prev => prev ? { ...prev, status: 'CANCELLED' } : null)
+      
+      alert("Transaction has been successfully voided.")
+      
+    } catch (error: any) {
+      console.error('Void error:', error)
+      alert(error.message)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -130,6 +209,10 @@ export default function TransactionsPage() {
         <Button variant="outline">
           <Filter className="h-4 w-4 mr-2" inline-block="true" />
           Filter Date
+        </Button>
+        <Button variant="outline" onPress={exportToCSV}>
+          <Download className="h-4 w-4 mr-2" inline-block="true" />
+          Export CSV
         </Button>
       </div>
 
@@ -217,11 +300,11 @@ export default function TransactionsPage() {
             <div className="flex flex-col items-center">
               <div id="printable-receipt" className="w-full p-5 print:p-0 bg-white text-black text-sm print:text-xs font-mono flex flex-col gap-2 rounded-xl border print:border-none print:shadow-none mb-2 print:m-0 print:w-[300px] print:absolute print:top-0 print:left-0">
                 <div className="text-center font-bold text-lg print:text-base mb-1">
-                  KIVO POS
+                  {storeSettings.receipt_header || storeSettings.name || 'KIVO POS'}
                 </div>
-                <div className="text-center text-xs print:text-[10px] font-normal text-gray-600 print:text-black mb-3">
-                  Jl. Teknologi No. 1, Jakarta<br />
-                  Telp: 0812-3456-7890
+                <div className="text-center text-xs print:text-[10px] font-normal text-gray-600 print:text-black mb-3 whitespace-pre-line">
+                  {storeSettings.address || 'Alamat Toko'}{storeSettings.address ? '\n' : ''}
+                  Telp: {storeSettings.phone || '-'}
                 </div>
 
                 <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2"></div>
@@ -283,9 +366,8 @@ export default function TransactionsPage() {
                   <span className="font-bold">Rp {(Number(selectedTransaction.payment_amount) - Number(selectedTransaction.total_amount)).toLocaleString("id-ID")}</span>
                 </div>
 
-                <div className="text-center text-xs print:text-[10px] mt-2 print:mt-1 italic text-gray-500 print:text-black">
-                  Thank you for your purchase!<br/>
-                  Please come again.
+                <div className="text-center text-xs print:text-[10px] mt-2 print:mt-1 italic text-gray-500 print:text-black whitespace-pre-line">
+                  {storeSettings.receipt_footer || 'Thank you for your purchase!\nPlease come again.'}
                 </div>
                 
                 <div className="print:hidden border-t border-dashed mt-4 pt-4 text-center text-xs text-muted-foreground">
@@ -379,13 +461,23 @@ export default function TransactionsPage() {
                 Print Now
               </Button>
             ) : (
-              <Button 
-                variant="secondary"
-                onPress={() => setIsReceiptMode(true)}
-              >
-                <Printer className="w-4 h-4 mr-2 inline" />
-                Print Receipt
-              </Button>
+              <div className="flex gap-2">
+                {selectedTransaction?.status === 'COMPLETED' && (
+                  <Button 
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onPress={handleVoidTransaction}
+                  >
+                    Void Transaction
+                  </Button>
+                )}
+                <Button 
+                  variant="secondary"
+                  onPress={() => setIsReceiptMode(true)}
+                >
+                  <Printer className="w-4 h-4 mr-2 inline" />
+                  Print Receipt
+                </Button>
+              </div>
             )}
           </DialogFooter>
         </DialogContent>

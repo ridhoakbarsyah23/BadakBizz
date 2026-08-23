@@ -39,6 +39,7 @@ class TransactionController extends Controller
             // customer_id and cashier_id are optional for now
             'customer_id' => 'nullable|exists:customers,id',
             'cashier_id' => 'nullable|exists:users,id',
+            'discount' => 'nullable|numeric|min:0',
         ]);
 
         try {
@@ -70,10 +71,16 @@ class TransactionController extends Controller
                 ];
             }
 
-            // Discount calculation (Flat 5% for Members)
+            // Discount calculation
             $discount = 0;
-            if (isset($validated['customer_id']) && $validated['customer_id']) {
-                $discount = $subtotal * 0.05; // 5% discount
+            if (isset($validated['discount'])) {
+                $discount = $validated['discount'];
+            } elseif (isset($validated['customer_id']) && $validated['customer_id']) {
+                $discount = $subtotal * 0.05; // 5% discount default for members
+            }
+            
+            if ($discount > $subtotal) {
+                throw new \Exception("Discount cannot be greater than subtotal.");
             }
 
             $store = Store::first();
@@ -157,6 +164,63 @@ class TransactionController extends Controller
             DB::rollBack();
             return response()->json([
                 'message' => 'Failed to process transaction.',
+                'error' => $e->getMessage()
+            ], 400);
+        }
+    }
+    public function voidTransaction(Request $request, $id)
+    {
+        try {
+            DB::beginTransaction();
+
+            $transaction = Transaction::with('items.product')->find($id);
+
+            if (!$transaction) {
+                return response()->json(['message' => 'Transaction not found'], 404);
+            }
+
+            if ($transaction->status !== 'COMPLETED') {
+                return response()->json(['message' => 'Transaction cannot be voided (Status is ' . $transaction->status . ')'], 400);
+            }
+
+            // Restore stock and record movement
+            foreach ($transaction->items as $item) {
+                if ($item->product) {
+                    $item->product->increment('stock', $item->quantity);
+
+                    InventoryMovement::create([
+                        'product_id' => $item->product_id,
+                        'type' => 'IN',
+                        'quantity' => $item->quantity,
+                        'notes' => 'Void Transaction ' . $transaction->transaction_number,
+                        'user_id' => $request->user() ? $request->user()->id : null,
+                    ]);
+                }
+            }
+
+            // Adjust Customer total if needed
+            if ($transaction->customer_id) {
+                $customer = Customer::find($transaction->customer_id);
+                if ($customer) {
+                    $customer->decrement('total_transactions');
+                    $customer->decrement('total_spending', $transaction->total_amount);
+                }
+            }
+
+            // Update Status
+            $transaction->update(['status' => 'CANCELLED']);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Transaction has been successfully voided.',
+                'data' => $transaction
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Failed to void transaction.',
                 'error' => $e->getMessage()
             ], 400);
         }
