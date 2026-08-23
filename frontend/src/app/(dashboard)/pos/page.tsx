@@ -40,6 +40,7 @@ export default function POSPage() {
   const [cashAmount, setCashAmount] = useState("")
   const [customers, setCustomers] = useState<any[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("")
+  const [customDiscountPercent, setCustomDiscountPercent] = useState("")
   const [storeSettings, setStoreSettings] = useState<any>({
     name: "Kivo POS",
     tax_rate: 11,
@@ -61,6 +62,7 @@ export default function POSPage() {
   const [isCheckingShift, setIsCheckingShift] = useState(true)
   const [startingCash, setStartingCash] = useState("")
   const [isCloseShiftOpen, setIsCloseShiftOpen] = useState(false)
+  const [isCartModalOpen, setIsCartModalOpen] = useState(false)
   const [endingCash, setEndingCash] = useState("")
   const [isShiftProcessing, setIsShiftProcessing] = useState(false)
 
@@ -250,7 +252,12 @@ export default function POSPage() {
 
   const subtotal = cart.reduce((sum, item) => sum + (item.selling_price * item.qty), 0)
   const selectedCustomer = customers.find(c => c.id.toString() === selectedCustomerId)
-  const discount = selectedCustomer ? subtotal * 0.05 : 0
+  
+  const memberDiscountPercent = selectedCustomer ? 5 : 0
+  const additionalDiscountPercent = Number(customDiscountPercent) || 0
+  const totalDiscountPercent = Math.min(100, memberDiscountPercent + additionalDiscountPercent)
+  
+  const discount = subtotal * (totalDiscountPercent / 100)
   const netAfterDiscount = subtotal - discount
   const serviceChargeRate = storeSettings.service_charge_rate ? (Number(storeSettings.service_charge_rate) / 100) : 0
   const serviceCharge = netAfterDiscount * serviceChargeRate
@@ -275,7 +282,8 @@ export default function POSPage() {
           })),
           customer_id: selectedCustomerId || null,
           payment_method: paymentMethod,
-          payment_amount: paymentAmount
+          payment_amount: paymentAmount,
+          discount: discount
         })
       })
 
@@ -326,7 +334,7 @@ export default function POSPage() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-8rem)] gap-4 lg:gap-6 relative">
+    <div className="flex flex-col gap-4 lg:gap-6 relative h-[calc(100vh-8rem)] pb-24">
       <style dangerouslySetInnerHTML={{__html: `
         @media print {
           @page {
@@ -381,15 +389,20 @@ export default function POSPage() {
       )}
       
       {/* LEFT: Product Grid */}
-      <div className="lg:flex-1 flex flex-col min-w-0 gap-4 lg:gap-6 overflow-hidden h-[70vh] lg:h-auto">
-        <div className="relative shrink-0">
-          <Search className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" />
-          <Input 
-            placeholder="Search for your products here..." 
-            className="pl-12 h-12 bg-white text-base shadow-sm border-default-200 rounded-xl transition-shadow focus-visible:ring-primary/20 focus-visible:shadow-md"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="flex-1 flex flex-col min-w-0 gap-4 lg:gap-6 overflow-hidden h-full">
+        <div className="flex items-center justify-between gap-4 shrink-0">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" />
+            <Input 
+              placeholder="Search for your products here..." 
+              className="pl-12 h-12 bg-white text-base shadow-sm border-default-200 rounded-xl transition-shadow focus-visible:ring-primary/20 focus-visible:shadow-md"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <Button variant="outline" onClick={() => setIsCloseShiftOpen(true)} className="h-12 border-destructive/20 text-destructive hover:bg-destructive/10 rounded-xl px-6 font-semibold shadow-sm hidden md:flex">
+             Close Shift
+          </Button>
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-2 shrink-0 scrollbar-hide">
@@ -436,19 +449,19 @@ export default function POSPage() {
                   key={product.id}
                 >
                   <Card 
-                    className="cursor-pointer border-none shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col bg-white group overflow-hidden rounded-xl h-full min-h-[160px]"
+                    className="cursor-pointer border border-transparent hover:border-primary/20 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col bg-white group overflow-hidden rounded-2xl h-full min-h-[170px]"
                     onClick={() => addToCart(product)}
                   >
-                    <CardContent className="p-3 flex flex-col items-center justify-center flex-1 text-center gap-1.5 relative">
-                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 text-[9px] px-1.5 py-0">Add</Badge>
+                    <CardContent className="p-4 flex flex-col items-center justify-center flex-1 text-center gap-2 relative">
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
+                        <Badge variant="secondary" className="bg-primary text-primary-foreground text-[10px] px-2 py-0.5 shadow-md"><Plus className="w-3 h-3 mr-1"/> Add</Badge>
                       </div>
-                      <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary font-bold text-lg mb-1 shadow-inner group-hover:scale-110 transition-transform duration-300">
+                      <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary font-black text-2xl mb-1 shadow-inner group-hover:scale-110 transition-transform duration-500">
                         {product.name.charAt(0)}
                       </div>
-                      <div className="font-semibold text-xs line-clamp-2 leading-tight text-default-900 group-hover:text-primary transition-colors">{product.name}</div>
-                      <div className="text-[9px] font-medium px-2 py-0.5 bg-default-100 rounded-full text-default-500">Stock: {product.stock}</div>
-                      <div className="text-primary font-bold text-sm mt-auto pt-1">
+                      <div className="font-bold text-sm line-clamp-2 leading-tight text-slate-800 group-hover:text-primary transition-colors">{product.name}</div>
+                      <div className="text-[10px] font-semibold px-2.5 py-0.5 bg-slate-100 rounded-full text-slate-500">Stock: {product.stock}</div>
+                      <div className="text-primary font-black text-base mt-auto pt-2">
                         Rp {Number(product.selling_price).toLocaleString("id-ID")}
                       </div>
                     </CardContent>
@@ -460,24 +473,42 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* RIGHT: Cart */}
-      <div className="w-full lg:w-[400px] shrink-0 border-none shadow-lg rounded-2xl flex flex-col bg-white overflow-hidden h-[60vh] lg:h-auto lg:flex-none">
-        <div className="p-5 bg-slate-50 border-b flex items-center justify-between font-bold text-lg text-default-900">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-xl text-primary">
-              <ShoppingCart className="w-5 h-5" />
+      {/* Floating Cart Button */}
+      <div className="fixed bottom-6 lg:left-64 left-0 right-0 flex justify-center z-30 px-4 pointer-events-none">
+        <div className="bg-slate-900 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] rounded-full p-2 flex items-center gap-4 text-white pointer-events-auto max-w-xl w-full border border-slate-700/50 backdrop-blur-xl bg-opacity-95 transform transition-all hover:scale-[1.02]">
+          <div className="flex-1 px-5 py-1 flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">{cart.reduce((sum, item) => sum + item.qty, 0)} Items in Cart</span>
+              <span className="text-2xl font-black text-white leading-none mt-1">Rp {total.toLocaleString("id-ID")}</span>
             </div>
-            Current Order
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setIsCloseShiftOpen(true)} className="text-xs h-8 text-destructive hover:bg-destructive/10 border-destructive/20">
-              Close Shift
-            </Button>
-            <Badge variant="default" className="rounded-full px-3 py-1 bg-primary">
-              {cart.reduce((sum, item) => sum + item.qty, 0)} items
-            </Badge>
-          </div>
+          <Button 
+            className="h-14 px-8 text-lg font-bold rounded-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary shadow-lg shadow-primary/25 text-white"
+            onClick={() => setIsCartModalOpen(true)}
+          >
+            <ShoppingCart className="w-5 h-5 mr-2" /> View Order
+          </Button>
         </div>
+      </div>
+
+      {/* Cart Modal */}
+      <Dialog open={isCartModalOpen} onOpenChange={setIsCartModalOpen}>
+        <DialogContent className="!max-w-5xl w-[95vw] sm:w-full p-0 overflow-hidden bg-white rounded-[2rem] shadow-2xl border-none">
+          <div className="flex flex-col lg:flex-row h-[85vh] max-h-[800px] bg-white">
+            
+            {/* Left side: Cart Items */}
+            <div className="flex-1 flex flex-col bg-slate-50/50 border-r border-slate-100 min-w-0">
+               <div className="p-6 bg-white border-b border-slate-100 flex items-center justify-between shadow-sm z-10 shrink-0">
+                  <div className="flex items-center gap-3 font-bold text-xl text-slate-900">
+                    <div className="p-2.5 bg-primary/10 rounded-xl text-primary">
+                      <ShoppingCart className="w-6 h-6" />
+                    </div>
+                    Order Details
+                  </div>
+                  <Badge variant="default" className="rounded-full px-4 py-1.5 bg-primary font-bold shadow-sm">
+                    {cart.reduce((sum, item) => sum + item.qty, 0)} items
+                  </Badge>
+               </div>
 
         {/* Close Shift Dialog */}
         <Dialog open={isCloseShiftOpen} onOpenChange={setIsCloseShiftOpen}>
@@ -519,62 +550,69 @@ export default function POSPage() {
           </DialogContent>
         </Dialog>
 
-        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-3 bg-slate-50/50">
-          <AnimatePresence>
-            {cart.length === 0 ? (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex-1 flex flex-col items-center justify-center text-muted-foreground mt-10"
-              >
-                <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                  <ShoppingCart className="w-10 h-10 opacity-30" />
-                </div>
-                <p className="font-medium text-lg">Your cart is empty</p>
-                <p className="text-sm">Click on a product to add it.</p>
-              </motion.div>
-            ) : (
-              cart.map(item => (
-                <motion.div 
-                  key={item.id}
-                  layout
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="flex gap-3 items-center bg-white p-3 rounded-xl border border-default-100 shadow-sm group"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-default-900 truncate">{item.name}</div>
-                    <div className="text-sm text-primary font-bold">
-                      Rp {(item.selling_price * item.qty).toLocaleString("id-ID")}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-1 bg-slate-50 rounded-lg p-1 border">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md hover:bg-white hover:shadow-sm transition-all" onClick={() => updateQty(item.id, -1)}>
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <span className="w-6 text-center font-bold text-sm">{item.qty}</span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md hover:bg-white hover:shadow-sm transition-all" onClick={() => updateQty(item.id, 1)}>
-                      <Plus className="h-3 w-3" />
-                    </Button>
-                  </div>
-                  
-                  <Button variant="ghost" size="icon" className="h-10 w-10 text-default-400 hover:text-destructive hover:bg-destructive/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeFromCart(item.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </motion.div>
-              ))
-            )}
-          </AnimatePresence>
-        </div>
+               <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-3">
+                  <AnimatePresence>
+                    {cart.length === 0 ? (
+                      <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="flex-1 flex flex-col items-center justify-center text-muted-foreground mt-10"
+                      >
+                        <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                          <ShoppingCart className="w-10 h-10 opacity-30" />
+                        </div>
+                        <p className="font-medium text-lg">Your cart is empty</p>
+                        <p className="text-sm">Click on a product to add it.</p>
+                      </motion.div>
+                    ) : (
+                      cart.map(item => (
+                        <motion.div 
+                          key={item.id}
+                          layout
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          className="flex gap-3 items-center bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow group"
+                        >
+                          <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 font-bold border border-slate-100">
+                            {item.name.charAt(0)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-bold text-slate-900 truncate">{item.name}</div>
+                            <div className="text-sm text-primary font-bold">
+                              Rp {(item.selling_price * item.qty).toLocaleString("id-ID")}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-1 bg-slate-50 rounded-lg p-1 border border-slate-200">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md hover:bg-white hover:shadow-sm transition-all" onClick={() => updateQty(item.id, -1)}>
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="w-6 text-center font-bold text-sm">{item.qty}</span>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md hover:bg-white hover:shadow-sm transition-all" onClick={() => updateQty(item.id, 1)}>
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          
+                          <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-400 hover:text-destructive hover:bg-destructive/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeFromCart(item.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </motion.div>
+                      ))
+                    )}
+                  </AnimatePresence>
+               </div>
+            </div>
 
-        <div className="p-6 bg-white border-t shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-10">
-          <div className="space-y-3 mb-6">
+            {/* Right side: Summary & Pay */}
+            <div className="w-full lg:w-[420px] shrink-0 bg-white flex flex-col z-20">
+
+               <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                 <h3 className="font-bold text-lg text-slate-800 mb-4">Payment Summary</h3>
             <div className="flex flex-col gap-1.5 mb-2">
-              <label className="text-xs font-semibold text-default-600">Customer (Optional)</label>
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Customer (Optional)</label>
               <select 
-                className="w-full h-10 px-3 rounded-lg border border-default-200 bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
                 value={selectedCustomerId}
                 onChange={(e) => setSelectedCustomerId(e.target.value)}
               >
@@ -584,41 +622,57 @@ export default function POSPage() {
                 ))}
               </select>
             </div>
-            
-            <div className="flex justify-between text-sm font-medium text-default-600">
-              <span>Subtotal</span>
-              <span>Rp {subtotal.toLocaleString("id-ID")}</span>
-            </div>
-            {discount > 0 && (
-              <div className="flex justify-between text-sm font-bold text-emerald-600">
-                <span>Member Disc (5%)</span>
-                <span>- Rp {discount.toLocaleString("id-ID")}</span>
-              </div>
-            )}
-            {serviceCharge > 0 && (
-              <div className="flex justify-between text-sm font-medium text-default-600">
-                <span>Service Charge ({storeSettings.service_charge_rate}%)</span>
-                <span>Rp {serviceCharge.toLocaleString("id-ID")}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-sm font-medium text-default-600">
-              <span>Tax ({storeSettings.tax_rate}%)</span>
-              <span>Rp {tax.toLocaleString("id-ID")}</span>
-            </div>
-            <Separator className="my-3 border-dashed" />
-            <div className="flex justify-between font-black text-2xl text-default-900">
-              <span>Total</span>
-              <span className="text-primary">Rp {total.toLocaleString("id-ID")}</span>
-            </div>
-          </div>
 
-          <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
-            <DialogTrigger render={
-              <Button className="w-full h-14 text-lg font-bold shadow-lg shadow-primary/25 rounded-xl transition-transform hover:scale-[1.02] active:scale-[0.98]" disabled={cart.length === 0}>
-                Pay Rp {total.toLocaleString("id-ID")}
-              </Button>
-            } />
-            <DialogContent className="sm:max-w-md">
+            <div className="flex flex-col gap-1.5 mb-2">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Custom Discount (%)</label>
+              <Input 
+                type="number"
+                min="0"
+                max="100"
+                placeholder="e.g. 10" 
+                value={customDiscountPercent}
+                onChange={(e) => setCustomDiscountPercent(e.target.value)}
+                className="h-10 text-sm rounded-xl"
+              />
+            </div>
+            
+                 <div className="pt-6 border-t border-slate-100 space-y-3">
+                    <div className="flex justify-between text-sm font-medium text-slate-600">
+                      <span>Subtotal</span>
+                      <span>Rp {subtotal.toLocaleString("id-ID")}</span>
+                    </div>
+                    {discount > 0 && (
+                      <div className="flex justify-between text-sm font-bold text-emerald-600">
+                        <span>Discount ({totalDiscountPercent}%)</span>
+                        <span>- Rp {discount.toLocaleString("id-ID")}</span>
+                      </div>
+                    )}
+                    {serviceCharge > 0 && (
+                      <div className="flex justify-between text-sm font-medium text-slate-600">
+                        <span>Service Charge ({storeSettings.service_charge_rate}%)</span>
+                        <span>Rp {serviceCharge.toLocaleString("id-ID")}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm font-medium text-slate-600">
+                      <span>Tax ({storeSettings.tax_rate}%)</span>
+                      <span>Rp {tax.toLocaleString("id-ID")}</span>
+                    </div>
+                 </div>
+               </div>
+
+               <div className="p-8 bg-slate-50 border-t border-slate-100 shadow-[0_-15px_40px_-15px_rgba(0,0,0,0.05)] z-20 shrink-0">
+                  <div className="flex justify-between font-black text-3xl text-slate-900 mb-6">
+                    <span>Total</span>
+                    <span className="text-primary">Rp {total.toLocaleString("id-ID")}</span>
+                  </div>
+                  
+                  <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
+                    <DialogTrigger render={
+                      <Button className="w-full h-16 text-xl font-black shadow-[0_8px_30px_rgb(0,0,0,0.12)] shadow-primary/30 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-r from-primary to-primary/90 hover:from-primary hover:to-primary text-white" disabled={cart.length === 0}>
+                        <Banknote className="w-6 h-6 mr-2" /> Checkout Now
+                      </Button>
+                    } />
+            <DialogContent className="!max-w-md w-[95vw] sm:w-full">
               <DialogHeader>
                 <DialogTitle className="text-2xl">Checkout</DialogTitle>
                 <DialogDescription>
@@ -657,10 +711,55 @@ export default function POSPage() {
               </div>
             </DialogContent>
           </Dialog>
+               </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-          {/* Cash Payment Dialog */}
+          {/* Close Shift Dialog */}
+        <Dialog open={isCloseShiftOpen} onOpenChange={setIsCloseShiftOpen}>
+          <DialogContent className="!max-w-md w-[95vw] sm:w-full">
+            <DialogHeader>
+              <DialogTitle>Close Shift</DialogTitle>
+              <DialogDescription>
+                Count the cash in your drawer and enter the final amount.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <div className="p-4 bg-slate-50 rounded-xl border space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Starting Cash</span>
+                  <span className="font-semibold">Rp {shift ? Number(shift.starting_cash).toLocaleString("id-ID") : 0}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Shift Started</span>
+                  <span className="font-semibold">{shift ? new Date(shift.start_time).toLocaleTimeString("id-ID") : '-'}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">Ending Cash (Cash di Laci)</label>
+                <Input 
+                  placeholder="e.g. 1.500.000" 
+                  value={endingCash ? Number(endingCash).toLocaleString("id-ID") : ""}
+                  onChange={(e) => setEndingCash(e.target.value.replace(/\D/g, ""))}
+                  className="h-12 text-lg font-bold"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCloseShiftOpen(false)}>Cancel</Button>
+              <Button variant="destructive" onClick={handleCloseShift} disabled={isShiftProcessing || !endingCash}>
+                {isShiftProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Confirm Close Shift
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Cash Payment Dialog */}
           <Dialog open={isCashOpen} onOpenChange={setIsCashOpen}>
-            <DialogContent className="sm:max-w-sm rounded-2xl">
+            <DialogContent className="!max-w-sm w-[95vw] sm:w-full rounded-2xl">
               <DialogHeader>
                 <DialogTitle>Cash Payment</DialogTitle>
               </DialogHeader>
@@ -711,7 +810,7 @@ export default function POSPage() {
 
           {/* QRIS Payment Dialog */}
           <Dialog open={isQrisOpen} onOpenChange={setIsQrisOpen}>
-            <DialogContent className="sm:max-w-sm text-center rounded-2xl">
+            <DialogContent className="!max-w-sm w-[95vw] sm:w-full text-center rounded-2xl">
               <DialogHeader>
                 <DialogTitle className="text-center">QRIS Payment</DialogTitle>
               </DialogHeader>
@@ -745,7 +844,7 @@ export default function POSPage() {
 
           {/* Receipt Dialog */}
           <Dialog open={isReceiptOpen} onOpenChange={setIsReceiptOpen}>
-            <DialogContent className="sm:max-w-sm rounded-2xl">
+            <DialogContent className="!max-w-sm w-[95vw] sm:w-full rounded-2xl">
               <div className="flex flex-col items-center pt-6 pb-2 text-center">
                 <motion.div 
                   initial={{ scale: 0, rotate: -180 }}
@@ -848,8 +947,6 @@ export default function POSPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
       
     </div>
   )
