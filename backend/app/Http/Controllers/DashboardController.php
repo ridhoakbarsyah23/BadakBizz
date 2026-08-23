@@ -11,16 +11,39 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $filter = $request->query('filter', 'today'); // today, week, month
+        
         $today = Carbon::today();
-        $startOfWeek = Carbon::now()->subDays(6)->startOfDay();
         
-        // 1. Total Revenue Today
-        $revenueToday = Transaction::whereDate('created_at', $today)->sum('total_amount');
+        $startDate = $today;
+        $trendDays = 7; // Default for chart
         
-        // 2. Total Transactions Today
-        $transactionsToday = Transaction::whereDate('created_at', $today)->count();
+        if ($filter === 'week') {
+            $startDate = Carbon::now()->subDays(6)->startOfDay();
+        } elseif ($filter === 'month') {
+            $startDate = Carbon::now()->subDays(29)->startOfDay();
+            $trendDays = 30;
+        }
+
+        // 1. Total Revenue
+        $revenueQuery = Transaction::query();
+        if ($filter === 'today') {
+            $revenueQuery->whereDate('created_at', $today);
+        } else {
+            $revenueQuery->where('created_at', '>=', $startDate);
+        }
+        $revenue = $revenueQuery->sum('total_amount');
+        
+        // 2. Total Transactions
+        $transactionsQuery = Transaction::query();
+        if ($filter === 'today') {
+            $transactionsQuery->whereDate('created_at', $today);
+        } else {
+            $transactionsQuery->where('created_at', '>=', $startDate);
+        }
+        $transactions = $transactionsQuery->count();
         
         // 3. Total Customers
         $totalCustomers = Customer::count();
@@ -28,21 +51,26 @@ class DashboardController extends Controller
         // 4. Low Stock Products
         $lowStockProducts = Product::whereColumn('stock', '<=', 'minimum_stock')->get();
 
-        // 5. Sales Trend (Last 7 Days)
+        // 5. Sales Trend (Chart)
+        // If filter is today, we still show the last 7 days trend to give context. 
+        // If month, we show 30 days.
+        $chartStartDate = $filter === 'month' ? $startDate : Carbon::now()->subDays(6)->startOfDay();
+        $chartDays = $filter === 'month' ? 30 : 7;
+
         $salesTrend = Transaction::select(
             DB::raw('DATE(created_at) as date'),
             DB::raw('SUM(total_amount) as revenue'),
             DB::raw('COUNT(*) as transactions')
         )
-        ->where('created_at', '>=', $startOfWeek)
+        ->where('created_at', '>=', $chartStartDate)
         ->groupBy('date')
         ->orderBy('date', 'ASC')
         ->get();
 
         // Fill in missing days with 0
         $trendData = [];
-        for ($i = 0; $i < 7; $i++) {
-            $dateStr = Carbon::now()->subDays(6 - $i)->format('Y-m-d');
+        for ($i = 0; $i < $chartDays; $i++) {
+            $dateStr = Carbon::now()->subDays($chartDays - 1 - $i)->format('Y-m-d');
             $dayData = $salesTrend->firstWhere('date', $dateStr);
             
             $trendData[] = [
@@ -52,22 +80,31 @@ class DashboardController extends Controller
             ];
         }
 
-        // 6. Top 5 Selling Products
-        $topProducts = DB::table('transaction_items')
+        // 6. Top 5 Selling Products (based on filter)
+        $topProductsQuery = DB::table('transaction_items')
             ->join('products', 'transaction_items.product_id', '=', 'products.id')
-            ->select('products.name', DB::raw('SUM(transaction_items.quantity) as total_sold'))
-            ->groupBy('products.id', 'products.name')
+            ->join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
+            ->select('products.name', DB::raw('SUM(transaction_items.quantity) as total_sold'));
+            
+        if ($filter === 'today') {
+            $topProductsQuery->whereDate('transactions.created_at', $today);
+        } else {
+            $topProductsQuery->where('transactions.created_at', '>=', $startDate);
+        }
+
+        $topProducts = $topProductsQuery->groupBy('products.id', 'products.name')
             ->orderBy('total_sold', 'DESC')
             ->limit(5)
             ->get();
 
         return response()->json([
-            'revenueToday' => $revenueToday,
-            'transactionsToday' => $transactionsToday,
+            'revenueToday' => $revenue, // keeping same variable name for frontend compatibility
+            'transactionsToday' => $transactions,
             'totalCustomers' => $totalCustomers,
             'lowStockProducts' => $lowStockProducts,
             'salesTrend' => $trendData,
-            'topProducts' => $topProducts
+            'topProducts' => $topProducts,
+            'filter' => $filter
         ]);
     }
 }
