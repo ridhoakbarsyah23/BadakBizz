@@ -12,87 +12,112 @@ class ReportController extends Controller
 {
     public function index(Request $request)
     {
-        $currentYear = Carbon::now()->year;
+        $startDateStr = $request->query('start_date');
+        $endDateStr = $request->query('end_date');
 
-        // 1. Total Revenue YTD
-        $totalRevenueYTD = Transaction::whereYear('created_at', $currentYear)->sum('total_amount');
+        if ($startDateStr && $endDateStr) {
+            $startDate = Carbon::parse($startDateStr)->startOfDay();
+            $endDate = Carbon::parse($endDateStr)->endOfDay();
+        } else {
+            // Default to Year-to-Date if no dates provided
+            $startDate = Carbon::now()->startOfYear();
+            $endDate = Carbon::now()->endOfDay();
+        }
+
+        // 1. Total Revenue
+        $totalRevenue = Transaction::whereBetween('created_at', [$startDate, $endDate])->sum('total_amount');
 
         // 2. Average Transaction
-        $averageTransaction = Transaction::whereYear('created_at', $currentYear)->avg('total_amount') ?? 0;
+        $averageTransaction = Transaction::whereBetween('created_at', [$startDate, $endDate])->avg('total_amount') ?? 0;
 
         // 3. Top Selling Item
         $topSellingItem = DB::table('transaction_items')
             ->join('products', 'transaction_items.product_id', '=', 'products.id')
+            ->join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
+            ->whereBetween('transactions.created_at', [$startDate, $endDate])
             ->select('products.name', DB::raw('SUM(transaction_items.quantity) as total_sold'))
             ->groupBy('products.id', 'products.name')
             ->orderBy('total_sold', 'DESC')
             ->first();
 
         // 4. Busiest Hour
-        // Using SQLite strftime since local env is typically SQLite if not specified otherwise.
-        // If it's MySQL, it would be HOUR(created_at). Let's use generic SQL if possible or handle both.
-        // A safer cross-database way is to fetch recent transactions and group in collection, 
-        // but for a small scale DB, we can do raw. Let's use collection grouping for max compatibility.
-        $transactionsTime = Transaction::select('created_at')->get();
+        $transactionsTime = Transaction::select('created_at')
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->get();
+            
         $busiestHourData = $transactionsTime->groupBy(function ($date) {
-            return Carbon::parse($date->created_at)->format('H'); // get hour
-        })->map(function ($row) {
-            return $row->count();
-        })->sortDesc()->first() ? $transactionsTime->groupBy(function ($date) {
             return Carbon::parse($date->created_at)->format('H');
         })->map(function ($row) {
             return $row->count();
-        })->sortDesc()->keys()->first() : null;
+        })->sortDesc()->keys()->first();
 
         $busiestHour = $busiestHourData ? $busiestHourData . ':00 - ' . str_pad((int)$busiestHourData + 1, 2, '0', STR_PAD_LEFT) . ':00' : 'N/A';
 
-        // 5. Sales vs Profit (6 Months)
-        $sixMonthsAgo = Carbon::now()->subMonths(5)->startOfMonth();
+        // 5. Chart Data
+        $diffInDays = $startDate->diffInDays($endDate);
         
-        $monthlyDataRaw = DB::table('transactions')
-            ->select(
-                DB::raw('strftime("%m-%Y", created_at) as month_year'), // SQLite specific, but let's do collection grouping for safety
-                'id', 'total_amount', 'created_at'
-            )
-            ->where('created_at', '>=', $sixMonthsAgo)
-            ->get();
-
-        // Let's do collection grouping to avoid SQLite/MySQL differences
-        $monthlyTransactions = Transaction::with('items.product')
-            ->where('created_at', '>=', $sixMonthsAgo)
+        $chartTransactions = Transaction::with('items.product')
+            ->whereBetween('created_at', [$startDate, $endDate])
             ->get();
 
         $chartData = collect([]);
-        
-        for ($i = 5; $i >= 0; $i--) {
-            $month = Carbon::now()->subMonths($i);
-            $monthStr = $month->format('M'); // e.g. "Jan", "Feb"
-            $monthKey = $month->format('Y-m');
 
-            $txsInMonth = $monthlyTransactions->filter(function($t) use ($monthKey) {
-                return Carbon::parse($t->created_at)->format('Y-m') === $monthKey;
-            });
-
-            $sales = $txsInMonth->sum('total_amount');
-            
-            // Calculate profit
-            $profit = 0;
-            foreach ($txsInMonth as $tx) {
-                foreach ($tx->items as $item) {
-                    $purchasePrice = $item->product ? $item->product->purchase_price : 0;
-                    $profit += ($item->price - $purchasePrice) * $item->quantity;
+        if ($diffInDays <= 31) {
+            // Daily Chart
+            $period = \Carbon\CarbonPeriod::create($startDate, $endDate);
+            foreach ($period as $date) {
+                $dateKey = $date->format('Y-m-d');
+                $dateLabel = $date->format('d M');
+                
+                $txsInDay = $chartTransactions->filter(function($t) use ($dateKey) {
+                    return Carbon::parse($t->created_at)->format('Y-m-d') === $dateKey;
+                });
+                
+                $sales = $txsInDay->sum('total_amount');
+                $profit = 0;
+                foreach ($txsInDay as $tx) {
+                    foreach ($tx->items as $item) {
+                        $purchasePrice = $item->product ? $item->product->purchase_price : 0;
+                        $profit += ($item->price - $purchasePrice) * $item->quantity;
+                    }
                 }
+                
+                $chartData->push([
+                    'label' => $dateLabel,
+                    'sales' => $sales,
+                    'profit' => $profit
+                ]);
             }
-
-            $chartData->push([
-                'month' => $monthStr,
-                'sales' => $sales,
-                'profit' => $profit
-            ]);
+        } else {
+            // Monthly Chart
+            $period = \Carbon\CarbonPeriod::create($startDate->copy()->startOfMonth(), '1 month', $endDate->copy()->startOfMonth());
+            foreach ($period as $date) {
+                $monthKey = $date->format('Y-m');
+                $monthLabel = $date->format('M Y');
+                
+                $txsInMonth = $chartTransactions->filter(function($t) use ($monthKey) {
+                    return Carbon::parse($t->created_at)->format('Y-m') === $monthKey;
+                });
+                
+                $sales = $txsInMonth->sum('total_amount');
+                $profit = 0;
+                foreach ($txsInMonth as $tx) {
+                    foreach ($tx->items as $item) {
+                        $purchasePrice = $item->product ? $item->product->purchase_price : 0;
+                        $profit += ($item->price - $purchasePrice) * $item->quantity;
+                    }
+                }
+                
+                $chartData->push([
+                    'label' => $monthLabel,
+                    'sales' => $sales,
+                    'profit' => $profit
+                ]);
+            }
         }
 
         return response()->json([
-            'totalRevenueYTD' => $totalRevenueYTD,
+            'totalRevenue' => $totalRevenue,
             'averageTransaction' => $averageTransaction,
             'topSellingItem' => $topSellingItem ? [
                 'name' => $topSellingItem->name,
