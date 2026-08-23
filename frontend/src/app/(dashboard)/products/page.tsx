@@ -94,8 +94,8 @@ export default function ProductsPage() {
     try {
       const headers = { "Authorization": `Bearer ${token}` }
       const [prodRes, catRes] = await Promise.all([
-        fetch("http://localhost:8000/api/products", { headers }),
-        fetch("http://localhost:8000/api/categories", { headers })
+        fetch("http://127.0.0.1:8000/api/products", { headers }),
+        fetch("http://127.0.0.1:8000/api/categories", { headers })
       ])
       
       const prodData = await prodRes.json()
@@ -114,8 +114,8 @@ export default function ProductsPage() {
     e.preventDefault()
     setConfirmConfig({
       isOpen: true,
-      title: "Save Changes",
-      desc: `Are you sure you want to ${editingId ? 'update' : 'add'} this product?`,
+      title: "Simpan Perubahan",
+      desc: `Apakah Anda yakin ingin ${editingId ? 'memperbarui' : 'menambahkan'} produk ini?`,
       action: executeSubmit
     })
   }
@@ -126,8 +126,8 @@ export default function ProductsPage() {
 
     try {
       const url = editingId 
-        ? `http://localhost:8000/api/products/${editingId}`
-        : "http://localhost:8000/api/products"
+        ? `http://127.0.0.1:8000/api/products/${editingId}`
+        : "http://127.0.0.1:8000/api/products"
         
       const payload = {
         ...formData,
@@ -151,7 +151,7 @@ export default function ProductsPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        throw new Error(data.message || "Failed to save product")
+        throw new Error(data.message || "Gagal menyimpan produk")
       }
 
       await fetchData()
@@ -167,11 +167,11 @@ export default function ProductsPage() {
     if (!deleteProduct) return
     setIsSubmitting(true)
     try {
-      const res = await fetch(`http://localhost:8000/api/products/${deleteProduct.id}`, {
+      const res = await fetch(`http://127.0.0.1:8000/api/products/${deleteProduct.id}`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` }
       })
-      if (!res.ok) throw new Error("Failed to delete product")
+      if (!res.ok) throw new Error("Gagal menghapus produk")
       
       await fetchData()
       setIsDeleteOpen(false)
@@ -244,9 +244,9 @@ export default function ProductsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Products</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Data Produk</h1>
           <p className="text-muted-foreground">
-            Manage your inventory and product details.
+            Kelola detail produk dan stok Anda.
           </p>
         </div>
         
@@ -254,13 +254,13 @@ export default function ProductsPage() {
           <DialogTrigger render={
             <Button onClick={openCreate}>
               <Plus className="w-4 h-4 mr-2" />
-              Add Product
+              Tambah Produk
             </Button>
           } />
           <DialogContent className="sm:max-w-xl">
             <DialogHeader>
-              <DialogTitle>{editingId ? "Edit Product" : "Add New Product"}</DialogTitle>
-              <DialogDescription>Fill in the product details below.</DialogDescription>
+              <DialogTitle>{editingId ? "Edit Produk" : "Tambah Produk Baru"}</DialogTitle>
+              <DialogDescription>Lengkapi detail produk di bawah ini.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-md">{error}</div>}
@@ -272,7 +272,7 @@ export default function ProductsPage() {
                     <Input 
                       id="sku"
                       required
-                      placeholder="e.g. MIN-KOP-001"
+                      placeholder="cth. MIN-KOP-001"
                       value={formData.sku}
                       onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                     />
@@ -282,14 +282,14 @@ export default function ProductsPage() {
                       size="icon" 
                       className="shrink-0"
                       onClick={handleGenerateSKU}
-                      title="Generate Smart SKU"
+                      title="Buat SKU Otomatis"
                     >
                       <Wand2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="name">Product Name <span className="text-destructive">*</span></Label>
+                  <Label htmlFor="name">Nama Produk <span className="text-destructive">*</span></Label>
                   <Input 
                     id="name"
                     required
@@ -301,14 +301,14 @@ export default function ProductsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
+                <Label htmlFor="category">Kategori</Label>
                 <select 
                   id="category"
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   value={formData.category_id}
                   onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
                 >
-                  <option value="">Select a category</option>
+                  <option value="">Pilih kategori</option>
                   {categories.map((cat) => (
                     <option key={cat.id} value={cat.id.toString()}>{cat.name}</option>
                   ))}
@@ -317,7 +317,7 @@ export default function ProductsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="purchase_price">Purchase Price (Rp) <span className="text-destructive">*</span></Label>
+                  <Label htmlFor="purchase_price">Harga Beli (Rp) <span className="text-destructive">*</span></Label>
                   <Input 
                     id="purchase_price"
                     required
@@ -328,7 +328,7 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="selling_price">Selling Price (Rp) <span className="text-destructive">*</span></Label>
+                  <Label htmlFor="selling_price">Harga Jual (Rp) <span className="text-destructive">*</span></Label>
                   <Input 
                     id="selling_price"
                     required
@@ -342,7 +342,7 @@ export default function ProductsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="stock">Current Stock <span className="text-destructive">*</span></Label>
+                  <Label htmlFor="stock">Stok Saat Ini <span className="text-destructive">*</span></Label>
                   <Input 
                     id="stock"
                     required
@@ -353,7 +353,7 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="minimum_stock">Minimum Stock <span className="text-destructive">*</span></Label>
+                  <Label htmlFor="minimum_stock">Minimal Stok <span className="text-destructive">*</span></Label>
                   <Input 
                     id="minimum_stock"
                     required
@@ -367,11 +367,11 @@ export default function ProductsPage() {
 
               <DialogFooter className="pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
-                  Cancel
+                  Batal
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  Save Changes
+                  Simpan Perubahan
                 </Button>
               </DialogFooter>
             </form>
@@ -382,7 +382,7 @@ export default function ProductsPage() {
       <div className="flex flex-col sm:flex-row items-center gap-4">
         <div className="relative w-full sm:max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search products..." className="pl-8 w-full" />
+          <Input placeholder="Cari produk..." className="pl-8 w-full" />
         </div>
         <Button variant="secondary">
           <Filter className="mr-2 h-4 w-4" /> Filter
@@ -399,19 +399,19 @@ export default function ProductsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>SKU</TableHead>
-                <TableHead>PRODUCT NAME</TableHead>
-                <TableHead>CATEGORY</TableHead>
-                <TableHead>PRICE</TableHead>
-                <TableHead>STOCK</TableHead>
+                <TableHead>NAMA PRODUK</TableHead>
+                <TableHead>KATEGORI</TableHead>
+                <TableHead>HARGA</TableHead>
+                <TableHead>STOK</TableHead>
                 <TableHead>STATUS</TableHead>
-                <TableHead className="text-right">ACTIONS</TableHead>
+                <TableHead className="text-right">AKSI</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {products.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    No products found. Add a product to get started.
+                    Tidak ada produk yang ditemukan. Tambahkan produk untuk memulai.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -427,13 +427,13 @@ export default function ProductsPage() {
                           {product.stock}
                         </span>
                         {product.stock <= product.minimum_stock && (
-                          <Badge variant="destructive" className="h-5 px-1 text-[10px]">Low</Badge>
+                          <Badge variant="destructive" className="h-5 px-1 text-[10px]">Menipis</Badge>
                         )}
                       </div>
                     </TableCell>
                     <TableCell className="py-3 px-4">
                       <Badge variant={product.is_active ? "secondary" : "outline"} className={product.is_active ? "bg-green-100 text-green-700 hover:bg-green-100" : ""}>
-                        {product.is_active ? "Active" : "Inactive"}
+                        {product.is_active ? "Aktif" : "Nonaktif"}
                       </Badge>
                     </TableCell>
                     <TableCell className="py-3 px-4 text-right">
@@ -459,20 +459,20 @@ export default function ProductsPage() {
           <DialogHeader>
             <div className="flex items-center gap-3 text-destructive">
               <AlertTriangle className="w-6 h-6" />
-              <DialogTitle>Delete Product</DialogTitle>
+              <DialogTitle>Hapus Produk</DialogTitle>
             </div>
             <DialogDescription className="pt-2">
-              Are you sure you want to delete the product <strong>{deleteProduct?.name}</strong>? 
-              <br />This action cannot be undone.
+              Apakah Anda yakin ingin menghapus produk <strong>{deleteProduct?.name}</strong>? 
+              <br />Tindakan ini tidak dapat dibatalkan.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="pt-4">
             <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
-              Cancel
+              Batal
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Delete
+              Hapus
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -484,14 +484,14 @@ export default function ProductsPage() {
             <AlertDialogDescription>{confirmConfig.desc}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
             <AlertDialogAction onClick={(e) => {
               e.preventDefault();
               setConfirmConfig(prev => ({ ...prev, isOpen: false }));
               if (confirmConfig.action) {
                 setTimeout(() => confirmConfig.action(), 100);
               }
-            }}>Confirm</AlertDialogAction>
+            }}>Konfirmasi</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

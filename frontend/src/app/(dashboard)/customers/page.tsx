@@ -68,7 +68,7 @@ export default function CustomersPage() {
   const fetchData = async () => {
     try {
       setIsLoading(true)
-      const res = await fetch('http://localhost:8000/api/customers', {
+      const res = await fetch('http://127.0.0.1:8000/api/customers', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -125,8 +125,8 @@ export default function CustomersPage() {
     e.preventDefault()
     setConfirmConfig({
       isOpen: true,
-      title: "Save Changes",
-      desc: `Are you sure you want to ${modalMode === 'create' ? 'add' : 'update'} this customer?`,
+      title: "Simpan Perubahan",
+      desc: `Apakah Anda yakin ingin ${modalMode === 'create' ? 'menambahkan' : 'memperbarui'} pelanggan ini?`,
       action: executeSubmit
     })
   }
@@ -135,8 +135,8 @@ export default function CustomersPage() {
     try {
       setIsSubmitting(true)
       const url = modalMode === 'create' 
-        ? 'http://localhost:8000/api/customers'
-        : `http://localhost:8000/api/customers/${selectedCustomer?.id}`
+        ? 'http://127.0.0.1:8000/api/customers'
+        : `http://127.0.0.1:8000/api/customers/${selectedCustomer?.id}`
       
       const method = modalMode === 'create' ? 'POST' : 'PUT'
 
@@ -149,7 +149,7 @@ export default function CustomersPage() {
         body: JSON.stringify(formData)
       })
 
-      if (!res.ok) throw new Error('Failed to save customer')
+      if (!res.ok) throw new Error('Gagal menyimpan pelanggan')
 
       await fetchData()
       setIsModalOpen(false)
@@ -165,14 +165,14 @@ export default function CustomersPage() {
     
     try {
       setIsSubmitting(true)
-      const res = await fetch(`http://localhost:8000/api/customers/${selectedCustomer.id}`, {
+      const res = await fetch(`http://127.0.0.1:8000/api/customers/${selectedCustomer.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
         }
       })
 
-      if (!res.ok) throw new Error('Failed to delete customer')
+      if (!res.ok) throw new Error('Gagal menghapus pelanggan')
 
       await fetchData()
       setIsDeleteModalOpen(false)
@@ -187,9 +187,9 @@ export default function CustomersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Customers</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Pelanggan</h1>
           <p className="text-muted-foreground">
-            Manage your customer database and see their history.
+            Kelola basis data pelanggan dan riwayat transaksi mereka.
           </p>
         </div>
         
@@ -197,33 +197,33 @@ export default function CustomersPage() {
           <DialogTrigger render={
             <Button onClick={openCreateModal}>
               <Plus className="w-4 h-4 mr-2" />
-              Add Customer
+              Tambah Pelanggan
             </Button>
           } />
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>
-                {modalMode === 'create' ? 'Add New Customer' : 'Edit Customer'}
+                {modalMode === 'create' ? 'Tambah Pelanggan Baru' : 'Edit Pelanggan'}
               </DialogTitle>
               <DialogDescription>
-                Fill in the customer's contact details below.
+                Lengkapi detail kontak pelanggan di bawah ini.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-4 py-2">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Name <span className="text-destructive">*</span></Label>
+                  <Label htmlFor="name">Nama <span className="text-destructive">*</span></Label>
                   <Input 
                     id="name"
                     required
-                    placeholder="Enter customer name"
+                    placeholder="Masukkan nama pelanggan"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
+                  <Label htmlFor="phone">Nomor Telepon</Label>
                   <Input 
                     id="phone"
                     placeholder="e.g. 08123456789"
@@ -245,14 +245,14 @@ export default function CustomersPage() {
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-                  Cancel
+                  Batal
                 </Button>
                 <Button 
                   type="submit" 
                   disabled={!formData.name || isSubmitting}
                 >
                   {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  {modalMode === 'create' ? 'Save Customer' : 'Update Customer'}
+                  {modalMode === 'create' ? 'Simpan Pelanggan' : 'Perbarui Pelanggan'}
                 </Button>
               </DialogFooter>
             </form>
@@ -265,7 +265,7 @@ export default function CustomersPage() {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Search customers..."
+            placeholder="Cari pelanggan..."
             className="pl-8"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -282,19 +282,19 @@ export default function CustomersPage() {
           <Table className="min-w-[800px] w-full">
             <TableHeader>
               <TableRow>
-                <TableHead>NAME</TableHead>
-                <TableHead>PHONE</TableHead>
+                <TableHead>NAMA</TableHead>
+                <TableHead>TELEPON</TableHead>
                 <TableHead>EMAIL</TableHead>
-                <TableHead>TOTAL TRANSACTIONS</TableHead>
-                <TableHead>TOTAL SPENT</TableHead>
-                <TableHead className="text-right">ACTIONS</TableHead>
+                <TableHead>TOTAL TRANSAKSI</TableHead>
+                <TableHead>TOTAL PEMBELANJAAN</TableHead>
+                <TableHead className="text-right">AKSI</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredCustomers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    {searchQuery ? "No customers found matching your search" : "No customers found. Add your first customer!"}
+                    {searchQuery ? "Tidak ada pelanggan yang cocok dengan pencarian" : "Tidak ada pelanggan yang ditemukan. Tambahkan pelanggan pertama Anda!"}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -336,20 +336,20 @@ export default function CustomersPage() {
           <DialogHeader>
             <div className="flex items-center gap-3 text-destructive">
               <AlertTriangle className="w-6 h-6" />
-              <DialogTitle>Delete Customer</DialogTitle>
+              <DialogTitle>Hapus Pelanggan</DialogTitle>
             </div>
             <DialogDescription className="pt-2">
-              Are you sure you want to delete <strong>{selectedCustomer?.name}</strong>?
-              <br />This action cannot be undone.
+              Apakah Anda yakin ingin menghapus <strong>{selectedCustomer?.name}</strong>?
+              <br />Tindakan ini tidak dapat dibatalkan.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="pt-4">
             <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>
-              Cancel
+              Batal
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Delete
+              Hapus
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -361,14 +361,14 @@ export default function CustomersPage() {
             <AlertDialogDescription>{confirmConfig.desc}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
             <AlertDialogAction onClick={(e) => {
               e.preventDefault();
               setConfirmConfig(prev => ({ ...prev, isOpen: false }));
               if (confirmConfig.action) {
                 setTimeout(() => confirmConfig.action(), 100);
               }
-            }}>Confirm</AlertDialogAction>
+            }}>Konfirmasi</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

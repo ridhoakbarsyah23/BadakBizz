@@ -77,14 +77,14 @@ export default function TransactionsPage() {
   const fetchData = async () => {
     try {
       setIsLoading(true)
-      const res = await fetch('http://localhost:8000/api/transactions', {
+      const res = await fetch('http://127.0.0.1:8000/api/transactions', {
         headers: { "Authorization": `Bearer ${token}` }
       })
       if (!res.ok) throw new Error('Failed to fetch data')
       const data = await res.json()
       setTransactions(data)
 
-      const settingsRes = await fetch('http://localhost:8000/api/settings', {
+      const settingsRes = await fetch('http://127.0.0.1:8000/api/settings', {
         headers: { "Authorization": `Bearer ${token}` }
       })
       if (settingsRes.ok) {
@@ -152,12 +152,12 @@ export default function TransactionsPage() {
   const handleVoidTransaction = async () => {
     if (!selectedTransaction) return;
     
-    if (!window.confirm("Are you sure you want to void this transaction? This action cannot be undone and stock will be restored.")) {
+    if (!window.confirm("Apakah Anda yakin ingin membatalkan transaksi ini? Tindakan ini tidak dapat dibatalkan dan stok akan dikembalikan.")) {
       return;
     }
 
     try {
-      const res = await fetch(`http://localhost:8000/api/transactions/${selectedTransaction.id}/void`, {
+      const res = await fetch(`http://127.0.0.1:8000/api/transactions/${selectedTransaction.id}/void`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` }
       })
@@ -176,7 +176,7 @@ export default function TransactionsPage() {
       // Update selectedTransaction so the UI reflects the change immediately
       setSelectedTransaction(prev => prev ? { ...prev, status: 'CANCELLED' } : null)
       
-      alert("Transaction has been successfully voided.")
+      alert("Transaksi telah berhasil dibatalkan.")
       
     } catch (error: any) {
       console.error('Void error:', error)
@@ -188,9 +188,9 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Riwayat Transaksi</h1>
           <p className="text-muted-foreground">
-            View and manage all sales transactions.
+            Lihat dan kelola semua transaksi penjualan.
           </p>
         </div>
       </div>
@@ -200,7 +200,7 @@ export default function TransactionsPage() {
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
           <Input
             type="search"
-            placeholder="Search by receipt number..."
+            placeholder="Cari berdasarkan nomor struk..."
             className="pl-8"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -208,11 +208,11 @@ export default function TransactionsPage() {
         </div>
         <Button variant="outline">
           <Filter className="h-4 w-4 mr-2" inline-block="true" />
-          Filter Date
+          Filter Tanggal
         </Button>
         <Button variant="outline" onPress={exportToCSV}>
           <Download className="h-4 w-4 mr-2" inline-block="true" />
-          Export CSV
+          Ekspor CSV
         </Button>
       </div>
 
@@ -225,20 +225,20 @@ export default function TransactionsPage() {
           <Table className="min-w-[800px] w-full">
             <TableHeader>
               <TableRow>
-                <TableHead>RECEIPT NO</TableHead>
-                <TableHead>DATE & TIME</TableHead>
-                <TableHead>CUSTOMER</TableHead>
-                <TableHead>PAYMENT</TableHead>
+                <TableHead>NO STRUK</TableHead>
+                <TableHead>TANGGAL & WAKTU</TableHead>
+                <TableHead>PELANGGAN</TableHead>
+                <TableHead>PEMBAYARAN</TableHead>
                 <TableHead>TOTAL</TableHead>
                 <TableHead>STATUS</TableHead>
-                <TableHead className="text-right">ACTION</TableHead>
+                <TableHead className="text-right">AKSI</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredTransactions.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-default-500">
-                    No transactions found
+                    Tidak ada transaksi yang ditemukan
                   </TableCell>
                 </TableRow>
               ) : (
@@ -314,7 +314,7 @@ export default function TransactionsPage() {
                   <span>{selectedTransaction.transaction_number}</span>
                 </div>
                 <div className="text-left text-xs print:text-[10px] mb-2 font-medium text-gray-600 print:text-black">
-                  Customer: {selectedTransaction.customer?.name || 'Walk-in'}
+                  Pelanggan: {selectedTransaction.customer?.name || 'Walk-in'}
                 </div>
 
                 <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 flex flex-col gap-2">
@@ -337,18 +337,18 @@ export default function TransactionsPage() {
                 </div>
                 {Number(selectedTransaction.discount) > 0 && (
                   <div className="flex justify-between text-xs print:text-[10px] print:text-black">
-                    <span>Discount</span>
+                    <span>Diskon</span>
                     <span>- Rp {Number(selectedTransaction.discount).toLocaleString("id-ID")}</span>
                   </div>
                 )}
                 {Number(selectedTransaction.service_charge) > 0 && (
                   <div className="flex justify-between text-xs print:text-[10px] print:text-black">
-                    <span>Service Charge</span>
+                    <span>Biaya Layanan</span>
                     <span>Rp {Number(selectedTransaction.service_charge).toLocaleString("id-ID")}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-xs print:text-[10px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
-                  <span>Tax</span>
+                  <span>Pajak</span>
                   <span>Rp {Number(selectedTransaction.tax).toLocaleString("id-ID")}</span>
                 </div>
                 
@@ -358,20 +358,20 @@ export default function TransactionsPage() {
                 </div>
 
                 <div className="flex justify-between text-xs print:text-[10px] print:text-black">
-                  <span>Pay ({selectedTransaction.payment_method})</span>
+                  <span>Bayar ({selectedTransaction.payment_method})</span>
                   <span>Rp {Number(selectedTransaction.payment_amount).toLocaleString("id-ID")}</span>
                 </div>
                 <div className="flex justify-between text-xs print:text-[10px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
-                  <span>Change</span>
+                  <span>Kembali</span>
                   <span className="font-bold">Rp {(Number(selectedTransaction.payment_amount) - Number(selectedTransaction.total_amount)).toLocaleString("id-ID")}</span>
                 </div>
 
                 <div className="text-center text-xs print:text-[10px] mt-2 print:mt-1 italic text-gray-500 print:text-black whitespace-pre-line">
-                  {storeSettings.receipt_footer || 'Thank you for your purchase!\nPlease come again.'}
+                  {storeSettings.receipt_footer || 'Terima kasih atas kunjungan Anda!\nSilakan datang kembali.'}
                 </div>
                 
                 <div className="print:hidden border-t border-dashed mt-4 pt-4 text-center text-xs text-muted-foreground">
-                  This is a preview of the printed receipt.
+                  Ini adalah pratinjau struk yang akan dicetak.
                 </div>
               </div>
             </div>
@@ -380,7 +380,7 @@ export default function TransactionsPage() {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Receipt className="w-5 h-5 text-primary" /> 
-                  Transaction Details
+                  Detail Transaksi
                 </DialogTitle>
               </DialogHeader>
               
@@ -388,15 +388,15 @@ export default function TransactionsPage() {
                 <div className="space-y-6 py-4">
                   <div className="grid grid-cols-2 gap-4 text-sm bg-slate-50 p-4 rounded-xl border">
                     <div>
-                      <p className="text-muted-foreground mb-1">Receipt No</p>
+                      <p className="text-muted-foreground mb-1">No Struk</p>
                       <p className="font-bold">{selectedTransaction.transaction_number}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground mb-1">Date</p>
+                      <p className="text-muted-foreground mb-1">Tanggal</p>
                       <p className="font-medium">{formatDate(selectedTransaction.created_at)}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground mb-1">Customer</p>
+                      <p className="text-muted-foreground mb-1">Pelanggan</p>
                       <p className="font-medium">{selectedTransaction.customer?.name || '-'}</p>
                     </div>
                     <div>
@@ -412,7 +412,7 @@ export default function TransactionsPage() {
                   </div>
 
                   <div>
-                    <h4 className="font-semibold mb-3">Order Items</h4>
+                    <h4 className="font-semibold mb-3">Item Pesanan</h4>
                     <div className="space-y-3">
                       {selectedTransaction.items?.map((item) => (
                         <div key={item.id} className="flex justify-between items-center text-sm border-b pb-2">
@@ -432,15 +432,15 @@ export default function TransactionsPage() {
                       <span className="font-medium">Rp {Number(selectedTransaction.subtotal).toLocaleString('id-ID')}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Tax</span>
+                      <span className="text-muted-foreground">Pajak</span>
                       <span className="font-medium">Rp {Number(selectedTransaction.tax).toLocaleString('id-ID')}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Discount</span>
+                      <span className="text-muted-foreground">Diskon</span>
                       <span className="font-medium">Rp {Number(selectedTransaction.discount).toLocaleString('id-ID')}</span>
                     </div>
                     <div className="flex justify-between text-base font-bold pt-2 border-t mt-2">
-                      <span>Total Amount</span>
+                      <span>Total Tagihan</span>
                       <span className="text-primary">Rp {Number(selectedTransaction.total_amount).toLocaleString('id-ID')}</span>
                     </div>
                   </div>
@@ -451,14 +451,14 @@ export default function TransactionsPage() {
 
           <DialogFooter className="sm:justify-between">
             <Button variant="ghost" onPress={() => setIsDetailsOpen(false)}>
-              Close
+              Tutup
             </Button>
             {isReceiptMode ? (
               <Button 
                 variant="primary"
                 onPress={() => window.print()}
               >
-                Print Now
+                Cetak Sekarang
               </Button>
             ) : (
               <div className="flex gap-2">
@@ -467,7 +467,7 @@ export default function TransactionsPage() {
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     onPress={handleVoidTransaction}
                   >
-                    Void Transaction
+                    Batalkan Transaksi
                   </Button>
                 )}
                 <Button 
@@ -475,7 +475,7 @@ export default function TransactionsPage() {
                   onPress={() => setIsReceiptMode(true)}
                 >
                   <Printer className="w-4 h-4 mr-2 inline" />
-                  Print Receipt
+                  Cetak Struk
                 </Button>
               </div>
             )}

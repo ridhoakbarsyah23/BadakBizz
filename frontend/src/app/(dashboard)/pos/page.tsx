@@ -71,9 +71,9 @@ export default function POSPage() {
     try {
       const headers = { "Authorization": `Bearer ${token}` }
       const [productsRes, customersRes, settingsRes] = await Promise.all([
-        fetch("http://localhost:8000/api/products", { headers }),
-        fetch("http://localhost:8000/api/customers", { headers }),
-        fetch("http://localhost:8000/api/settings", { headers })
+        fetch("http://127.0.0.1:8000/api/products", { headers }),
+        fetch("http://127.0.0.1:8000/api/customers", { headers }),
+        fetch("http://127.0.0.1:8000/api/settings", { headers })
       ])
       
       const productsData = await productsRes.json()
@@ -95,7 +95,7 @@ export default function POSPage() {
   const fetchCurrentShift = async () => {
     setIsCheckingShift(true)
     try {
-      const res = await fetch("http://localhost:8000/api/shifts/current", {
+      const res = await fetch("http://127.0.0.1:8000/api/shifts/current", {
         headers: { "Authorization": `Bearer ${token}` }
       })
       const data = await res.json()
@@ -161,7 +161,7 @@ export default function POSPage() {
   const handleOpenShift = async () => {
     setIsShiftProcessing(true)
     try {
-      const res = await fetch("http://localhost:8000/api/shifts/open", {
+      const res = await fetch("http://127.0.0.1:8000/api/shifts/open", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -185,7 +185,7 @@ export default function POSPage() {
   const handleCloseShift = async () => {
     setIsShiftProcessing(true)
     try {
-      const res = await fetch("http://localhost:8000/api/shifts/close", {
+      const res = await fetch("http://127.0.0.1:8000/api/shifts/close", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -268,7 +268,7 @@ export default function POSPage() {
   const handleCheckout = async (paymentMethod: string, paymentAmount: number) => {
     setIsProcessing(true)
     try {
-      const res = await fetch("http://localhost:8000/api/transactions", {
+      const res = await fetch("http://127.0.0.1:8000/api/transactions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -370,8 +370,8 @@ export default function POSPage() {
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center text-primary mb-2">
                   <Clock className="w-8 h-8" />
                 </div>
-                <h2 className="text-2xl font-bold tracking-tight">Open Cashier Shift</h2>
-                <p className="text-muted-foreground">Ready to start your shift? Click the button below to begin processing transactions.</p>
+                <h2 className="text-2xl font-bold tracking-tight">Buka Shift Kasir</h2>
+                <p className="text-muted-foreground">Siap memulai shift Anda? Klik tombol di bawah untuk mulai memproses transaksi.</p>
               </div>
               <div className="pt-2">
                 <Button 
@@ -380,7 +380,7 @@ export default function POSPage() {
                   disabled={isShiftProcessing}
                 >
                   {isShiftProcessing ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-                  Start Shift
+                  Buka Shift
                 </Button>
               </div>
             </CardContent>
@@ -394,14 +394,14 @@ export default function POSPage() {
           <div className="relative flex-1">
             <Search className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" />
             <Input 
-              placeholder="Search for your products here..." 
+              placeholder="Cari produk di sini..." 
               className="pl-12 h-12 bg-white text-base shadow-sm border-default-200 rounded-xl transition-shadow focus-visible:ring-primary/20 focus-visible:shadow-md"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
           <Button variant="outline" onClick={() => setIsCloseShiftOpen(true)} className="h-12 border-destructive/20 text-destructive hover:bg-destructive/10 rounded-xl px-6 font-semibold shadow-sm hidden md:flex">
-             Close Shift
+             Tutup Shift
           </Button>
         </div>
 
@@ -411,7 +411,7 @@ export default function POSPage() {
             className={`px-5 py-2 text-sm cursor-pointer transition-all duration-300 rounded-full border-transparent ${activeCategory === "All" ? "shadow-md bg-primary text-primary-foreground hover:bg-primary/90" : "hover:bg-default-200 bg-white shadow-sm"}`}
             onClick={() => setActiveCategory("All")}
           >
-            All
+            Semua
           </Badge>
           {categories.map(cat => (
             <Badge 
@@ -433,8 +433,8 @@ export default function POSPage() {
           ) : filteredProducts.length === 0 ? (
             <div className="col-span-full text-center py-20 text-muted-foreground bg-white/50 rounded-2xl border border-dashed border-default-200">
               <Search className="h-10 w-10 mx-auto mb-3 opacity-20" />
-              <p className="text-lg font-medium text-default-600">No active products found.</p>
-              <p className="text-sm">Try adjusting your search or category filter.</p>
+              <p className="text-lg font-medium text-default-600">Tidak ada produk aktif yang ditemukan.</p>
+              <p className="text-sm">Coba sesuaikan pencarian atau filter kategori Anda.</p>
             </div>
           ) : (
             <AnimatePresence>
@@ -454,13 +454,13 @@ export default function POSPage() {
                   >
                     <CardContent className="p-4 flex flex-col items-center justify-center flex-1 text-center gap-2 relative">
                       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
-                        <Badge variant="secondary" className="bg-primary text-primary-foreground text-[10px] px-2 py-0.5 shadow-md"><Plus className="w-3 h-3 mr-1"/> Add</Badge>
+                        <Badge variant="secondary" className="bg-primary text-primary-foreground text-[10px] px-2 py-0.5 shadow-md"><Plus className="w-3 h-3 mr-1"/> Tambah</Badge>
                       </div>
                       <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary font-black text-2xl mb-1 shadow-inner group-hover:scale-110 transition-transform duration-500">
                         {product.name.charAt(0)}
                       </div>
                       <div className="font-bold text-sm line-clamp-2 leading-tight text-slate-800 group-hover:text-primary transition-colors">{product.name}</div>
-                      <div className="text-[10px] font-semibold px-2.5 py-0.5 bg-slate-100 rounded-full text-slate-500">Stock: {product.stock}</div>
+                      <div className="text-[10px] font-semibold px-2.5 py-0.5 bg-slate-100 rounded-full text-slate-500">Stok: {product.stock}</div>
                       <div className="text-primary font-black text-base mt-auto pt-2">
                         Rp {Number(product.selling_price).toLocaleString("id-ID")}
                       </div>
@@ -478,7 +478,7 @@ export default function POSPage() {
         <div className="bg-slate-900 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] rounded-full p-2 flex items-center gap-4 text-white pointer-events-auto max-w-xl w-full border border-slate-700/50 backdrop-blur-xl bg-opacity-95 transform transition-all hover:scale-[1.02]">
           <div className="flex-1 px-5 py-1 flex items-center justify-between">
             <div className="flex flex-col">
-              <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">{cart.reduce((sum, item) => sum + item.qty, 0)} Items in Cart</span>
+              <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">{cart.reduce((sum, item) => sum + item.qty, 0)} Item di Keranjang</span>
               <span className="text-2xl font-black text-white leading-none mt-1">Rp {total.toLocaleString("id-ID")}</span>
             </div>
           </div>
@@ -486,7 +486,7 @@ export default function POSPage() {
             className="h-14 px-8 text-lg font-bold rounded-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary shadow-lg shadow-primary/25 text-white"
             onClick={() => setIsCartModalOpen(true)}
           >
-            <ShoppingCart className="w-5 h-5 mr-2" /> View Order
+            <ShoppingCart className="w-5 h-5 mr-2" /> Lihat Pesanan
           </Button>
         </div>
       </div>
@@ -503,7 +503,7 @@ export default function POSPage() {
                     <div className="p-2.5 bg-primary/10 rounded-xl text-primary">
                       <ShoppingCart className="w-6 h-6" />
                     </div>
-                    Order Details
+                    Detail Pesanan
                   </div>
                   <Badge variant="default" className="rounded-full px-4 py-1.5 bg-primary font-bold shadow-sm">
                     {cart.reduce((sum, item) => sum + item.qty, 0)} items
@@ -514,24 +514,24 @@ export default function POSPage() {
         <Dialog open={isCloseShiftOpen} onOpenChange={setIsCloseShiftOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Close Shift</DialogTitle>
+              <DialogTitle>Tutup Shift</DialogTitle>
               <DialogDescription>
-                Count the cash in your drawer and enter the final amount.
+                Hitung uang tunai di laci Anda dan masukkan jumlah akhirnya.
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-4">
               <div className="p-4 bg-slate-50 rounded-xl border space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Starting Cash</span>
+                  <span className="text-muted-foreground">Uang Awal</span>
                   <span className="font-semibold">Rp {shift ? Number(shift.starting_cash).toLocaleString("id-ID") : 0}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Shift Started</span>
+                  <span className="text-muted-foreground">Waktu Mulai</span>
                   <span className="font-semibold">{shift ? new Date(shift.start_time).toLocaleTimeString("id-ID") : '-'}</span>
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-semibold">Ending Cash (Cash di Laci)</label>
+                <label className="text-sm font-semibold">Uang Akhir (Kas di Laci)</label>
                 <Input 
                   placeholder="e.g. 1.500.000" 
                   value={endingCash ? Number(endingCash).toLocaleString("id-ID") : ""}
@@ -541,10 +541,10 @@ export default function POSPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCloseShiftOpen(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setIsCloseShiftOpen(false)}>Batal</Button>
               <Button variant="destructive" onClick={handleCloseShift} disabled={isShiftProcessing || !endingCash}>
                 {isShiftProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                Confirm Close Shift
+                Konfirmasi Tutup Shift
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -561,8 +561,8 @@ export default function POSPage() {
                         <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4">
                           <ShoppingCart className="w-10 h-10 opacity-30" />
                         </div>
-                        <p className="font-medium text-lg">Your cart is empty</p>
-                        <p className="text-sm">Click on a product to add it.</p>
+                        <p className="font-medium text-lg">Keranjang belanja kosong</p>
+                        <p className="text-sm">Klik produk untuk menambahkannya.</p>
                       </motion.div>
                     ) : (
                       cart.map(item => (
@@ -608,15 +608,15 @@ export default function POSPage() {
             <div className="w-full lg:w-[420px] shrink-0 bg-white flex flex-col z-20">
 
                <div className="flex-1 overflow-y-auto p-8 space-y-6">
-                 <h3 className="font-bold text-lg text-slate-800 mb-4">Payment Summary</h3>
+                 <h3 className="font-bold text-lg text-slate-800 mb-4">Ringkasan Pembayaran</h3>
             <div className="flex flex-col gap-1.5 mb-2">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Customer (Optional)</label>
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pelanggan (Opsional)</label>
               <select 
                 className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
                 value={selectedCustomerId}
                 onChange={(e) => setSelectedCustomerId(e.target.value)}
               >
-                <option value="">Walk-in (No Member Discount)</option>
+                <option value="">Walk-in (Tanpa Diskon Member)</option>
                 {customers.map(c => (
                   <option key={c.id} value={c.id.toString()}>{c.name} - {c.phone}</option>
                 ))}
@@ -624,7 +624,7 @@ export default function POSPage() {
             </div>
 
             <div className="flex flex-col gap-1.5 mb-2">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Custom Discount (%)</label>
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Diskon Tambahan (%)</label>
               <Input 
                 type="number"
                 min="0"
@@ -643,18 +643,18 @@ export default function POSPage() {
                     </div>
                     {discount > 0 && (
                       <div className="flex justify-between text-sm font-bold text-emerald-600">
-                        <span>Discount ({totalDiscountPercent}%)</span>
+                        <span>Diskon ({totalDiscountPercent}%)</span>
                         <span>- Rp {discount.toLocaleString("id-ID")}</span>
                       </div>
                     )}
                     {serviceCharge > 0 && (
                       <div className="flex justify-between text-sm font-medium text-slate-600">
-                        <span>Service Charge ({storeSettings.service_charge_rate}%)</span>
+                        <span>Biaya Layanan ({storeSettings.service_charge_rate}%)</span>
                         <span>Rp {serviceCharge.toLocaleString("id-ID")}</span>
                       </div>
                     )}
                     <div className="flex justify-between text-sm font-medium text-slate-600">
-                      <span>Tax ({storeSettings.tax_rate}%)</span>
+                      <span>Pajak ({storeSettings.tax_rate}%)</span>
                       <span>Rp {tax.toLocaleString("id-ID")}</span>
                     </div>
                  </div>
@@ -669,14 +669,14 @@ export default function POSPage() {
                   <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
                     <DialogTrigger render={
                       <Button className="w-full h-16 text-xl font-black shadow-[0_8px_30px_rgb(0,0,0,0.12)] shadow-primary/30 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-r from-primary to-primary/90 hover:from-primary hover:to-primary text-white" disabled={cart.length === 0}>
-                        <Banknote className="w-6 h-6 mr-2" /> Checkout Now
+                        <Banknote className="w-6 h-6 mr-2" /> Checkout Sekarang
                       </Button>
                     } />
             <DialogContent className="!max-w-md w-[95vw] sm:w-full">
               <DialogHeader>
                 <DialogTitle className="text-2xl">Checkout</DialogTitle>
                 <DialogDescription>
-                  Select a payment method to complete the transaction.
+                  Pilih metode pembayaran untuk menyelesaikan transaksi.
                 </DialogDescription>
               </DialogHeader>
               
@@ -692,7 +692,7 @@ export default function POSPage() {
                   <div className="p-3 bg-green-100 rounded-full text-green-600">
                     <Banknote className="h-8 w-8" />
                   </div>
-                  <span className="font-bold text-lg">Cash</span>
+                  <span className="font-bold text-lg">Tunai</span>
                 </Button>
 
                 <Button 
@@ -761,18 +761,18 @@ export default function POSPage() {
           <Dialog open={isCashOpen} onOpenChange={setIsCashOpen}>
             <DialogContent className="!max-w-sm w-[95vw] sm:w-full rounded-2xl">
               <DialogHeader>
-                <DialogTitle>Cash Payment</DialogTitle>
+                <DialogTitle>Pembayaran Tunai</DialogTitle>
               </DialogHeader>
               <div className="py-4 space-y-6">
                 <div className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border">
-                  <span className="font-semibold text-default-600">Total to Pay</span>
+                  <span className="font-semibold text-default-600">Total Tagihan</span>
                   <span className="text-2xl font-black text-primary">Rp {total.toLocaleString("id-ID")}</span>
                 </div>
                 <div className="space-y-3">
-                  <label className="text-sm font-semibold">Cash Received</label>
+                  <label className="text-sm font-semibold">Uang Diterima</label>
                   <Input 
                     type="text" 
-                    placeholder="Enter amount (e.g. 100.000)" 
+                    placeholder="Masukkan jumlah (cth. 100.000)" 
                     value={cashAmount ? Number(cashAmount).toLocaleString("id-ID") : ""}
                     onChange={(e) => {
                       const rawValue = e.target.value.replace(/\D/g, "")
@@ -782,10 +782,10 @@ export default function POSPage() {
                     autoFocus
                   />
                   {Number(cashAmount) > 0 && Number(cashAmount) < total && (
-                    <p className="text-sm text-destructive font-medium">Amount is less than the total.</p>
+                    <p className="text-sm text-destructive font-medium">Jumlah uang kurang dari total tagihan.</p>
                   )}
                   {Number(cashAmount) >= total && (
-                    <p className="text-sm text-green-600 font-medium">Change: Rp {(Number(cashAmount) - total).toLocaleString("id-ID")}</p>
+                    <p className="text-sm text-green-600 font-medium">Kembalian: Rp {(Number(cashAmount) - total).toLocaleString("id-ID")}</p>
                   )}
                 </div>
               </div>
@@ -798,10 +798,10 @@ export default function POSPage() {
                   {isProcessing ? (
                     <>
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Processing...
+                      Memproses...
                     </>
                   ) : (
-                    "Complete Transaction"
+                    "Selesaikan Transaksi"
                   )}
                 </Button>
               </DialogFooter>
@@ -812,14 +812,14 @@ export default function POSPage() {
           <Dialog open={isQrisOpen} onOpenChange={setIsQrisOpen}>
             <DialogContent className="!max-w-sm w-[95vw] sm:w-full text-center rounded-2xl">
               <DialogHeader>
-                <DialogTitle className="text-center">QRIS Payment</DialogTitle>
+                <DialogTitle className="text-center">Pembayaran QRIS</DialogTitle>
               </DialogHeader>
               <div className="py-8 flex flex-col items-center justify-center gap-6">
                 <div className="w-56 h-56 bg-slate-50 flex items-center justify-center border-2 border-dashed border-primary/30 rounded-2xl">
                   <QrCode className="w-40 h-40 text-primary/80" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Scan using any supported e-Wallet</p>
+                  <p className="text-sm font-medium text-muted-foreground">Scan menggunakan e-Wallet atau Mobile Banking</p>
                   <div className="text-3xl font-black text-primary">Rp {total.toLocaleString("id-ID")}</div>
                 </div>
               </div>
@@ -832,10 +832,10 @@ export default function POSPage() {
                   {isProcessing ? (
                     <>
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Processing...
+                      Memproses...
                     </>
                   ) : (
-                    "Verify Payment"
+                    "Verifikasi Pembayaran"
                   )}
                 </Button>
               </DialogFooter>
@@ -854,8 +854,8 @@ export default function POSPage() {
                 >
                   <CheckCircle2 className="w-10 h-10" />
                 </motion.div>
-                <h2 className="text-2xl font-black text-default-900">Payment Success!</h2>
-                <p className="text-default-500 mt-1">Transaction has been recorded.</p>
+                <h2 className="text-2xl font-black text-default-900">Pembayaran Berhasil!</h2>
+                <p className="text-default-500 mt-1">Transaksi telah tersimpan.</p>
               </div>
 
               {/* Printable Receipt Area */}
@@ -875,8 +875,8 @@ export default function POSPage() {
                   <span>{receiptData?.transaction_number}</span>
                 </div>
                 <div className="flex justify-between text-xs print:text-[10px] mb-2 font-medium text-gray-600 print:text-black">
-                  <span>Cashier: {receiptData?.cashierName}</span>
-                  <span>Cust: {receiptData?.customerName}</span>
+                  <span>Kasir: {receiptData?.cashierName}</span>
+                  <span>Pelanggan: {receiptData?.customerName}</span>
                 </div>
 
                 <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 flex flex-col gap-2">
@@ -899,7 +899,7 @@ export default function POSPage() {
                 </div>
                 {receiptData?.discount > 0 && (
                   <div className="flex justify-between text-xs print:text-[10px] print:text-black">
-                    <span>Member Disc</span>
+                    <span>Diskon Member</span>
                     <span>- Rp {receiptData?.discount.toLocaleString("id-ID")}</span>
                   </div>
                 )}
@@ -920,29 +920,29 @@ export default function POSPage() {
                 </div>
 
                 <div className="flex justify-between text-xs print:text-[10px] print:text-black">
-                  <span>Pay ({receiptData?.paymentMethod})</span>
+                  <span>Bayar ({receiptData?.paymentMethod})</span>
                   <span>Rp {receiptData?.paymentAmount.toLocaleString("id-ID")}</span>
                 </div>
                 <div className="flex justify-between text-xs print:text-[10px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
-                  <span>Change</span>
+                  <span>Kembali</span>
                   <span className="font-bold">Rp {receiptData?.change.toLocaleString("id-ID")}</span>
                 </div>
 
                 <div className="text-center text-xs print:text-[10px] mt-2 print:mt-1 italic text-gray-500 print:text-black">
-                  {storeSettings.receipt_footer || 'Thank you for your purchase!'}
+                  {storeSettings.receipt_footer || 'Terima kasih atas kunjungan Anda!'}
                 </div>
                 
                 <div className="print:hidden border-t border-dashed mt-4 pt-4 text-center text-xs text-muted-foreground">
-                  This is a preview of the printed receipt.
+                  Ini adalah pratinjau struk yang akan dicetak.
                 </div>
               </div>
 
               <DialogFooter className="sm:justify-between px-2 pb-2">
                 <Button variant="outline" className="rounded-xl font-semibold" onClick={() => setIsReceiptOpen(false)}>
-                  Close
+                  Tutup
                 </Button>
                 <Button onClick={handlePrint} className="rounded-xl font-bold bg-slate-900 text-white hover:bg-slate-800">
-                  Print Receipt
+                  Cetak Struk
                 </Button>
               </DialogFooter>
             </DialogContent>

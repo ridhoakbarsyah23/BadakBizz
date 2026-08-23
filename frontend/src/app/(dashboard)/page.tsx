@@ -20,7 +20,7 @@ export default function Dashboard() {
       if (!token) return
       setIsLoading(true)
       try {
-        const res = await fetch(`http://localhost:8000/api/dashboard?filter=${filter}`, {
+        const res = await fetch(`http://127.0.0.1:8000/api/dashboard?filter=${filter}`, {
           headers: { "Authorization": `Bearer ${token}` }
         })
         const result = await res.json()
@@ -118,9 +118,9 @@ export default function Dashboard() {
     >
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <motion.div variants={itemVariants} className="flex flex-col gap-2">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard Analytics</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Analitik Dasbor</h1>
           <p className="text-muted-foreground">
-            Welcome to Kivo POS. Here is your business overview.
+            Selamat datang di Kivo POS. Berikut adalah ringkasan bisnis Anda.
           </p>
         </motion.div>
         
@@ -131,7 +131,7 @@ export default function Dashboard() {
             className={`rounded-lg px-4 transition-all duration-300 ${filter === 'today' ? 'shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'}`}
             onClick={() => setFilter('today')}
           >
-            Today
+            Hari Ini
           </Button>
           <Button 
             variant={filter === 'week' ? 'default' : 'ghost'} 
@@ -139,7 +139,7 @@ export default function Dashboard() {
             className={`rounded-lg px-4 transition-all duration-300 ${filter === 'week' ? 'shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'}`}
             onClick={() => setFilter('week')}
           >
-            7 Days
+            7 Hari
           </Button>
           <Button 
             variant={filter === 'month' ? 'default' : 'ghost'} 
@@ -147,7 +147,7 @@ export default function Dashboard() {
             className={`rounded-lg px-4 transition-all duration-300 ${filter === 'month' ? 'shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'}`}
             onClick={() => setFilter('month')}
           >
-            30 Days
+            30 Hari
           </Button>
         </motion.div>
       </div>
@@ -163,7 +163,7 @@ export default function Dashboard() {
           <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Total Revenue
+                Total Pendapatan
               </CardTitle>
               <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center transition-transform hover:scale-110">
                 <DollarSign className="h-5 w-5 text-blue-600" />
@@ -181,7 +181,7 @@ export default function Dashboard() {
           <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Total Transactions
+                Total Transaksi
               </CardTitle>
               <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center transition-transform hover:scale-110">
                 <CreditCard className="h-5 w-5 text-emerald-600" />
@@ -199,7 +199,7 @@ export default function Dashboard() {
           <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Total Customers
+                Total Pelanggan
               </CardTitle>
               <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center transition-transform hover:scale-110">
                 <Users className="h-5 w-5 text-purple-600" />
@@ -217,7 +217,7 @@ export default function Dashboard() {
           <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Low Stock Items
+                Stok Menipis
               </CardTitle>
               <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center transition-transform hover:scale-110">
                 <Package className="h-5 w-5 text-red-600" />
@@ -228,20 +228,20 @@ export default function Dashboard() {
                 {data?.lowStockProducts?.length || 0}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Needs your attention
+                Perlu Perhatian
               </p>
             </CardContent>
           </Card>
         </motion.div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-7 lg:grid-cols-7">
-        <motion.div variants={itemVariants} className="col-span-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-7">
+        <motion.div variants={itemVariants} className="col-span-1 md:col-span-4">
           <Card className="shadow-sm h-full rounded-2xl">
             <CardHeader>
-              <CardTitle className="text-xl font-bold">Sales Overview</CardTitle>
+              <CardTitle className="text-xl font-bold">Ringkasan Penjualan</CardTitle>
               <CardDescription>
-                Your store revenue trend for the selected period.
+                Tren pendapatan toko Anda untuk periode yang dipilih.
               </CardDescription>
             </CardHeader>
             <CardContent className="pl-2">
@@ -266,7 +266,7 @@ export default function Dashboard() {
                       width={80}
                     />
                     <Tooltip 
-                      formatter={(value: any) => [`Rp ${Number(value).toLocaleString("id-ID")}`, "Revenue"]}
+                      formatter={(value: any) => [`Rp ${Number(value).toLocaleString("id-ID")}`, "Pendapatan"]}
                       cursor={{fill: 'rgba(59, 130, 246, 0.05)'}}
                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' }}
                     />
@@ -278,19 +278,19 @@ export default function Dashboard() {
           </Card>
         </motion.div>
         
-        <motion.div variants={itemVariants} className="col-span-3">
+        <motion.div variants={itemVariants} className="col-span-1 md:col-span-3">
           <Card className="shadow-sm h-full rounded-2xl">
             <CardHeader>
-              <CardTitle className="text-xl font-bold">Top Selling Products</CardTitle>
+              <CardTitle className="text-xl font-bold">Produk Terlaris</CardTitle>
               <CardDescription>
-                Most popular items by quantity sold.
+                Item paling populer berdasarkan jumlah terjual.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-6 mt-2">
                 {!data?.topProducts || data.topProducts.length === 0 ? (
                   <div className="text-center text-muted-foreground py-10 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                    No sales data found for this period.
+                    Tidak ada data penjualan untuk periode ini.
                   </div>
                 ) : (
                   <AnimatePresence mode="popLayout">
@@ -318,7 +318,7 @@ export default function Dashboard() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-black text-slate-800">{item.total_sold} <span className="text-slate-500 font-medium text-xs">sold</span></p>
+                          <p className="text-sm font-black text-slate-800">{item.total_sold} <span className="text-slate-500 font-medium text-xs">terjual</span></p>
                         </div>
                       </motion.div>
                     ))}

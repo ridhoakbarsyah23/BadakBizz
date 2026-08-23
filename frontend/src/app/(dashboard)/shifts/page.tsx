@@ -39,7 +39,7 @@ export default function ShiftsPage() {
   const fetchShifts = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch('http://localhost:8000/api/shifts', {
+      const res = await fetch('http://127.0.0.1:8000/api/shifts', {
         headers: { "Authorization": `Bearer ${token}` }
       })
       if (!res.ok) throw new Error('Failed to fetch data')

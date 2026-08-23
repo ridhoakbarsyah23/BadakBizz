@@ -64,7 +64,7 @@ export default function StaffManagementPage() {
   const fetchStaff = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch("http://localhost:8000/api/staff", {
+      const res = await fetch("http://127.0.0.1:8000/api/staff", {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -126,8 +126,8 @@ export default function StaffManagementPage() {
     setIsSubmitting(true)
     
     const url = isEditMode 
-      ? `http://localhost:8000/api/staff/${currentId}`
-      : `http://localhost:8000/api/staff`
+      ? `http://127.0.0.1:8000/api/staff/${currentId}`
+      : `http://127.0.0.1:8000/api/staff`
       
     const method = isEditMode ? 'PUT' : 'POST'
     
@@ -176,7 +176,7 @@ export default function StaffManagementPage() {
       desc: `Are you sure you want to ${actionText} ${user.name}'s account?`,
       action: async () => {
         try {
-          await fetch(`http://localhost:8000/api/staff/${user.id}`, {
+          await fetch(`http://127.0.0.1:8000/api/staff/${user.id}`, {
             method: 'PUT',
             headers: {
               "Content-Type": "application/json",

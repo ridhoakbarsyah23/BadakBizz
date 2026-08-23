@@ -34,7 +34,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await fetch("http://localhost:8000/api/settings", {
+        const res = await fetch("http://127.0.0.1:8000/api/settings", {
           headers: {
             "Authorization": `Bearer ${token}`
           }
@@ -64,7 +64,7 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      const res = await fetch("http://localhost:8000/api/settings", {
+      const res = await fetch("http://127.0.0.1:8000/api/settings", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -99,9 +99,9 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Pengaturan Toko</h1>
         <p className="text-muted-foreground">
-          Manage your store preferences, receipt formats, and staff access.
+          Kelola preferensi toko, format struk, dan akses karyawan.
         </p>
       </div>
 
@@ -114,20 +114,20 @@ export default function SettingsPage() {
               <div className="p-2 bg-primary/20 rounded-lg">
                 <Store className="w-5 h-5 text-primary" />
               </div>
-              <CardTitle>Staff & Users</CardTitle>
+              <CardTitle>Karyawan & Pengguna</CardTitle>
             </div>
             <CardDescription>
-              Add cashiers, reset passwords, and revoke access.
+              Tambahkan kasir, atur ulang kata sandi, dan cabut akses.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-slate-600">
-              Control who can access your POS system. Each cashier will have their name printed on the receipt for accountability.
+              Kontrol siapa yang dapat mengakses sistem POS Anda. Setiap nama kasir akan tercetak di struk untuk akuntabilitas.
             </p>
           </CardContent>
           <CardFooter>
             <Link href="/staff" className="w-full sm:w-auto">
-              <Button className="w-full sm:w-auto">Manage Staff Accounts</Button>
+              <Button className="w-full sm:w-auto">Kelola Akun Karyawan</Button>
             </Link>
           </CardFooter>
         </Card>
@@ -137,15 +137,15 @@ export default function SettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Store className="w-5 h-5 text-primary" />
-              <CardTitle>General Information</CardTitle>
+              <CardTitle>Informasi Umum</CardTitle>
             </div>
             <CardDescription>
-              Update your store name and contact details.
+              Perbarui nama toko dan detail kontak Anda.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="storeName">Store Name</Label>
+              <Label htmlFor="storeName">Nama Toko</Label>
               <Input 
                 id="storeName" 
                 value={settings.name} 
@@ -153,7 +153,7 @@ export default function SettingsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
+              <Label htmlFor="phone">Nomor Telepon</Label>
               <Input 
                 id="phone" 
                 value={settings.phone} 
@@ -161,7 +161,7 @@ export default function SettingsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="address">Store Address</Label>
+              <Label htmlFor="address">Alamat Toko</Label>
               <Input 
                 id="address" 
                 value={settings.address} 
@@ -172,7 +172,7 @@ export default function SettingsPage() {
           <CardFooter>
             <Button onClick={handleSave} disabled={isSaving}>
               {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Save Changes
+              Simpan Perubahan
             </Button>
           </CardFooter>
         </Card>
@@ -182,20 +182,20 @@ export default function SettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Coins className="w-5 h-5 text-primary" />
-              <CardTitle>Financial & Tax</CardTitle>
+              <CardTitle>Keuangan & Pajak</CardTitle>
             </div>
             <CardDescription>
-              Set up your currency and standard tax rates.
+              Atur mata uang dan tarif pajak standar Anda.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="currency">Currency</Label>
+                <Label htmlFor="currency">Mata Uang</Label>
                 <Input id="currency" value="IDR (Rp)" disabled />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="tax">Default Tax (%)</Label>
+                <Label htmlFor="tax">Pajak Default (%)</Label>
                 <Input 
                   id="tax" 
                   type="number" 
@@ -205,7 +205,7 @@ export default function SettingsPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="serviceCharge">Service Charge (%)</Label>
+              <Label htmlFor="serviceCharge">Biaya Layanan (Service Charge) (%)</Label>
               <Input 
                 id="serviceCharge" 
                 type="number" 
@@ -217,7 +217,7 @@ export default function SettingsPage() {
           <CardFooter>
             <Button onClick={handleSave} disabled={isSaving}>
               {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Save Changes
+              Simpan Perubahan
             </Button>
           </CardFooter>
         </Card>
@@ -227,38 +227,38 @@ export default function SettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Receipt className="w-5 h-5 text-primary" />
-              <CardTitle>Receipt Customization</CardTitle>
+              <CardTitle>Kustomisasi Struk</CardTitle>
             </div>
             <CardDescription>
-              Customize the text printed on the header and footer of your receipts.
+              Sesuaikan teks yang dicetak di bagian atas dan bawah struk Anda.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="receiptHeader">Receipt Header</Label>
+                <Label htmlFor="receiptHeader">Header Struk</Label>
                 <Input 
                   id="receiptHeader" 
                   value={settings.receipt_header} 
                   onChange={(e) => setSettings({...settings, receipt_header: e.target.value})} 
                 />
-                <p className="text-xs text-muted-foreground">Appears at the very top of the printed receipt.</p>
+                <p className="text-xs text-muted-foreground">Muncul di bagian paling atas struk yang dicetak.</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="receiptFooter">Receipt Footer / Thank You Message</Label>
+                <Label htmlFor="receiptFooter">Footer Struk / Pesan Terima Kasih</Label>
                 <Input 
                   id="receiptFooter" 
                   value={settings.receipt_footer} 
                   onChange={(e) => setSettings({...settings, receipt_footer: e.target.value})} 
                 />
-                <p className="text-xs text-muted-foreground">Appears at the very bottom.</p>
+                <p className="text-xs text-muted-foreground">Muncul di bagian paling bawah.</p>
               </div>
             </div>
           </CardContent>
           <CardFooter>
             <Button onClick={handleSave} disabled={isSaving}>
               {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Save Changes
+              Simpan Perubahan
             </Button>
           </CardFooter>
         </Card>

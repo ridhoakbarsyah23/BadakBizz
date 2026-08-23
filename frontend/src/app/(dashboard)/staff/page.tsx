@@ -54,8 +54,8 @@ export default function StaffPage() {
     try {
       const headers = { "Authorization": `Bearer ${token}` }
       const [staffRes, rolesRes] = await Promise.all([
-        fetch('http://localhost:8000/api/staff', { headers }),
-        fetch('http://localhost:8000/api/roles', { headers })
+        fetch('http://127.0.0.1:8000/api/staff', { headers }),
+        fetch('http://127.0.0.1:8000/api/roles', { headers })
       ])
       
       const staffData = await staffRes.json()
@@ -103,8 +103,8 @@ export default function StaffPage() {
     setIsSaving(true)
     try {
       const url = editingStaff 
-        ? `http://localhost:8000/api/staff/${editingStaff.id}`
-        : `http://localhost:8000/api/staff`
+        ? `http://127.0.0.1:8000/api/staff/${editingStaff.id}`
+        : `http://127.0.0.1:8000/api/staff`
       
       const method = editingStaff ? "PUT" : "POST"
       
@@ -153,7 +153,7 @@ export default function StaffPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Staff Management</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Manajemen Karyawan</h1>
           <p className="text-muted-foreground">
             Kelola akun Admin dan Kasir. Anda dapat me-nonaktifkan akun karyawan yang sudah resign.
           </p>
@@ -207,7 +207,7 @@ export default function StaffPage() {
                         <TableCell className="font-semibold text-default-900">
                           {staff.name}
                           {user?.id === staff.id && (
-                            <Badge variant="outline" className="ml-2 text-[10px] py-0 border-primary text-primary">You</Badge>
+                            <Badge variant="outline" className="ml-2 text-[10px] py-0 border-primary text-primary">Anda</Badge>
                           )}
                         </TableCell>
                         <TableCell className="text-muted-foreground">{staff.email}</TableCell>
@@ -218,7 +218,7 @@ export default function StaffPage() {
                             </div>
                           ) : (
                             <div className="flex items-center gap-1.5 text-blue-700 font-medium">
-                              <ShieldAlert className="w-4 h-4 text-blue-500" /> Cashier
+                              <ShieldAlert className="w-4 h-4 text-blue-500" /> Kasir
                             </div>
                           )}
                         </TableCell>

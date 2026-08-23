@@ -64,13 +64,13 @@ export function RestockDialog({ product }: { product: any }) {
       <DialogTrigger render={
         <Button size="sm" variant="outline" className="h-8">
           <Plus className="w-4 h-4 mr-1" />
-          Restock
+          Tambah Stok
         </Button>
       } />
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleRestock}>
           <DialogHeader>
-            <DialogTitle>Restock Produk</DialogTitle>
+            <DialogTitle>Tambah Stok Produk</DialogTitle>
             <DialogDescription>
               Tambahkan stok baru untuk produk <strong>{product.name}</strong>.
             </DialogDescription>

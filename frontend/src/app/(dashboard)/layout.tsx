@@ -18,15 +18,20 @@ export default function DashboardLayout({
       
       <main className="flex flex-1 flex-col overflow-hidden relative">
         {/* Mobile Header */}
-        <div className="flex h-16 items-center border-b border-default-200 px-4 bg-background lg:hidden shrink-0">
+        <div className="flex h-16 items-center border-b border-slate-100 px-4 bg-white lg:hidden shrink-0 shadow-sm z-10">
           <Button 
             isIconOnly 
             variant="tertiary" 
             onPress={() => setIsSidebarOpen(true)}
           >
-            <Menu className="w-6 h-6 text-default-600" />
+            <Menu className="w-6 h-6 text-slate-700" />
           </Button>
-          <span className="font-bold ml-4 text-default-800 text-lg">Kivo POS</span>
+          <div className="flex items-center gap-2 font-black text-lg text-primary tracking-tight ml-4">
+            <div className="w-7 h-7 bg-primary rounded-md flex items-center justify-center shadow-md shadow-primary/20">
+              <span className="text-white text-xs">K</span>
+            </div>
+            <span>Kivo POS</span>
+          </div>
         </div>
         
         {/* Main Content Area */}

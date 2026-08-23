@@ -11,7 +11,8 @@ import {
 import { Bar, BarChart, CartesianGrid, XAxis, ResponsiveContainer, LineChart, Line } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { useAuth } from "@/context/AuthContext"
-import { Loader2 } from "lucide-react"
+import { Loader2, Download } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
@@ -22,11 +23,11 @@ import {
 
 const salesConfig = {
   sales: {
-    label: "Sales",
+    label: "Penjualan",
     color: "hsl(var(--primary))",
   },
   profit: {
-    label: "Profit",
+    label: "Laba",
     color: "hsl(var(--destructive))",
   }
 }
@@ -36,7 +37,66 @@ export default function ReportsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [dateRange, setDateRange] = useState('this_year')
+  const [isExporting, setIsExporting] = useState(false)
   const { token } = useAuth()
+
+  const handleExport = async () => {
+    try {
+      setIsExporting(true)
+      const now = new Date()
+      let startDate = ''
+      let endDate = now.toISOString()
+      
+      if (dateRange === 'today') {
+        const start = new Date(now)
+        start.setHours(0, 0, 0, 0)
+        startDate = start.toISOString()
+      } else if (dateRange === 'last_7_days') {
+        const start = new Date(now)
+        start.setDate(now.getDate() - 6)
+        start.setHours(0, 0, 0, 0)
+        startDate = start.toISOString()
+      } else if (dateRange === 'last_30_days') {
+        const start = new Date(now)
+        start.setDate(now.getDate() - 29)
+        start.setHours(0, 0, 0, 0)
+        startDate = start.toISOString()
+      } else if (dateRange === 'this_month') {
+        const start = new Date(now.getFullYear(), now.getMonth(), 1)
+        startDate = start.toISOString()
+      } else if (dateRange === 'this_year') {
+        const start = new Date(now.getFullYear(), 0, 1)
+        startDate = start.toISOString()
+      }
+
+      let url = 'http://127.0.0.1:8000/api/reports/export'
+      if (startDate) {
+        url += `?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`
+      }
+
+      const res = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (!res.ok) throw new Error('Gagal mengekspor data')
+      
+      const blob = await res.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = downloadUrl
+      a.download = `KivoPOS_Report_${dateRange}.csv`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(downloadUrl)
+      a.remove()
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   useEffect(() => {
     const fetchReports = async () => {
@@ -69,7 +129,7 @@ export default function ReportsPage() {
           startDate = start.toISOString()
         }
 
-        let url = 'http://localhost:8000/api/reports'
+        let url = 'http://127.0.0.1:8000/api/reports'
         if (startDate) {
           url += `?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`
         }
@@ -81,7 +141,7 @@ export default function ReportsPage() {
           }
         })
         
-        if (!res.ok) throw new Error('Failed to fetch reports data')
+        if (!res.ok) throw new Error('Gagal mengambil data laporan')
         
         const jsonData = await res.json()
         setData(jsonData)
@@ -109,30 +169,36 @@ export default function ReportsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
         <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Laporan Keuangan</h1>
           <p className="text-muted-foreground">
-            Analytics and insights for your business.
+            Analitik dan wawasan untuk bisnis Anda.
           </p>
         </div>
-        <div className="w-[180px]">
-          <Select value={dateRange} onValueChange={(val) => { if (val) setDateRange(val) }}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select period">
-                {dateRange === 'today' && 'Today'}
-                {dateRange === 'last_7_days' && 'Last 7 Days'}
-                {dateRange === 'last_30_days' && 'Last 30 Days'}
-                {dateRange === 'this_month' && 'This Month'}
-                {dateRange === 'this_year' && 'This Year'}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="last_7_days">Last 7 Days</SelectItem>
-              <SelectItem value="last_30_days">Last 30 Days</SelectItem>
-              <SelectItem value="this_month">This Month</SelectItem>
-              <SelectItem value="this_year">This Year</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-3">
+          <Button onClick={handleExport} variant="outline" className="h-10" disabled={isExporting}>
+            {isExporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+            Ekspor CSV
+          </Button>
+          <div className="w-[180px]">
+            <Select value={dateRange} onValueChange={(val) => { if (val) setDateRange(val) }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pilih periode">
+                  {dateRange === 'today' && 'Hari Ini'}
+                  {dateRange === 'last_7_days' && '7 Hari Terakhir'}
+                  {dateRange === 'last_30_days' && '30 Hari Terakhir'}
+                  {dateRange === 'this_month' && 'Bulan Ini'}
+                  {dateRange === 'this_year' && 'Tahun Ini'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Hari Ini</SelectItem>
+                <SelectItem value="last_7_days">7 Hari Terakhir</SelectItem>
+                <SelectItem value="last_30_days">30 Hari Terakhir</SelectItem>
+                <SelectItem value="this_month">Bulan Ini</SelectItem>
+                <SelectItem value="this_year">Tahun Ini</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
       
@@ -145,20 +211,20 @@ export default function ReportsPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                <CardTitle className="text-sm font-medium">Total Pendapatan</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
                   Rp {Number(data?.totalRevenue || 0).toLocaleString("id-ID")}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  For the selected period
+                  Untuk periode yang dipilih
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Average Transaction</CardTitle>
+                <CardTitle className="text-sm font-medium">Rata-Rata Transaksi</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
@@ -168,23 +234,23 @@ export default function ReportsPage() {
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Top Selling Item</CardTitle>
+                <CardTitle className="text-sm font-medium">Produk Terlaris</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold truncate">
-                  {data?.topSellingItem?.name || "N/A"}
+                  {data?.topSellingItem?.name || "-"}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {data?.topSellingItem ? `${data.topSellingItem.sold} units sold` : "No sales yet"}
+                  {data?.topSellingItem ? `${data.topSellingItem.sold} unit terjual` : "Belum ada penjualan"}
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Busiest Hour</CardTitle>
+                <CardTitle className="text-sm font-medium">Jam Tersibuk</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{data?.busiestHour || "N/A"}</div>
+                <div className="text-2xl font-bold">{data?.busiestHour || "-"}</div>
               </CardContent>
             </Card>
           </div>
@@ -192,9 +258,9 @@ export default function ReportsPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Sales vs Profit</CardTitle>
+                <CardTitle>Penjualan vs Laba</CardTitle>
                 <CardDescription>
-                  Comparing total revenue and net profit.
+                  Perbandingan total pendapatan dan laba bersih.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -217,9 +283,9 @@ export default function ReportsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Revenue Trend</CardTitle>
+                <CardTitle>Tren Pendapatan</CardTitle>
                 <CardDescription>
-                  Revenue trajectory over the selected period.
+                  Pergerakan pendapatan selama periode yang dipilih.
                 </CardDescription>
               </CardHeader>
               <CardContent>

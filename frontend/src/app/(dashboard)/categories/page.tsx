@@ -69,7 +69,7 @@ export default function CategoriesPage() {
   const fetchCategories = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch("http://localhost:8000/api/categories", {
+      const res = await fetch("http://127.0.0.1:8000/api/categories", {
         headers: { "Authorization": `Bearer ${token}` }
       })
       const data = await res.json()
@@ -85,8 +85,8 @@ export default function CategoriesPage() {
     e.preventDefault()
     setConfirmConfig({
       isOpen: true,
-      title: "Save Changes",
-      desc: `Are you sure you want to ${editingId ? 'update' : 'add'} this category?`,
+      title: "Simpan Perubahan",
+      desc: `Apakah Anda yakin ingin ${editingId ? 'memperbarui' : 'menambahkan'} kategori ini?`,
       action: executeSubmit
     })
   }
@@ -97,8 +97,8 @@ export default function CategoriesPage() {
 
     try {
       const url = editingId 
-        ? `http://localhost:8000/api/categories/${editingId}`
-        : "http://localhost:8000/api/categories"
+        ? `http://127.0.0.1:8000/api/categories/${editingId}`
+        : "http://127.0.0.1:8000/api/categories"
         
       const res = await fetch(url, {
         method: editingId ? "PUT" : "POST",
@@ -113,7 +113,7 @@ export default function CategoriesPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        throw new Error(data.message || "Failed to save category")
+        throw new Error(data.message || "Gagal menyimpan kategori")
       }
 
       await fetchCategories()
@@ -129,11 +129,11 @@ export default function CategoriesPage() {
     if (!deleteCategory) return
     setIsSubmitting(true)
     try {
-      const res = await fetch(`http://localhost:8000/api/categories/${deleteCategory.id}`, {
+      const res = await fetch(`http://127.0.0.1:8000/api/categories/${deleteCategory.id}`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` }
       })
-      if (!res.ok) throw new Error("Failed to delete category")
+      if (!res.ok) throw new Error("Gagal menghapus kategori")
       
       await fetchCategories()
       setIsDeleteOpen(false)
@@ -167,9 +167,9 @@ export default function CategoriesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Categories</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Kategori</h1>
           <p className="text-muted-foreground">
-            Manage your product categories.
+            Kelola kategori produk Anda.
           </p>
         </div>
         
@@ -177,25 +177,25 @@ export default function CategoriesPage() {
           <DialogTrigger render={
             <Button onClick={openCreate}>
               <Plus className="w-4 h-4 mr-2" />
-              Add Category
+              Tambah Kategori
             </Button>
           } />
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>{editingId ? "Edit Category" : "Add New Category"}</DialogTitle>
+              <DialogTitle>{editingId ? "Edit Kategori" : "Tambah Kategori Baru"}</DialogTitle>
               <DialogDescription>
-                Fill in the category name below.
+                Masukkan nama kategori di bawah ini.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-4 py-2">
                 {error && <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-md">{error}</div>}
                 <div className="space-y-2">
-                  <Label htmlFor="name">Category Name <span className="text-destructive">*</span></Label>
+                  <Label htmlFor="name">Nama Kategori <span className="text-destructive">*</span></Label>
                   <Input 
                     id="name"
                     required
-                    placeholder="e.g., Beverages"
+                    placeholder="cth., Minuman"
                     value={formData.name}
                     onChange={(e) => setFormData({ name: e.target.value })}
                   />
@@ -203,11 +203,11 @@ export default function CategoriesPage() {
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
-                  Cancel
+                  Batal
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  Save Changes
+                  Simpan Perubahan
                 </Button>
               </DialogFooter>
             </form>
@@ -225,16 +225,16 @@ export default function CategoriesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>ID</TableHead>
-                <TableHead>NAME</TableHead>
+                <TableHead>NAMA</TableHead>
                 <TableHead>SLUG</TableHead>
-                <TableHead className="text-right">ACTIONS</TableHead>
+                <TableHead className="text-right">AKSI</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {categories.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                    No categories found. Add a category to get started.
+                    Tidak ada kategori yang ditemukan. Tambahkan kategori untuk memulai.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -266,20 +266,20 @@ export default function CategoriesPage() {
           <DialogHeader>
             <div className="flex items-center gap-3 text-destructive">
               <AlertTriangle className="w-6 h-6" />
-              <DialogTitle>Delete Category</DialogTitle>
+              <DialogTitle>Hapus Kategori</DialogTitle>
             </div>
             <DialogDescription className="pt-2">
-              Are you sure you want to delete the category <strong>{deleteCategory?.name}</strong>?
-              <br />This action cannot be undone.
+              Apakah Anda yakin ingin menghapus kategori <strong>{deleteCategory?.name}</strong>?
+              <br />Tindakan ini tidak dapat dibatalkan.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="pt-4">
             <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
-              Cancel
+              Batal
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Delete
+              Hapus
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -291,14 +291,14 @@ export default function CategoriesPage() {
             <AlertDialogDescription>{confirmConfig.desc}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
             <AlertDialogAction onClick={(e) => {
               e.preventDefault();
               setConfirmConfig(prev => ({ ...prev, isOpen: false }));
               if (confirmConfig.action) {
                 setTimeout(() => confirmConfig.action(), 100);
               }
-            }}>Confirm</AlertDialogAction>
+            }}>Konfirmasi</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
