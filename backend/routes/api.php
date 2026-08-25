@@ -11,6 +11,10 @@ use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\MidtransController;
+
+// Midtrans Webhook (No Auth Required)
+Route::post('/midtrans/webhook', [MidtransController::class, 'webhook']);
 
 // Authentication Routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -36,6 +40,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Transactions
     Route::get('/transactions', [TransactionController::class, 'index']);
     Route::post('/transactions', [TransactionController::class, 'store']);
+    
+    // QRIS
+    Route::post('/qris/generate', [MidtransController::class, 'generateQris']);
+    Route::get('/qris/status/{order_id}', [MidtransController::class, 'checkStatus']);
 
     // ---- Admin Only Routes ----
     Route::middleware('role:admin')->group(function () {

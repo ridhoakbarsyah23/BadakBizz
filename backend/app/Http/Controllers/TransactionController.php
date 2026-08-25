@@ -43,6 +43,8 @@ class TransactionController extends Controller
             'customer_id' => 'nullable|exists:customers,id',
             'cashier_id' => 'nullable|exists:users,id',
             'discount' => 'nullable|numeric|min:0',
+            'order_type' => 'nullable|string|in:dine_in,takeaway',
+            'table_id' => 'nullable|exists:tables,id',
         ]);
 
         try {
@@ -119,7 +121,9 @@ class TransactionController extends Controller
                 'total_amount' => $totalAmount,
                 'payment_amount' => $validated['payment_amount'],
                 'payment_method' => $validated['payment_method'],
-                'status' => 'COMPLETED'
+                'status' => $validated['payment_method'] === 'QRIS' ? 'PENDING' : 'COMPLETED',
+                'order_type' => $validated['order_type'] ?? 'dine_in',
+                'table_id' => $validated['table_id'] ?? null,
             ]);
 
             // 3. Create Items, Update Stock, Create Inventory Movements
