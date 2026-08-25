@@ -8,6 +8,9 @@ class Store extends Model
 {
     protected $fillable = [
         'name',
+        'business_type',
+        'enable_table_management',
+        'enable_kitchen_receipts',
         'phone',
         'address',
         'currency',

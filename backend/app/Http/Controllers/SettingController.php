@@ -34,6 +34,9 @@ class SettingController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'business_type' => 'required|string|in:retail,fnb,services,mixed',
+            'enable_table_management' => 'boolean',
+            'enable_kitchen_receipts' => 'boolean',
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:255',
             'tax_rate' => 'numeric|min:0|max:100',

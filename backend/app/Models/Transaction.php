@@ -21,6 +21,8 @@ class Transaction extends Model
         'payment_amount',
         'payment_method',
         'status',
+        'order_type',
+        'table_id',
     ];
 
     public function customer(): BelongsTo
@@ -31,6 +33,11 @@ class Transaction extends Model
     public function cashier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cashier_id');
+    }
+
+    public function table(): BelongsTo
+    {
+        return $this->belongsTo(Table::class);
     }
 
     public function cashierShift(): BelongsTo
