@@ -1,64 +1,64 @@
 # BadakBiz 🏪
 
-BadakBiz is a modern, responsive Point of Sale application designed to help you manage your store, inventory, and transactions efficiently. Built with an industry-standard separated architecture.
+BadakBiz adalah aplikasi Point of Sale (Kasir) modern dan responsif yang dirancang untuk membantu Anda mengelola toko, inventaris, dan transaksi secara efisien. Dibangun menggunakan arsitektur terpisah (separated architecture) dengan standar industri saat ini.
 
-## 🏗️ Architecture
+## 🏗️ Arsitektur
 
-- **Frontend**: [Next.js 15+](https://nextjs.org/) (App Router) with [shadcn/ui](https://ui.shadcn.com/) and Tailwind CSS.
-- **Backend**: [Laravel 11](https://laravel.com/) with SQLite (default) providing RESTful APIs.
-- **Authentication**: Laravel Sanctum (Token-based API Authentication).
+- **Frontend**: [Next.js 15+](https://nextjs.org/) (App Router) dengan [shadcn/ui](https://ui.shadcn.com/) dan Tailwind CSS.
+- **Backend**: [Laravel 11](https://laravel.com/) dengan SQLite (bawaan) yang menyediakan RESTful API.
+- **Autentikasi**: Laravel Sanctum (Autentikasi API berbasis token).
 
-## 🚀 Getting Started
+## 🚀 Memulai Proyek
 
-Since the project is separated into `frontend` and `backend`, you need to run two separate development servers.
+Karena proyek ini dipisahkan menjadi `frontend` dan `backend`, Anda perlu menjalankan dua server pengembangan (development server) yang terpisah.
 
-### 1. Backend Setup (Laravel)
+### 1. Pengaturan Backend (Laravel)
 
-Navigate to the `backend` directory:
+Masuk ke direktori `backend`:
 ```bash
 cd backend
 ```
 
-Install dependencies and start the server:
+Instal dependensi dan jalankan server:
 ```bash
 composer install
 php artisan migrate
-php artisan db:seed # Optional: if you have seeders
+php artisan db:seed # Opsional: jika Anda ingin mengisi data awal
 php artisan serve
 ```
-The backend API will run on `http://127.0.0.1:8000`.
+API backend akan berjalan di `http://127.0.0.1:8000`.
 
-### 2. Frontend Setup (Next.js)
+### 2. Pengaturan Frontend (Next.js)
 
-Open a new terminal and navigate to the `frontend` directory:
+Buka terminal baru dan masuk ke direktori `frontend`:
 ```bash
 cd frontend
 ```
 
-Install dependencies and start the Next.js server:
+Instal dependensi dan jalankan server Next.js:
 ```bash
 npm install
 npm run dev
 ```
-The frontend UI will be available at `http://localhost:3000`.
+UI frontend akan tersedia di `http://localhost:3000`.
 
-## 🔐 Default Credentials
+## 🔐 Kredensial Bawaan
 
-To log into the BadakBiz Dashboard, use the following credentials (if you have seeded the database):
+Untuk masuk ke Dashboard BadakBiz, gunakan kredensial berikut (jika Anda telah menjalankan seeder database):
 - **Email:** `admin@badakbiz.com`
 - **Password:** `password123`
 
-## 🌟 Features
+## 🌟 Fitur
 
-- **Dashboard**: Real-time charts and recent transactions overview.
-- **POS / Checkout**: Interactive cart system with cash and QRIS payment simulations.
-- **Inventory & Products**: Manage your catalog, pricing, and track stock levels.
-- **Categories**: Organize products efficiently.
-- **Transactions & Reports**: Historical records and performance metrics.
-- **Settings**: Store configurations.
+- **Dashboard**: Grafik real-time dan ringkasan transaksi terbaru.
+- **Kasir (POS) / Checkout**: Sistem keranjang interaktif dengan simulasi pembayaran tunai dan QRIS.
+- **Inventaris & Produk**: Kelola katalog, harga, dan pantau ketersediaan stok Anda.
+- **Kategori**: Mengelompokkan produk dengan rapi dan efisien.
+- **Transaksi & Laporan**: Riwayat transaksi dan metrik performa penjualan.
+- **Pengaturan**: Konfigurasi profil dan pengaturan toko.
 
-## 💻 Tech Stack Highlights
+## 💻 Sorotan Teknologi
 - `React 19` & `Next.js`
-- `Tailwind CSS` & `lucide-react` icons
+- `Tailwind CSS` & ikon dari `lucide-react`
 - `Laravel 11` & `Eloquent ORM`
-- `Recharts` for interactive data visualization
+- `Recharts` untuk visualisasi data interaktif
