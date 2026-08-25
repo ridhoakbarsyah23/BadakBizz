@@ -24,7 +24,7 @@ export function middleware(request: NextRequest) {
 
   // Restrict cashier from accessing admin pages
   if (role === 'cashier') {
-    const adminRoutes = ['/', '/settings', '/staff', '/shifts', '/reports', '/customers']
+    const adminRoutes = ['/', '/settings', '/staff', '/shifts', '/reports', '/products', '/categories', '/inventory']
     if (adminRoutes.some(route => path === route || path.startsWith(`${route}/`))) {
       return NextResponse.redirect(new URL('/pos', request.url))
     }
@@ -41,8 +41,8 @@ export const config = {
      * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
+     * - favicon.ico, images (static files)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|.*\\.png$|.*\\.jpeg$|.*\\.jpg$|.*\\.svg$|favicon.ico).*)',
   ],
 }

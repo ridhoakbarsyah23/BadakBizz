@@ -48,8 +48,8 @@ export default function LoginPage() {
     <div className="min-h-screen w-full flex items-center justify-center bg-slate-50 p-4 relative overflow-hidden">
       {/* Background decoration */}
       <div className="absolute top-0 left-0 w-full h-96 bg-primary/5 -skew-y-6 transform origin-top-left -z-10" />
-      
-      <motion.div 
+
+      <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
@@ -57,15 +57,13 @@ export default function LoginPage() {
       >
         <div className="p-8 sm:p-12">
           <div className="flex flex-col items-center text-center mb-10">
-            <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mb-6 shadow-xl shadow-primary/30">
-              <Store className="w-8 h-8 text-white" />
-            </div>
+            <img src="/BadakBiz.jpeg" alt="BadakBiz Logo" className="w-16 h-16 rounded-2xl shadow-xl shadow-primary/30 object-cover mb-6" />
             <h2 className="text-3xl font-black text-slate-900 tracking-tight">Selamat Datang</h2>
-            <p className="text-slate-500 mt-2 font-medium">Silakan masuk ke akun Kivo POS Anda.</p>
+            <p className="text-slate-500 mt-2 font-medium">Silakan masuk ke akun BadakBiz Anda.</p>
           </div>
 
           {error && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               className="bg-red-50 text-red-600 text-sm p-4 rounded-xl font-bold mb-6 border border-red-100 flex items-center justify-center text-center"
@@ -77,9 +75,9 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-700">Alamat Email</label>
-              <Input 
-                type="email" 
-                placeholder="admin@kivo.com" 
+              <Input
+                type="email"
+                placeholder="admin@badakbiz.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="h-12 rounded-xl bg-slate-50 border-slate-200 focus-visible:ring-primary focus-visible:bg-white transition-all font-medium"
@@ -89,17 +87,17 @@ export default function LoginPage() {
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-700">Kata Sandi</label>
               <div className="relative">
-                <Input 
-                  type={showPassword ? "text" : "password"} 
-                  placeholder="••••••••" 
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="h-12 rounded-xl bg-slate-50 border-slate-200 pr-12 focus-visible:ring-primary focus-visible:bg-white transition-all font-medium"
                   required
                 />
-                <Button 
+                <Button
                   type="button"
-                  variant="ghost" 
+                  variant="ghost"
                   size="icon"
                   className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10 text-slate-400 hover:text-slate-700"
                   onClick={() => setShowPassword(!showPassword)}
@@ -109,8 +107,8 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full h-14 rounded-xl font-black text-lg mt-4 shadow-lg shadow-primary/25 transition-transform hover:scale-[1.02] active:scale-[0.98]"
               disabled={isSubmitting}
             >
@@ -128,15 +126,15 @@ export default function LoginPage() {
           <div className="mt-8 pt-6 border-t border-slate-100">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 text-center">Akses Cepat (Demo)</p>
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div 
-                className="p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all group text-center" 
-                onClick={() => { setEmail('admin@kivo.com'); setPassword('password'); }}
+              <div
+                className="p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all group text-center"
+                onClick={() => { setEmail('admin@badakbiz.com'); setPassword('password'); }}
               >
                 <div className="font-black text-slate-900 group-hover:text-primary">Admin</div>
               </div>
-              <div 
-                className="p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all group text-center" 
-                onClick={() => { setEmail('cashier@kivo.com'); setPassword('password'); }}
+              <div
+                className="p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all group text-center"
+                onClick={() => { setEmail('cashier@badakbiz.com'); setPassword('password'); }}
               >
                 <div className="font-black text-slate-900 group-hover:text-primary">Kasir</div>
               </div>

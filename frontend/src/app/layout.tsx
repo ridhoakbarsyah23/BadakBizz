@@ -8,8 +8,11 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "Kivo POS - Sell. Track. Grow.",
-  description: "Modern Point of Sale & Business Management Platform",
+  title: "BadakBiz - Your Biz, But Stronger",
+  description: "Builtbfor Business",
+  icons: {
+    icon: "/BadakBiz.jpeg",
+  }
 };
 
 import { TooltipProvider } from "@/components/ui/tooltip";
