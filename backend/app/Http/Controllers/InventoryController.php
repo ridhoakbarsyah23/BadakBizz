@@ -11,15 +11,19 @@ class InventoryController extends Controller
     /**
      * Get inventory movements history
      */
-    public function movements()
+    public function movements(Request $request)
     {
-        $movements = DB::table('inventory_movements')
+        $query = DB::table('inventory_movements')
             ->join('products', 'inventory_movements.product_id', '=', 'products.id')
             ->select('inventory_movements.*', 'products.name as product_name', 'products.sku')
-            ->orderBy('inventory_movements.created_at', 'desc')
-            ->get();
+            ->orderBy('inventory_movements.created_at', 'desc');
+
+        if ($request->has('per_page')) {
+            $perPage = $request->query('per_page', 10);
+            return response()->json($query->paginate($perPage));
+        }
             
-        return response()->json($movements);
+        return response()->json($query->get());
     }
 
     /**

@@ -15,8 +15,14 @@ class StaffController extends Controller
     public function index(Request $request)
     {
         // For simplicity, we just return all users. In a multi-tenant app we would filter by store_id.
-        $users = User::with('role')->orderBy('id', 'DESC')->get();
-        return response()->json($users);
+        $query = User::with('role')->orderBy('id', 'DESC');
+        
+        if ($request->has('per_page')) {
+            $perPage = $request->query('per_page', 10);
+            return response()->json($query->paginate($perPage));
+        }
+
+        return response()->json($query->get());
     }
 
     /**

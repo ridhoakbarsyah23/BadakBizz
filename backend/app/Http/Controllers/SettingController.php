@@ -13,11 +13,11 @@ class SettingController extends Controller
         
         if (!$store) {
             $store = Store::create([
-                'name' => 'Kivo Coffee & Eatery',
+                'name' => 'BadakBiz Coffee & Eatery',
                 'currency' => 'IDR',
                 'tax_rate' => 11.00,
                 'service_charge_rate' => 5.00,
-                'receipt_header' => 'Kivo Coffee & Eatery',
+                'receipt_header' => 'BadakBiz Coffee & Eatery',
                 'receipt_footer' => 'Terima kasih atas kunjungan Anda!',
             ]);
         }
@@ -40,6 +40,7 @@ class SettingController extends Controller
             'service_charge_rate' => 'numeric|min:0|max:100',
             'receipt_header' => 'nullable|string|max:255',
             'receipt_footer' => 'nullable|string',
+            'receipt_width' => 'nullable|integer|in:58,80',
         ]);
 
         $store->update($validated);

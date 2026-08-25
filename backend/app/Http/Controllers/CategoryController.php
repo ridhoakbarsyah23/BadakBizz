@@ -8,8 +8,12 @@ use Illuminate\Support\Str;
 
 class CategoryController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        if ($request->has('per_page')) {
+            $perPage = $request->query('per_page', 10);
+            return response()->json(Category::paginate($perPage));
+        }
         return response()->json(Category::all());
     }
 

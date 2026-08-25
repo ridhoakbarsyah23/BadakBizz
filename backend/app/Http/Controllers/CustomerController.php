@@ -10,9 +10,13 @@ class CustomerController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        return Customer::latest()->get();
+        $query = Customer::latest();
+        if ($request->has('per_page')) {
+            return $query->paginate($request->per_page);
+        }
+        return $query->get();
     }
 
     /**

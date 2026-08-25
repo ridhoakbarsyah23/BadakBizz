@@ -17,13 +17,16 @@ class TransactionController extends Controller
     /**
      * Display a listing of the transactions.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $transactions = Transaction::with(['items.product', 'customer', 'cashier'])
-            ->latest()
-            ->get();
+        $query = Transaction::with(['items.product', 'customer', 'cashier'])
+            ->latest();
             
-        return response()->json($transactions);
+        if ($request->has('per_page')) {
+            return response()->json($query->paginate($request->per_page));
+        }
+        
+        return response()->json($query->get());
     }
     /**
      * Store a newly created transaction in storage.

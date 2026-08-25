@@ -15,6 +15,10 @@ class ProductController extends Controller
             $query->where('category_id', $request->category_id);
         }
         
+        if ($request->has('per_page')) {
+            return response()->json($query->paginate($request->per_page));
+        }
+        
         return response()->json($query->get());
     }
 

@@ -149,7 +149,7 @@ class ReportController extends Controller
 
         $headers = [
             "Content-type"        => "text/csv",
-            "Content-Disposition" => "attachment; filename=KivoPOS_Report_" . $startDate->format('Ymd') . "_to_" . $endDate->format('Ymd') . ".csv",
+            "Content-Disposition" => "attachment; filename=BadakBizPOS_Report_" . $startDate->format('Ymd') . "_to_" . $endDate->format('Ymd') . ".csv",
             "Pragma"              => "no-cache",
             "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
             "Expires"             => "0"
