@@ -1,6 +1,6 @@
-# Kivo POS 🏪
+# BadakBiz 🏪
 
-Kivo POS is a modern, responsive Point of Sale application designed to help you manage your store, inventory, and transactions efficiently. Built with an industry-standard separated architecture.
+BadakBiz is a modern, responsive Point of Sale application designed to help you manage your store, inventory, and transactions efficiently. Built with an industry-standard separated architecture.
 
 ## 🏗️ Architecture
 
@@ -44,8 +44,8 @@ The frontend UI will be available at `http://localhost:3000`.
 
 ## 🔐 Default Credentials
 
-To log into the Kivo POS Dashboard, use the following credentials (if you have seeded the database):
-- **Email:** `admin@kivo.com`
+To log into the BadakBiz Dashboard, use the following credentials (if you have seeded the database):
+- **Email:** `admin@badakbiz.com`
 - **Password:** `password123`
 
 ## 🌟 Features
