@@ -13,7 +13,8 @@ import {
   CardFooter,
 } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Store, Receipt, Coins, Loader2 } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Store, Receipt, Coins, Loader2, Settings2 } from "lucide-react"
 
 import Link from "next/link"
 
@@ -23,6 +24,9 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [settings, setSettings] = useState({
     name: "",
+    business_type: "retail",
+    enable_table_management: false,
+    enable_kitchen_receipts: false,
     phone: "",
     address: "",
     tax_rate: "11",
@@ -44,6 +48,9 @@ export default function SettingsPage() {
         if (res.ok) {
           setSettings({
             name: data.name || "",
+            business_type: data.business_type || "retail",
+            enable_table_management: data.enable_table_management == 1 || data.enable_table_management === true,
+            enable_kitchen_receipts: data.enable_kitchen_receipts == 1 || data.enable_kitchen_receipts === true,
             phone: data.phone || "",
             address: data.address || "",
             tax_rate: data.tax_rate?.toString() || "11",
@@ -134,6 +141,71 @@ export default function SettingsPage() {
           </CardFooter>
         </Card>
         
+        {/* Business Type & Features */}
+        <Card className="md:col-span-2 border-primary/30">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Settings2 className="w-5 h-5 text-primary" />
+              <CardTitle>Tipe Bisnis & Fitur Khusus</CardTitle>
+            </div>
+            <CardDescription>
+              Konfigurasikan jenis UMKM Anda untuk mengaktifkan fitur yang relevan.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="businessType">Kategori Bisnis Utama</Label>
+              <select 
+                id="businessType"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={settings.business_type}
+                onChange={(e) => setSettings({...settings, business_type: e.target.value})}
+              >
+                <option value="retail">Retail (Minimarket, Toko Kelontong, Butik)</option>
+                <option value="fnb">Food & Beverage (Restoran, Kafe, Kopi)</option>
+                <option value="services">Jasa (Salon, Bengkel, Cuci Sepatu)</option>
+                <option value="mixed">Campuran / Lainnya</option>
+              </select>
+            </div>
+
+            <div className="space-y-4 pt-2 border-t">
+              <h4 className="font-medium text-sm text-muted-foreground mb-3">Fitur Tambahan</h4>
+              
+              <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Manajemen Meja (Dine-in)</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Aktifkan jika pelanggan Anda bisa makan di tempat dan Anda perlu mencatat pesanan berdasarkan meja.
+                  </p>
+                </div>
+                <Switch 
+                  checked={settings.enable_table_management}
+                  onCheckedChange={(checked) => setSettings({...settings, enable_table_management: checked})}
+                />
+              </div>
+
+              <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Cetak Tiket Dapur (Kitchen Receipt)</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Otomatis mencetak daftar pesanan untuk dapur tanpa menyertakan harga barang.
+                  </p>
+                </div>
+                <Switch 
+                  checked={settings.enable_kitchen_receipts}
+                  onCheckedChange={(checked) => setSettings({...settings, enable_kitchen_receipts: checked})}
+                />
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Simpan Konfigurasi
+            </Button>
+          </CardFooter>
+        </Card>
+
         {/* General Information */}
         <Card>
           <CardHeader>

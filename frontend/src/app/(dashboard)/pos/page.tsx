@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { QRCodeSVG } from "qrcode.react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -40,6 +41,7 @@ export default function POSPage() {
   const [cashAmount, setCashAmount] = useState("")
   const [customers, setCustomers] = useState<any[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("")
+  const [orderType, setOrderType] = useState<string>("dine_in")
   const [customDiscountPercent, setCustomDiscountPercent] = useState("")
   const [storeSettings, setStoreSettings] = useState<any>({
     name: "Kivo POS",
@@ -57,14 +59,12 @@ export default function POSPage() {
   const [receiptData, setReceiptData] = useState<any>(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
-  // Shift states
-  const [shift, setShift] = useState<any>(null)
-  const [isCheckingShift, setIsCheckingShift] = useState(true)
-  const [startingCash, setStartingCash] = useState("")
-  const [isCloseShiftOpen, setIsCloseShiftOpen] = useState(false)
+  // QRIS dynamic state
+  const [qrisString, setQrisString] = useState<string | null>(null)
+  const [qrisTransactionId, setQrisTransactionId] = useState<string | null>(null)
+  const [isPollingQris, setIsPollingQris] = useState(false)
+
   const [isCartModalOpen, setIsCartModalOpen] = useState(false)
-  const [endingCash, setEndingCash] = useState("")
-  const [isShiftProcessing, setIsShiftProcessing] = useState(false)
 
   const fetchProductsAndCustomers = async () => {
     setIsLoading(true)
@@ -92,25 +92,9 @@ export default function POSPage() {
     }
   }
 
-  const fetchCurrentShift = async () => {
-    setIsCheckingShift(true)
-    try {
-      const res = await fetch("http://127.0.0.1:8000/api/shifts/current", {
-        headers: { "Authorization": `Bearer ${token}` }
-      })
-      const data = await res.json()
-      setShift(data.shift)
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setIsCheckingShift(false)
-    }
-  }
-
   useEffect(() => {
     if (token) {
       fetchProductsAndCustomers()
-      fetchCurrentShift()
     }
   }, [token])
 
@@ -158,53 +142,6 @@ export default function POSPage() {
   }, [products]) // Depends on products so it can find the matched product
   // ---------------------------------
 
-  const handleOpenShift = async () => {
-    setIsShiftProcessing(true)
-    try {
-      const res = await fetch("http://127.0.0.1:8000/api/shifts/open", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ starting_cash: Number(startingCash.replace(/\D/g, "")) || 0 })
-      })
-      if (res.ok) {
-        fetchCurrentShift()
-      } else {
-        const errorData = await res.json()
-        alert(errorData.message || 'Failed to open shift')
-      }
-    } catch (error) {
-      alert("Network error")
-    } finally {
-      setIsShiftProcessing(false)
-    }
-  }
-
-  const handleCloseShift = async () => {
-    setIsShiftProcessing(true)
-    try {
-      const res = await fetch("http://127.0.0.1:8000/api/shifts/close", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ ending_cash: Number(endingCash.replace(/\D/g, "")) || 0 })
-      })
-      if (res.ok) {
-        window.location.href = "/" // Redirect to dashboard or login
-      } else {
-        const errorData = await res.json()
-        alert(errorData.message || 'Failed to close shift')
-      }
-    } catch (error) {
-      alert("Network error")
-    } finally {
-      setIsShiftProcessing(false)
-    }
-  }
 
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(search.toLowerCase()) && 
@@ -256,13 +193,13 @@ export default function POSPage() {
   const memberDiscountPercent = selectedCustomer ? 5 : 0
   const additionalDiscountPercent = Number(customDiscountPercent) || 0
   const totalDiscountPercent = Math.min(100, memberDiscountPercent + additionalDiscountPercent)
-  
-  const discount = subtotal * (totalDiscountPercent / 100)
+  const discount = Math.round(subtotal * (totalDiscountPercent / 100))
   const netAfterDiscount = subtotal - discount
-  const serviceChargeRate = storeSettings.service_charge_rate ? (Number(storeSettings.service_charge_rate) / 100) : 0
-  const serviceCharge = netAfterDiscount * serviceChargeRate
+  // Biaya Layanan hanya diterapkan jika tipe pesanan = takeaway
+  const serviceChargeRate = (storeSettings.service_charge_rate && orderType === 'takeaway') ? (Number(storeSettings.service_charge_rate) / 100) : 0
+  const serviceCharge = Math.round(netAfterDiscount * serviceChargeRate)
   const taxRate = storeSettings.tax_rate ? (Number(storeSettings.tax_rate) / 100) : 0
-  const tax = (netAfterDiscount + serviceCharge) * taxRate
+  const tax = Math.round((netAfterDiscount + serviceCharge) * taxRate)
   const total = netAfterDiscount + serviceCharge + tax
 
   const handleCheckout = async (paymentMethod: string, paymentAmount: number) => {
@@ -283,42 +220,85 @@ export default function POSPage() {
           customer_id: selectedCustomerId || null,
           payment_method: paymentMethod,
           payment_amount: paymentAmount,
-          discount: discount
+          discount: discount,
+          order_type: orderType
         })
       })
 
       const data = await res.json()
       if (res.ok) {
         const txn = data.data
-        setReceiptData({
-          transaction_number: txn?.transaction_number || "TRX-" + Date.now(),
-          items: [...cart],
-          subtotal: Number(txn?.subtotal ?? subtotal),
-          discount: Number(txn?.discount ?? discount),
-          service_charge: Number(txn?.service_charge ?? serviceCharge),
-          tax: Number(txn?.tax ?? tax),
-          total: Number(txn?.total_amount ?? total),
-          paymentMethod,
-          paymentAmount,
-          change: paymentAmount - Number(txn?.total_amount ?? total),
-          date: new Date().toLocaleString("id-ID"),
-          cashierName: user?.name || 'Unknown',
-          customerName: selectedCustomer ? selectedCustomer.name : 'Walk-in'
-        })
-        setCart([])
-        setSelectedCustomerId("")
-        setIsCashOpen(false)
-        setIsQrisOpen(false)
-        setIsCheckoutOpen(false)
-        setIsReceiptOpen(true)
-        setCashAmount("")
-        fetchProductsAndCustomers() // refresh stock
-        
-        // Auto-trigger print for seamless Kiosk printing experience
-        setTimeout(() => {
-          handlePrint()
-        }, 800)
-
+        if (paymentMethod === 'QRIS') {
+          // Hit QRIS generate API
+          const qrisRes = await fetch("http://127.0.0.1:8000/api/qris/generate", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              order_id: txn.transaction_number,
+              gross_amount: txn.total_amount
+            })
+          })
+          
+          const qrisData = await qrisRes.json()
+          if (qrisRes.ok && qrisData.status === 'success') {
+            setQrisString(qrisData.qr_string)
+            setQrisTransactionId(txn.transaction_number)
+            setIsPollingQris(true)
+            
+            // Keep the receipt data ready for when polling finishes
+            setReceiptData({
+              transaction_number: txn?.transaction_number || "TRX-" + Date.now(),
+              items: [...cart],
+              subtotal: Number(txn?.subtotal ?? subtotal),
+              discount: Number(txn?.discount ?? discount),
+              service_charge: Number(txn?.service_charge ?? serviceCharge),
+              tax: Number(txn?.tax ?? tax),
+              total: Number(txn?.total_amount ?? total),
+              paymentMethod,
+              paymentAmount,
+              change: paymentAmount - Number(txn?.total_amount ?? total),
+              date: new Date().toLocaleString("id-ID"),
+              cashierName: user?.name || 'Unknown',
+              customerName: selectedCustomer ? selectedCustomer.name : 'Walk-in'
+            })
+            
+            setIsCheckoutOpen(false)
+            setIsQrisOpen(true)
+          } else {
+            alert("Gagal memuat QRIS: " + (qrisData.message || "Kesalahan API"))
+          }
+        } else {
+          setReceiptData({
+            transaction_number: txn?.transaction_number || "TRX-" + Date.now(),
+            items: [...cart],
+            subtotal: Number(txn?.subtotal ?? subtotal),
+            discount: Number(txn?.discount ?? discount),
+            service_charge: Number(txn?.service_charge ?? serviceCharge),
+            tax: Number(txn?.tax ?? tax),
+            total: Number(txn?.total_amount ?? total),
+            paymentMethod,
+            paymentAmount,
+            change: paymentAmount - Number(txn?.total_amount ?? total),
+            date: new Date().toLocaleString("id-ID"),
+            cashierName: user?.name || 'Unknown',
+            customerName: selectedCustomer ? selectedCustomer.name : 'Walk-in'
+          })
+          setCart([])
+          setSelectedCustomerId("")
+          setIsCashOpen(false)
+          setIsCheckoutOpen(false)
+          setIsReceiptOpen(true)
+          setCashAmount("")
+          fetchProductsAndCustomers() // refresh stock
+          
+          setTimeout(() => {
+            handlePrint()
+          }, 800)
+        }
       } else {
         alert("Error: " + (data.message || "Failed"))
       }
@@ -334,7 +314,8 @@ export default function POSPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 lg:gap-6 relative h-[calc(100vh-8rem)] pb-24">
+    <>
+    <div className="flex flex-row gap-6 relative h-[calc(100vh-8rem)] w-full overflow-hidden">
       <style dangerouslySetInnerHTML={{__html: `
         @media print {
           @page {
@@ -361,33 +342,7 @@ export default function POSPage() {
           }
         }
       `}} />
-      {/* Shift Overlay (Blocking) */}
-      {!isCheckingShift && !shift && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-xl">
-          <Card className="w-full max-w-md shadow-2xl border-none">
-            <CardContent className="p-8 space-y-6">
-              <div className="flex flex-col items-center text-center space-y-2">
-                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center text-primary mb-2">
-                  <Clock className="w-8 h-8" />
-                </div>
-                <h2 className="text-2xl font-bold tracking-tight">Buka Shift Kasir</h2>
-                <p className="text-muted-foreground">Siap memulai shift Anda? Klik tombol di bawah untuk mulai memproses transaksi.</p>
-              </div>
-              <div className="pt-2">
-                <Button 
-                  className="w-full h-14 text-xl font-bold shadow-lg shadow-primary/25 rounded-xl transition-transform hover:scale-[1.02] active:scale-[0.98]" 
-                  onClick={handleOpenShift}
-                  disabled={isShiftProcessing}
-                >
-                  {isShiftProcessing ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-                  Buka Shift
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-      
+
       {/* LEFT: Product Grid */}
       <div className="flex-1 flex flex-col min-w-0 gap-4 lg:gap-6 overflow-hidden h-full">
         <div className="flex items-center justify-between gap-4 shrink-0">
@@ -400,9 +355,6 @@ export default function POSPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <Button variant="outline" onClick={() => setIsCloseShiftOpen(true)} className="h-12 border-destructive/20 text-destructive hover:bg-destructive/10 rounded-xl px-6 font-semibold shadow-sm hidden md:flex">
-             Tutup Shift
-          </Button>
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-2 shrink-0 scrollbar-hide">
@@ -417,7 +369,7 @@ export default function POSPage() {
             <Badge 
               key={cat}
               variant={activeCategory === cat ? "default" : "secondary"} 
-              className={`px-5 py-2 text-sm cursor-pointer transition-all duration-300 rounded-full border-transparent ${activeCategory === cat ? "shadow-md bg-primary text-primary-foreground hover:bg-primary/90" : "hover:bg-default-200 bg-white shadow-sm"}`}
+              className={`px-5 py-2 text-sm cursor-pointer transition-all duration-300 rounded-full border-transparent ${activeCategory === cat ? "shadow-lg bg-slate-900 text-white hover:bg-slate-800 scale-105" : "hover:bg-slate-100 bg-white text-slate-600 shadow-sm hover:shadow-md"}`}
               onClick={() => setActiveCategory(cat)}
             >
               {cat}
@@ -449,19 +401,19 @@ export default function POSPage() {
                   key={product.id}
                 >
                   <Card 
-                    className="cursor-pointer border border-transparent hover:border-primary/20 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col bg-white group overflow-hidden rounded-2xl h-full min-h-[170px]"
+                    className="cursor-pointer border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-1 hover:border-primary/30 transition-all duration-300 flex flex-col bg-white overflow-hidden rounded-2xl h-full group"
                     onClick={() => addToCart(product)}
                   >
                     <CardContent className="p-4 flex flex-col items-center justify-center flex-1 text-center gap-2 relative">
-                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
-                        <Badge variant="secondary" className="bg-primary text-primary-foreground text-[10px] px-2 py-0.5 shadow-md"><Plus className="w-3 h-3 mr-1"/> Tambah</Badge>
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                        <div className="bg-primary text-primary-foreground rounded-full p-1 shadow-md"><Plus className="w-3 h-3"/></div>
                       </div>
-                      <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary font-black text-2xl mb-1 shadow-inner group-hover:scale-110 transition-transform duration-500">
+                      <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center text-primary font-black text-2xl mb-1 group-hover:scale-110 transition-transform duration-300 border border-slate-100">
                         {product.name.charAt(0)}
                       </div>
                       <div className="font-bold text-sm line-clamp-2 leading-tight text-slate-800 group-hover:text-primary transition-colors">{product.name}</div>
-                      <div className="text-[10px] font-semibold px-2.5 py-0.5 bg-slate-100 rounded-full text-slate-500">Stok: {product.stock}</div>
-                      <div className="text-primary font-black text-base mt-auto pt-2">
+                      <div className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 rounded-full text-slate-500 uppercase tracking-wider">Stok: {product.stock}</div>
+                      <div className="text-primary font-black text-base mt-auto pt-1">
                         Rp {Number(product.selling_price).toLocaleString("id-ID")}
                       </div>
                     </CardContent>
@@ -473,34 +425,41 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* Floating Cart Button */}
-      <div className="fixed bottom-6 lg:left-64 left-0 right-0 flex justify-center z-30 px-4 pointer-events-none">
-        <div className="bg-slate-900 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] rounded-full p-2 flex items-center gap-4 text-white pointer-events-auto max-w-xl w-full border border-slate-700/50 backdrop-blur-xl bg-opacity-95 transform transition-all hover:scale-[1.02]">
+      {/* Mobile Floating Cart Button */}
+      <div className="md:hidden fixed bottom-6 left-0 right-0 flex justify-center z-40 px-4 pointer-events-none">
+        <div className="bg-slate-900/95 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.6)] rounded-full p-2.5 flex items-center gap-4 text-white pointer-events-auto max-w-xl w-full border border-slate-700/50 backdrop-blur-xl transform transition-all hover:scale-[1.02]">
           <div className="flex-1 px-5 py-1 flex items-center justify-between">
             <div className="flex flex-col">
-              <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">{cart.reduce((sum, item) => sum + item.qty, 0)} Item di Keranjang</span>
-              <span className="text-2xl font-black text-white leading-none mt-1">Rp {total.toLocaleString("id-ID")}</span>
+              <span className="text-[11px] text-slate-300 font-bold uppercase tracking-widest">{cart.reduce((sum, item) => sum + item.qty, 0)} Item</span>
+              <span className="text-xl sm:text-2xl font-black text-white leading-tight mt-0.5">Rp {total.toLocaleString("id-ID")}</span>
             </div>
           </div>
           <Button 
-            className="h-14 px-8 text-lg font-bold rounded-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary shadow-lg shadow-primary/25 text-white"
+            className="h-12 sm:h-14 px-6 sm:px-8 text-sm sm:text-lg font-bold rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-lg shadow-blue-900/20 text-white border-none"
             onClick={() => setIsCartModalOpen(true)}
           >
-            <ShoppingCart className="w-5 h-5 mr-2" /> Lihat Pesanan
+            <ShoppingCart className="w-5 h-5 mr-2 hidden sm:block" /> Pesanan
           </Button>
         </div>
       </div>
 
-      {/* Cart Modal */}
-      <Dialog open={isCartModalOpen} onOpenChange={setIsCartModalOpen}>
-        <DialogContent className="!max-w-5xl w-[95vw] sm:w-full p-0 overflow-hidden bg-white rounded-[2rem] shadow-2xl border-none">
-          <div className="flex flex-col lg:flex-row h-[85vh] max-h-[800px] bg-white">
-            
-            {/* Left side: Cart Items */}
-            <div className="flex-1 flex flex-col bg-slate-50/50 border-r border-slate-100 min-w-0">
-               <div className="p-6 bg-white border-b border-slate-100 flex items-center justify-between shadow-sm z-10 shrink-0">
+      {/* Mobile Overlay */}
+      {isCartModalOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm transition-opacity"
+          onClick={() => setIsCartModalOpen(false)}
+        />
+      )}
+
+      {/* Right side: Persistent Cart (Desktop) & Slide-over (Mobile) */}
+      <div className={`fixed inset-y-0 right-0 z-50 w-full sm:w-[400px] md:relative md:w-[380px] lg:w-[420px] shrink-0 bg-white flex flex-col shadow-2xl md:shadow-xl md:rounded-[2rem] border-l md:border border-slate-100/50 overflow-hidden h-[100dvh] md:h-full transition-transform duration-300 ease-in-out ${isCartModalOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}`}>
+        <div className="flex flex-col min-w-0 flex-1 overflow-y-auto">
+               <div className="p-6 bg-white border-b border-slate-100 flex items-center justify-between shadow-sm z-20 sticky top-0 shrink-0">
                   <div className="flex items-center gap-3 font-bold text-xl text-slate-900">
-                    <div className="p-2.5 bg-primary/10 rounded-xl text-primary">
+                    <Button variant="ghost" size="icon" className="md:hidden -ml-2 text-slate-500 hover:bg-slate-100" onClick={() => setIsCartModalOpen(false)}>
+                      <Minus className="w-6 h-6 rotate-90" />
+                    </Button>
+                    <div className="p-2.5 bg-primary/10 rounded-xl text-primary hidden md:block">
                       <ShoppingCart className="w-6 h-6" />
                     </div>
                     Detail Pesanan
@@ -510,47 +469,9 @@ export default function POSPage() {
                   </Badge>
                </div>
 
-        {/* Close Shift Dialog */}
-        <Dialog open={isCloseShiftOpen} onOpenChange={setIsCloseShiftOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Tutup Shift</DialogTitle>
-              <DialogDescription>
-                Hitung uang tunai di laci Anda dan masukkan jumlah akhirnya.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4 space-y-4">
-              <div className="p-4 bg-slate-50 rounded-xl border space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Uang Awal</span>
-                  <span className="font-semibold">Rp {shift ? Number(shift.starting_cash).toLocaleString("id-ID") : 0}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Waktu Mulai</span>
-                  <span className="font-semibold">{shift ? new Date(shift.start_time).toLocaleTimeString("id-ID") : '-'}</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold">Uang Akhir (Kas di Laci)</label>
-                <Input 
-                  placeholder="e.g. 1.500.000" 
-                  value={endingCash ? Number(endingCash).toLocaleString("id-ID") : ""}
-                  onChange={(e) => setEndingCash(e.target.value.replace(/\D/g, ""))}
-                  className="h-12 text-lg font-bold"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCloseShiftOpen(false)}>Batal</Button>
-              <Button variant="destructive" onClick={handleCloseShift} disabled={isShiftProcessing || !endingCash}>
-                {isShiftProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                Konfirmasi Tutup Shift
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
-               <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-3">
+
+               <div className="p-6 flex flex-col gap-3 shrink-0">
                   <AnimatePresence>
                     {cart.length === 0 ? (
                       <motion.div 
@@ -594,21 +515,30 @@ export default function POSPage() {
                             </Button>
                           </div>
                           
-                          <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-400 hover:text-destructive hover:bg-destructive/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeFromCart(item.id)}>
+                          <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-400 hover:text-destructive hover:bg-destructive/10 rounded-xl transition-colors" onClick={() => removeFromCart(item.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </motion.div>
                       ))
                     )}
                   </AnimatePresence>
-               </div>
+                </div>
+
+                {/* Summary & Pay */}
+                <div className="p-5 space-y-4 border-t border-slate-100 mt-auto shrink-0">
+                 <h3 className="font-bold text-base text-slate-800 mb-2">Ringkasan Pembayaran</h3>
+            <div className="flex flex-col gap-1.5 mb-2">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tipe Pesanan</label>
+              <select 
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                value={orderType}
+                onChange={(e) => setOrderType(e.target.value)}
+              >
+                <option value="dine_in">Makan di Tempat (Dine In)</option>
+                <option value="takeaway">Bungkus (Take Away)</option>
+              </select>
             </div>
 
-            {/* Right side: Summary & Pay */}
-            <div className="w-full lg:w-[420px] shrink-0 bg-white flex flex-col z-20">
-
-               <div className="flex-1 overflow-y-auto p-8 space-y-6">
-                 <h3 className="font-bold text-lg text-slate-800 mb-4">Ringkasan Pembayaran</h3>
             <div className="flex flex-col gap-1.5 mb-2">
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pelanggan (Opsional)</label>
               <select 
@@ -636,7 +566,7 @@ export default function POSPage() {
               />
             </div>
             
-                 <div className="pt-6 border-t border-slate-100 space-y-3">
+                 <div className="pt-4 border-t border-slate-100 space-y-2">
                     <div className="flex justify-between text-sm font-medium text-slate-600">
                       <span>Subtotal</span>
                       <span>Rp {subtotal.toLocaleString("id-ID")}</span>
@@ -659,16 +589,17 @@ export default function POSPage() {
                     </div>
                  </div>
                </div>
+        </div>
 
-               <div className="p-8 bg-slate-50 border-t border-slate-100 shadow-[0_-15px_40px_-15px_rgba(0,0,0,0.05)] z-20 shrink-0">
-                  <div className="flex justify-between font-black text-3xl text-slate-900 mb-6">
+               <div className="p-5 bg-slate-50 border-t border-slate-100 shadow-[0_-15px_40px_-15px_rgba(0,0,0,0.05)] z-20 shrink-0">
+                  <div className="flex justify-between font-black text-2xl text-slate-900 mb-4">
                     <span>Total</span>
                     <span className="text-primary">Rp {total.toLocaleString("id-ID")}</span>
                   </div>
                   
                   <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
                     <DialogTrigger render={
-                      <Button className="w-full h-16 text-xl font-black shadow-[0_8px_30px_rgb(0,0,0,0.12)] shadow-primary/30 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-r from-primary to-primary/90 hover:from-primary hover:to-primary text-white" disabled={cart.length === 0}>
+                      <Button className="w-full h-16 text-xl font-black shadow-[0_10px_40px_-10px_rgba(79,70,229,0.5)] rounded-[1.25rem] transition-all hover:scale-[1.03] active:scale-[0.97] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border-none" disabled={cart.length === 0}>
                         <Banknote className="w-6 h-6 mr-2" /> Checkout Sekarang
                       </Button>
                     } />
@@ -699,8 +630,7 @@ export default function POSPage() {
                   variant="outline" 
                   className="h-32 flex flex-col gap-3 rounded-2xl hover:border-blue-500 hover:bg-blue-50/50 transition-all border-2"
                   onClick={() => {
-                    setIsCheckoutOpen(false)
-                    setIsQrisOpen(true)
+                    handleCheckout('QRIS', total)
                   }}
                 >
                   <div className="p-3 bg-blue-100 rounded-full text-blue-600">
@@ -712,51 +642,8 @@ export default function POSPage() {
             </DialogContent>
           </Dialog>
                </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-          {/* Close Shift Dialog */}
-        <Dialog open={isCloseShiftOpen} onOpenChange={setIsCloseShiftOpen}>
-          <DialogContent className="!max-w-md w-[95vw] sm:w-full">
-            <DialogHeader>
-              <DialogTitle>Close Shift</DialogTitle>
-              <DialogDescription>
-                Count the cash in your drawer and enter the final amount.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4 space-y-4">
-              <div className="p-4 bg-slate-50 rounded-xl border space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Starting Cash</span>
-                  <span className="font-semibold">Rp {shift ? Number(shift.starting_cash).toLocaleString("id-ID") : 0}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Shift Started</span>
-                  <span className="font-semibold">{shift ? new Date(shift.start_time).toLocaleTimeString("id-ID") : '-'}</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold">Ending Cash (Cash di Laci)</label>
-                <Input 
-                  placeholder="e.g. 1.500.000" 
-                  value={endingCash ? Number(endingCash).toLocaleString("id-ID") : ""}
-                  onChange={(e) => setEndingCash(e.target.value.replace(/\D/g, ""))}
-                  className="h-12 text-lg font-bold"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCloseShiftOpen(false)}>Cancel</Button>
-              <Button variant="destructive" onClick={handleCloseShift} disabled={isShiftProcessing || !endingCash}>
-                {isShiftProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                Confirm Close Shift
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
+      </div>
+    </div>
         {/* Cash Payment Dialog */}
           <Dialog open={isCashOpen} onOpenChange={setIsCashOpen}>
             <DialogContent className="!max-w-sm w-[95vw] sm:w-full rounded-2xl">
@@ -815,8 +702,15 @@ export default function POSPage() {
                 <DialogTitle className="text-center">Pembayaran QRIS</DialogTitle>
               </DialogHeader>
               <div className="py-8 flex flex-col items-center justify-center gap-6">
-                <div className="w-56 h-56 bg-slate-50 flex items-center justify-center border-2 border-dashed border-primary/30 rounded-2xl">
-                  <QrCode className="w-40 h-40 text-primary/80" />
+                <div className="w-56 h-56 bg-slate-50 flex items-center justify-center border-2 border-dashed border-primary/30 rounded-2xl p-4">
+                  {qrisString ? (
+                    <QRCodeSVG value={qrisString} size={180} />
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="w-10 h-10 animate-spin text-primary/50" />
+                      <span className="text-sm font-medium text-muted-foreground">Memuat QRIS...</span>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">Scan menggunakan e-Wallet atau Mobile Banking</p>
@@ -825,18 +719,14 @@ export default function POSPage() {
               </div>
               <DialogFooter>
                 <Button 
-                  className="w-full h-14 text-lg font-bold rounded-xl transition-transform hover:scale-[1.02] active:scale-[0.98]" 
-                  disabled={isProcessing}
-                  onClick={() => handleCheckout('QRIS', total)}
+                  variant="outline"
+                  className="w-full h-12 text-sm font-bold rounded-xl transition-transform hover:scale-[1.02] active:scale-[0.98]" 
+                  onClick={() => {
+                    setIsPollingQris(false)
+                    setIsQrisOpen(false)
+                  }}
                 >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Memproses...
-                    </>
-                  ) : (
-                    "Verifikasi Pembayaran"
-                  )}
+                  Batal / Tutup
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -948,6 +838,7 @@ export default function POSPage() {
             </DialogContent>
           </Dialog>
       
-    </div>
+      
+    </>
   )
 }

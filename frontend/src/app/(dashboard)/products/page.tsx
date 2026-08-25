@@ -35,7 +35,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Edit2, Trash2, Loader2, AlertTriangle, Search, Filter, Wand2 } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Plus, Edit2, Trash2, Loader2, AlertTriangle, Search, Filter, Wand2, X } from "lucide-react"
 
 interface Category {
   id: number
@@ -53,16 +54,45 @@ interface Product {
   stock: number
   minimum_stock: number
   is_active: boolean
+  barcode?: string
+  unit?: string
+  has_variants?: boolean
+  variants?: any[]
 }
 
-const initialForm = {
+interface VariantForm {
+  name: string;
+  sku: string;
+  price_adjustment: number;
+  stock: number;
+}
+
+interface ProductForm {
+  sku: string;
+  name: string;
+  category_id: string;
+  purchase_price: string;
+  selling_price: string;
+  stock: string;
+  minimum_stock: string;
+  barcode: string;
+  unit: string;
+  has_variants: boolean;
+  variants: VariantForm[];
+}
+
+const initialForm: ProductForm = {
   sku: "",
   name: "",
   category_id: "",
   purchase_price: "",
   selling_price: "",
   stock: "0",
-  minimum_stock: "0"
+  minimum_stock: "0",
+  barcode: "",
+  unit: "pcs",
+  has_variants: false,
+  variants: []
 }
 
 export default function ProductsPage() {
@@ -144,6 +174,10 @@ export default function ProductsPage() {
         selling_price: parseFloat(formData.selling_price) || 0,
         stock: parseInt(formData.stock) || 0,
         minimum_stock: parseInt(formData.minimum_stock) || 0,
+        barcode: formData.barcode,
+        unit: formData.unit,
+        has_variants: formData.has_variants,
+        variants: formData.variants,
       }
         
       const res = await fetch(url, {
@@ -200,7 +234,11 @@ export default function ProductsPage() {
       purchase_price: product.purchase_price,
       selling_price: product.selling_price,
       stock: product.stock.toString(),
-      minimum_stock: product.minimum_stock.toString()
+      minimum_stock: product.minimum_stock.toString(),
+      barcode: product.barcode || "",
+      unit: product.unit || "pcs",
+      has_variants: product.has_variants || false,
+      variants: product.variants || []
     })
     setIsFormOpen(true)
   }
@@ -308,20 +346,143 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="category">Kategori</Label>
-                <select 
-                  id="category"
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  value={formData.category_id}
-                  onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                >
-                  <option value="">Pilih kategori</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id.toString()}>{cat.name}</option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="barcode">Barcode (Opsional)</Label>
+                  <Input 
+                    id="barcode"
+                    placeholder="Scan atau ketik barcode"
+                    value={formData.barcode}
+                    onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="category">Kategori</Label>
+                  <select 
+                    id="category"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    value={formData.category_id}
+                    onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                  >
+                    <option value="">Pilih kategori</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id.toString()}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="unit">Satuan Produk <span className="text-destructive">*</span></Label>
+                  <select 
+                    id="unit"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    value={formData.unit}
+                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                  >
+                    <option value="pcs">Pcs / Buah</option>
+                    <option value="kg">Kilogram (Kg)</option>
+                    <option value="gr">Gram (Gr)</option>
+                    <option value="ltr">Liter (Ltr)</option>
+                    <option value="ml">Mililiter (Ml)</option>
+                    <option value="porsi">Porsi / Cup</option>
+                  </select>
+                </div>
+                <div className="flex items-center space-x-2 pt-6">
+                  <Switch 
+                    id="has_variants" 
+                    checked={formData.has_variants}
+                    onCheckedChange={(checked) => setFormData({ ...formData, has_variants: checked })}
+                  />
+                  <Label htmlFor="has_variants">Produk memiliki varian?</Label>
+                </div>
+              </div>
+
+              {formData.has_variants && (
+                <div className="p-4 border rounded-md bg-muted/20 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <Label>Varian Produk</Label>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setFormData({ ...formData, variants: [...(formData.variants || []), { name: '', sku: '', price_adjustment: 0, stock: 0 }] })}
+                    >
+                      <Plus className="w-4 h-4 mr-1" /> Tambah Varian
+                    </Button>
+                  </div>
+                  {(!formData.variants || formData.variants.length === 0) ? (
+                    <div className="text-sm text-muted-foreground text-center py-2">Belum ada varian. Klik "Tambah Varian".</div>
+                  ) : (
+                    formData.variants.map((variant, index) => (
+                      <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                        <div className="col-span-4">
+                          <Input 
+                            placeholder="Nama varian (ex: Merah, L, Panas)" 
+                            value={variant.name} 
+                            onChange={(e) => {
+                              const newVariants = [...formData.variants!];
+                              newVariants[index].name = e.target.value;
+                              setFormData({ ...formData, variants: newVariants });
+                            }} 
+                            required
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <Input 
+                            placeholder="SKU Tambahan" 
+                            value={variant.sku} 
+                            onChange={(e) => {
+                              const newVariants = [...formData.variants!];
+                              newVariants[index].sku = e.target.value;
+                              setFormData({ ...formData, variants: newVariants });
+                            }} 
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <Input 
+                            type="number"
+                            placeholder="+Harga" 
+                            value={variant.price_adjustment} 
+                            onChange={(e) => {
+                              const newVariants = [...formData.variants!];
+                              newVariants[index].price_adjustment = parseFloat(e.target.value) || 0;
+                              setFormData({ ...formData, variants: newVariants });
+                            }} 
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <Input 
+                            type="number"
+                            placeholder="Stok" 
+                            value={variant.stock} 
+                            onChange={(e) => {
+                              const newVariants = [...formData.variants!];
+                              newVariants[index].stock = parseInt(e.target.value) || 0;
+                              setFormData({ ...formData, variants: newVariants });
+                            }} 
+                          />
+                        </div>
+                        <div className="col-span-1 flex justify-end">
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => {
+                              const newVariants = [...formData.variants!];
+                              newVariants.splice(index, 1);
+                              setFormData({ ...formData, variants: newVariants });
+                            }}
+                          >
+                            <X className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
