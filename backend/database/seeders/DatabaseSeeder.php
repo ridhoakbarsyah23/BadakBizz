@@ -20,7 +20,7 @@ class DatabaseSeeder extends Seeder
 
         // Create Admin User
         User::firstOrCreate(
-            ['email' => 'admin@kivo.com'],
+            ['email' => 'admin@badakbiz.com'],
             [
                 'name' => 'Super Admin',
                 'password' => Hash::make('password'),
@@ -30,7 +30,7 @@ class DatabaseSeeder extends Seeder
 
         // Create Cashier User
         User::firstOrCreate(
-            ['email' => 'cashier@kivo.com'],
+            ['email' => 'cashier@badakbiz.com'],
             [
                 'name' => 'Cashier Staff',
                 'password' => Hash::make('password'),

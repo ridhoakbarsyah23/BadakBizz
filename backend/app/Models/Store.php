@@ -15,5 +15,6 @@ class Store extends Model
         'service_charge_rate',
         'receipt_header',
         'receipt_footer',
+        'receipt_width',
     ];
 }

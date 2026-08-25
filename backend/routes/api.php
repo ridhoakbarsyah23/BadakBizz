@@ -20,6 +20,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ---- Open for Both Admin & Cashier ----
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+    Route::put('/profile', [AuthController::class, 'updateProfile']);
     
     // Shifts
     Route::get('/shifts', [\App\Http\Controllers\ShiftController::class, 'index']);
