@@ -70,6 +70,8 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   
   // Dialog State
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -87,21 +89,27 @@ export default function ProductsPage() {
     if (token) {
       fetchData()
     }
-  }, [token])
+  }, [token, currentPage])
 
   const fetchData = async () => {
     setIsLoading(true)
     try {
       const headers = { "Authorization": `Bearer ${token}` }
       const [prodRes, catRes] = await Promise.all([
-        fetch("http://127.0.0.1:8000/api/products", { headers }),
+        fetch(`http://127.0.0.1:8000/api/products?page=${currentPage}&per_page=10`, { headers }),
         fetch("http://127.0.0.1:8000/api/categories", { headers })
       ])
       
       const prodData = await prodRes.json()
       const catData = await catRes.json()
       
-      setProducts(Array.isArray(prodData) ? prodData : [])
+      if (prodData && prodData.data) {
+        setProducts(prodData.data)
+        setTotalPages(prodData.last_page || 1)
+      } else {
+        setProducts(Array.isArray(prodData) ? prodData : [])
+        setTotalPages(1)
+      }
       setCategories(Array.isArray(catData) ? catData : [])
     } catch (error) {
       console.error("Error fetching data:", error)
@@ -453,6 +461,28 @@ export default function ProductsPage() {
           </Table>
         )}
       </div>
+
+      {!isLoading && totalPages > 1 && (
+        <div className="flex justify-between items-center mt-4 px-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+          >
+            Sebelumnya
+          </Button>
+          <span className="text-sm text-muted-foreground font-medium">
+            Halaman {currentPage} dari {totalPages}
+          </span>
+          <Button 
+            variant="outline" 
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+          >
+            Selanjutnya
+          </Button>
+        </div>
+      )}
 
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
         <DialogContent className="sm:max-w-[425px]">

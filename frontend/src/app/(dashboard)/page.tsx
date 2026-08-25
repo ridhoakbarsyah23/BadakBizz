@@ -44,7 +44,7 @@ export default function Dashboard() {
         </div>
         <Skeleton className="h-10 w-[240px]" />
       </div>
-      
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[1, 2, 3, 4].map(i => (
           <Card key={i} className="shadow-sm">
@@ -69,7 +69,7 @@ export default function Dashboard() {
             <Skeleton className="h-[300px] w-full" />
           </CardContent>
         </Card>
-        
+
         <Card className="col-span-3 shadow-sm">
           <CardHeader>
             <Skeleton className="h-6 w-[200px] mb-2" />
@@ -110,7 +110,7 @@ export default function Dashboard() {
   }
 
   return (
-    <motion.div 
+    <motion.div
       className="space-y-6"
       variants={containerVariants}
       initial="hidden"
@@ -120,30 +120,30 @@ export default function Dashboard() {
         <motion.div variants={itemVariants} className="flex flex-col gap-2">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Analitik Dasbor</h1>
           <p className="text-muted-foreground">
-            Selamat datang di Kivo POS. Berikut adalah ringkasan bisnis Anda.
+            Selamat datang di BadakBiz. Berikut adalah ringkasan bisnis Anda.
           </p>
         </motion.div>
-        
+
         <motion.div variants={itemVariants} className="flex items-center gap-1 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
-          <Button 
-            variant={filter === 'today' ? 'default' : 'ghost'} 
-            size="sm" 
+          <Button
+            variant={filter === 'today' ? 'default' : 'ghost'}
+            size="sm"
             className={`rounded-lg px-4 transition-all duration-300 ${filter === 'today' ? 'shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'}`}
             onClick={() => setFilter('today')}
           >
             Hari Ini
           </Button>
-          <Button 
-            variant={filter === 'week' ? 'default' : 'ghost'} 
-            size="sm" 
+          <Button
+            variant={filter === 'week' ? 'default' : 'ghost'}
+            size="sm"
             className={`rounded-lg px-4 transition-all duration-300 ${filter === 'week' ? 'shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'}`}
             onClick={() => setFilter('week')}
           >
             7 Hari
           </Button>
-          <Button 
-            variant={filter === 'month' ? 'default' : 'ghost'} 
-            size="sm" 
+          <Button
+            variant={filter === 'month' ? 'default' : 'ghost'}
+            size="sm"
             className={`rounded-lg px-4 transition-all duration-300 ${filter === 'month' ? 'shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'}`}
             onClick={() => setFilter('month')}
           >
@@ -151,11 +151,11 @@ export default function Dashboard() {
           </Button>
         </motion.div>
       </div>
-      
+
       {isLoading && data && (
-         <div className="fixed bottom-4 right-4 z-50 bg-white p-3 rounded-full shadow-lg border border-slate-100">
-           <Loader2 className="h-5 w-5 animate-spin text-primary" />
-         </div>
+        <div className="fixed bottom-4 right-4 z-50 bg-white p-3 rounded-full shadow-lg border border-slate-100">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+        </div>
       )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -176,7 +176,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </motion.div>
-        
+
         <motion.div variants={itemVariants}>
           <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -194,7 +194,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </motion.div>
-        
+
         <motion.div variants={itemVariants}>
           <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -212,7 +212,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </motion.div>
-        
+
         <motion.div variants={itemVariants}>
           <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -249,15 +249,15 @@ export default function Dashboard() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={data?.salesTrend || []}>
                     <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="date" 
-                      tickLine={false} 
+                    <XAxis
+                      dataKey="date"
+                      tickLine={false}
                       axisLine={false}
-                      tickMargin={10} 
+                      tickMargin={10}
                       fontSize={12}
                       stroke="#64748b"
                     />
-                    <YAxis 
+                    <YAxis
                       tickLine={false}
                       axisLine={false}
                       tickFormatter={(value) => `Rp ${(value / 1000)}k`}
@@ -265,9 +265,9 @@ export default function Dashboard() {
                       stroke="#64748b"
                       width={80}
                     />
-                    <Tooltip 
+                    <Tooltip
                       formatter={(value: any) => [`Rp ${Number(value).toLocaleString("id-ID")}`, "Pendapatan"]}
-                      cursor={{fill: 'rgba(59, 130, 246, 0.05)'}}
+                      cursor={{ fill: 'rgba(59, 130, 246, 0.05)' }}
                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' }}
                     />
                     <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
@@ -277,7 +277,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </motion.div>
-        
+
         <motion.div variants={itemVariants} className="col-span-1 md:col-span-3">
           <Card className="shadow-sm h-full rounded-2xl">
             <CardHeader>
@@ -295,8 +295,8 @@ export default function Dashboard() {
                 ) : (
                   <AnimatePresence mode="popLayout">
                     {data.topProducts.map((item: any, i: number) => (
-                      <motion.div 
-                        key={item.name} 
+                      <motion.div
+                        key={item.name}
                         layout
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -305,12 +305,11 @@ export default function Dashboard() {
                         className="flex items-center justify-between group p-2 hover:bg-slate-50 rounded-xl transition-colors"
                       >
                         <div className="flex items-center gap-4">
-                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold text-sm shadow-sm transition-transform group-hover:scale-110 ${
-                            i === 0 ? 'bg-amber-100 text-amber-600' :
-                            i === 1 ? 'bg-slate-200 text-slate-600' :
-                            i === 2 ? 'bg-orange-100 text-orange-600' :
-                            'bg-primary/10 text-primary'
-                          }`}>
+                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold text-sm shadow-sm transition-transform group-hover:scale-110 ${i === 0 ? 'bg-amber-100 text-amber-600' :
+                              i === 1 ? 'bg-slate-200 text-slate-600' :
+                                i === 2 ? 'bg-orange-100 text-orange-600' :
+                                  'bg-primary/10 text-primary'
+                            }`}>
                             #{i + 1}
                           </div>
                           <div>

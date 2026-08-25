@@ -13,21 +13,40 @@ export default function InventoryPage() {
   const [products, setProducts] = useState<any[]>([])
   const [movements, setMovements] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  
+  const [stockPage, setStockPage] = useState(1)
+  const [totalStockPages, setTotalStockPages] = useState(1)
+  
+  const [movementPage, setMovementPage] = useState(1)
+  const [totalMovementPages, setTotalMovementPages] = useState(1)
 
   const fetchData = async () => {
     setIsLoading(true)
     try {
       const headers = { "Authorization": `Bearer ${token}` }
       const [productsRes, movementsRes] = await Promise.all([
-        fetch('http://127.0.0.1:8000/api/products', { headers }),
-        fetch('http://127.0.0.1:8000/api/inventory/movements', { headers })
+        fetch(`http://127.0.0.1:8000/api/products?page=${stockPage}&per_page=10`, { headers }),
+        fetch(`http://127.0.0.1:8000/api/inventory/movements?page=${movementPage}&per_page=10`, { headers })
       ])
       
-      const prodData = productsRes.ok ? await productsRes.json() : []
-      const movData = movementsRes.ok ? await movementsRes.json() : []
+      const prodData = productsRes.ok ? await productsRes.json() : null
+      const movData = movementsRes.ok ? await movementsRes.json() : null
 
-      setProducts(Array.isArray(prodData) ? prodData : [])
-      setMovements(Array.isArray(movData) ? movData : [])
+      if (prodData && prodData.data) {
+        setProducts(prodData.data)
+        setTotalStockPages(prodData.last_page || 1)
+      } else {
+        setProducts(Array.isArray(prodData) ? prodData : [])
+        setTotalStockPages(1)
+      }
+
+      if (movData && movData.data) {
+        setMovements(movData.data)
+        setTotalMovementPages(movData.last_page || 1)
+      } else {
+        setMovements(Array.isArray(movData) ? movData : [])
+        setTotalMovementPages(1)
+      }
     } catch (error) {
       console.error("Error fetching inventory data:", error)
     } finally {
@@ -39,7 +58,7 @@ export default function InventoryPage() {
     if (token) {
       fetchData()
     }
-  }, [token])
+  }, [token, stockPage, movementPage])
 
   const lowStockCount = products.filter((p: any) => p.stock <= p.minimum_stock).length
 
@@ -139,6 +158,27 @@ export default function InventoryPage() {
                   </tbody>
                 </table>
               </div>
+              {!isLoading && totalStockPages > 1 && (
+                <div className="flex justify-between items-center p-4 border-t">
+                  <button 
+                    onClick={() => setStockPage(prev => Math.max(prev - 1, 1))}
+                    disabled={stockPage === 1}
+                    className="px-3 py-1 border rounded text-sm disabled:opacity-50"
+                  >
+                    Sebelumnya
+                  </button>
+                  <span className="text-sm text-slate-500">
+                    Halaman {stockPage} dari {totalStockPages}
+                  </span>
+                  <button 
+                    onClick={() => setStockPage(prev => Math.min(prev + 1, totalStockPages))}
+                    disabled={stockPage === totalStockPages}
+                    className="px-3 py-1 border rounded text-sm disabled:opacity-50"
+                  >
+                    Selanjutnya
+                  </button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -200,6 +240,27 @@ export default function InventoryPage() {
                   </tbody>
                 </table>
               </div>
+              {!isLoading && totalMovementPages > 1 && (
+                <div className="flex justify-between items-center p-4 border-t">
+                  <button 
+                    onClick={() => setMovementPage(prev => Math.max(prev - 1, 1))}
+                    disabled={movementPage === 1}
+                    className="px-3 py-1 border rounded text-sm disabled:opacity-50"
+                  >
+                    Sebelumnya
+                  </button>
+                  <span className="text-sm text-slate-500">
+                    Halaman {movementPage} dari {totalMovementPages}
+                  </span>
+                  <button 
+                    onClick={() => setMovementPage(prev => Math.min(prev + 1, totalMovementPages))}
+                    disabled={movementPage === totalMovementPages}
+                    className="px-3 py-1 border rounded text-sm disabled:opacity-50"
+                  >
+                    Selanjutnya
+                  </button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

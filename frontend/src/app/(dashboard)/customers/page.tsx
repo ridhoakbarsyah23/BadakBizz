@@ -47,6 +47,8 @@ export default function CustomersPage() {
   const { token } = useAuth()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
 
   // Modal states
@@ -68,14 +70,20 @@ export default function CustomersPage() {
   const fetchData = async () => {
     try {
       setIsLoading(true)
-      const res = await fetch('http://127.0.0.1:8000/api/customers', {
+      const res = await fetch(`http://127.0.0.1:8000/api/customers?page=${currentPage}&per_page=10`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       })
       if (!res.ok) throw new Error('Failed to fetch data')
       const data = await res.json()
-      setCustomers(Array.isArray(data) ? data : [])
+      if (data && data.data) {
+        setCustomers(data.data)
+        setTotalPages(data.last_page || 1)
+      } else {
+        setCustomers(Array.isArray(data) ? data : [])
+        setTotalPages(1)
+      }
     } catch (error) {
       console.error('Error fetching customers:', error)
     } finally {
@@ -87,7 +95,7 @@ export default function CustomersPage() {
     if (token) {
       fetchData()
     }
-  }, [token])
+  }, [token, currentPage])
 
   // Filtered data
   const filteredCustomers = customers.filter(customer => {
@@ -330,6 +338,28 @@ export default function CustomersPage() {
           </Table>
         )}
       </div>
+
+      {!isLoading && totalPages > 1 && (
+        <div className="flex justify-between items-center mt-4 px-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+          >
+            Sebelumnya
+          </Button>
+          <span className="text-sm text-muted-foreground font-medium">
+            Halaman {currentPage} dari {totalPages}
+          </span>
+          <Button 
+            variant="outline" 
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+          >
+            Selanjutnya
+          </Button>
+        </div>
+      )}
 
       <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
         <DialogContent className="sm:max-w-[425px]">

@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react"
 import { useAuth } from "@/context/AuthContext"
-import { 
-  Button, 
+import {
+  Button,
   Input,
   Chip
 } from "@heroui/react"
@@ -59,30 +59,39 @@ interface Transaction {
 }
 
 export default function TransactionsPage() {
-  const { token } = useAuth()
+  const { token, hasRole } = useAuth()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [isReceiptMode, setIsReceiptMode] = useState(false)
   const [storeSettings, setStoreSettings] = useState<any>({
-    name: "Kivo POS",
+    name: "BadakBiz",
     address: "",
     phone: "",
-    receipt_header: "Kivo POS",
+    receipt_header: "BadakBiz",
     receipt_footer: "Thank you!"
   })
 
   const fetchData = async () => {
     try {
       setIsLoading(true)
-      const res = await fetch('http://127.0.0.1:8000/api/transactions', {
+      const res = await fetch(`http://127.0.0.1:8000/api/transactions?page=${currentPage}&per_page=10`, {
         headers: { "Authorization": `Bearer ${token}` }
       })
       if (!res.ok) throw new Error('Failed to fetch data')
       const data = await res.json()
-      setTransactions(data)
+
+      if (data && data.data) {
+        setTransactions(data.data)
+        setTotalPages(data.last_page || 1)
+      } else {
+        setTransactions(Array.isArray(data) ? data : [])
+        setTotalPages(1)
+      }
 
       const settingsRes = await fetch('http://127.0.0.1:8000/api/settings', {
         headers: { "Authorization": `Bearer ${token}` }
@@ -104,9 +113,9 @@ export default function TransactionsPage() {
     if (token) {
       fetchData()
     }
-  }, [token])
+  }, [token, currentPage])
 
-  const filteredTransactions = transactions.filter(trx => 
+  const filteredTransactions = transactions.filter(trx =>
     trx.transaction_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (trx.customer?.name && trx.customer.name.toLowerCase().includes(searchQuery.toLowerCase()))
   )
@@ -137,9 +146,9 @@ export default function TransactionsPage() {
       trx.status
     ])
 
-    const csvContent = "data:text/csv;charset=utf-8," 
+    const csvContent = "data:text/csv;charset=utf-8,"
       + [headers.join(","), ...rows.map(e => e.join(","))].join("\n")
-    
+
     const encodedUri = encodeURI(csvContent)
     const link = document.createElement("a")
     link.setAttribute("href", encodedUri)
@@ -151,7 +160,7 @@ export default function TransactionsPage() {
 
   const handleVoidTransaction = async () => {
     if (!selectedTransaction) return;
-    
+
     if (!window.confirm("Apakah Anda yakin ingin membatalkan transaksi ini? Tindakan ini tidak dapat dibatalkan dan stok akan dikembalikan.")) {
       return;
     }
@@ -161,23 +170,23 @@ export default function TransactionsPage() {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` }
       })
-      
+
       const data = await res.json()
-      
+
       if (!res.ok) {
         throw new Error(data.message || 'Failed to void transaction')
       }
-      
+
       // Update local state
-      setTransactions(prev => prev.map(trx => 
+      setTransactions(prev => prev.map(trx =>
         trx.id === selectedTransaction.id ? { ...trx, status: 'CANCELLED' } : trx
       ))
-      
+
       // Update selectedTransaction so the UI reflects the change immediately
       setSelectedTransaction(prev => prev ? { ...prev, status: 'CANCELLED' } : null)
-      
+
       alert("Transaksi telah berhasil dibatalkan.")
-      
+
     } catch (error: any) {
       console.error('Void error:', error)
       alert(error.message)
@@ -250,9 +259,9 @@ export default function TransactionsPage() {
                     <TableCell className="py-3 px-4">{trx.payment_method}</TableCell>
                     <TableCell className="py-3 px-4 font-medium text-primary">Rp {Number(trx.total_amount).toLocaleString('id-ID')}</TableCell>
                     <TableCell className="py-3 px-4">
-                      <Chip 
-                        color={trx.status === 'COMPLETED' ? 'success' : trx.status === 'CANCELLED' ? 'danger' : 'warning'} 
-                        variant="soft" 
+                      <Chip
+                        color={trx.status === 'COMPLETED' ? 'success' : trx.status === 'CANCELLED' ? 'danger' : 'warning'}
+                        variant="soft"
                         size="sm"
                       >
                         {trx.status}
@@ -260,9 +269,9 @@ export default function TransactionsPage() {
                     </TableCell>
                     <TableCell className="py-3 px-4">
                       <div className="flex justify-end gap-2">
-                        <Button 
-                          isIconOnly 
-                          variant="ghost" 
+                        <Button
+                          isIconOnly
+                          variant="ghost"
                           size="sm"
                           onPress={() => {
                             setSelectedTransaction(trx)
@@ -272,9 +281,9 @@ export default function TransactionsPage() {
                         >
                           <Eye className="h-4 w-4 text-default-500 hover:text-primary" />
                         </Button>
-                        <Button 
-                          isIconOnly 
-                          variant="ghost" 
+                        <Button
+                          isIconOnly
+                          variant="ghost"
                           size="sm"
                           onPress={() => {
                             setSelectedTransaction(trx)
@@ -294,13 +303,35 @@ export default function TransactionsPage() {
         )}
       </div>
 
+      {!isLoading && totalPages > 1 && (
+        <div className="flex justify-between items-center mt-4 px-2">
+          <Button
+            variant="ghost"
+            onPress={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            isDisabled={currentPage === 1}
+          >
+            Sebelumnya
+          </Button>
+          <span className="text-sm text-muted-foreground font-medium">
+            Halaman {currentPage} dari {totalPages}
+          </span>
+          <Button
+            variant="ghost"
+            onPress={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            isDisabled={currentPage === totalPages}
+          >
+            Selanjutnya
+          </Button>
+        </div>
+      )}
+
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <DialogContent className="sm:max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
           {isReceiptMode && selectedTransaction ? (
             <div className="flex flex-col items-center">
               <div id="printable-receipt" className="w-full p-5 print:p-0 bg-white text-black text-sm print:text-xs font-mono flex flex-col gap-2 rounded-xl border print:border-none print:shadow-none mb-2 print:m-0 print:w-[300px] print:absolute print:top-0 print:left-0">
                 <div className="text-center font-bold text-lg print:text-base mb-1">
-                  {storeSettings.receipt_header || storeSettings.name || 'KIVO POS'}
+                  {storeSettings.receipt_header || storeSettings.name || 'BADAKBIZ'}
                 </div>
                 <div className="text-center text-xs print:text-[10px] font-normal text-gray-600 print:text-black mb-3 whitespace-pre-line">
                   {storeSettings.address || 'Alamat Toko'}{storeSettings.address ? '\n' : ''}
@@ -351,7 +382,7 @@ export default function TransactionsPage() {
                   <span>Pajak</span>
                   <span>Rp {Number(selectedTransaction.tax).toLocaleString("id-ID")}</span>
                 </div>
-                
+
                 <div className="flex justify-between font-black text-lg print:text-base mb-2 print:text-black">
                   <span>TOTAL</span>
                   <span>Rp {Number(selectedTransaction.total_amount).toLocaleString("id-ID")}</span>
@@ -369,7 +400,7 @@ export default function TransactionsPage() {
                 <div className="text-center text-xs print:text-[10px] mt-2 print:mt-1 italic text-gray-500 print:text-black whitespace-pre-line">
                   {storeSettings.receipt_footer || 'Terima kasih atas kunjungan Anda!\nSilakan datang kembali.'}
                 </div>
-                
+
                 <div className="print:hidden border-t border-dashed mt-4 pt-4 text-center text-xs text-muted-foreground">
                   Ini adalah pratinjau struk yang akan dicetak.
                 </div>
@@ -379,11 +410,11 @@ export default function TransactionsPage() {
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <Receipt className="w-5 h-5 text-primary" /> 
+                  <Receipt className="w-5 h-5 text-primary" />
                   Detail Transaksi
                 </DialogTitle>
               </DialogHeader>
-              
+
               {selectedTransaction && (
                 <div className="space-y-6 py-4">
                   <div className="grid grid-cols-2 gap-4 text-sm bg-slate-50 p-4 rounded-xl border">
@@ -401,9 +432,9 @@ export default function TransactionsPage() {
                     </div>
                     <div>
                       <p className="text-muted-foreground mb-1">Status</p>
-                      <Chip 
-                        color={selectedTransaction.status === 'COMPLETED' ? 'success' : selectedTransaction.status === 'CANCELLED' ? 'danger' : 'warning'} 
-                        variant="soft" 
+                      <Chip
+                        color={selectedTransaction.status === 'COMPLETED' ? 'success' : selectedTransaction.status === 'CANCELLED' ? 'danger' : 'warning'}
+                        variant="soft"
                         size="sm"
                       >
                         {selectedTransaction.status}
@@ -454,7 +485,7 @@ export default function TransactionsPage() {
               Tutup
             </Button>
             {isReceiptMode ? (
-              <Button 
+              <Button
                 variant="primary"
                 onPress={() => window.print()}
               >
@@ -462,15 +493,15 @@ export default function TransactionsPage() {
               </Button>
             ) : (
               <div className="flex gap-2">
-                {selectedTransaction?.status === 'COMPLETED' && (
-                  <Button 
+                {selectedTransaction?.status === 'COMPLETED' && hasRole('admin') && (
+                  <Button
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     onPress={handleVoidTransaction}
                   >
                     Batalkan Transaksi
                   </Button>
                 )}
-                <Button 
+                <Button
                   variant="secondary"
                   onPress={() => setIsReceiptMode(true)}
                 >

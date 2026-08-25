@@ -29,6 +29,7 @@ export default function SettingsPage() {
     service_charge_rate: "0",
     receipt_header: "",
     receipt_footer: "",
+    receipt_width: "80",
   })
 
   useEffect(() => {
@@ -49,6 +50,7 @@ export default function SettingsPage() {
             service_charge_rate: data.service_charge_rate?.toString() || "0",
             receipt_header: data.receipt_header || "",
             receipt_footer: data.receipt_footer || "",
+            receipt_width: data.receipt_width?.toString() || "80",
           })
         }
       } catch (error) {
@@ -234,6 +236,19 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="receiptWidth">Lebar Kertas Printer (Thermal)</Label>
+              <select 
+                id="receiptWidth"
+                className="flex h-10 w-full md:w-[200px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={settings.receipt_width}
+                onChange={(e) => setSettings({...settings, receipt_width: e.target.value})}
+              >
+                <option value="80">80mm (Standar)</option>
+                <option value="58">58mm (Kecil)</option>
+              </select>
+              <p className="text-xs text-muted-foreground">Pilih sesuai ukuran kertas printer struk yang Anda gunakan agar hasil cetakan proporsional.</p>
+            </div>
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="receiptHeader">Header Struk</Label>

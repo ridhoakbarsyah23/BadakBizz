@@ -47,6 +47,8 @@ export default function CategoriesPage() {
   const { token } = useAuth()
   const [categories, setCategories] = useState<Category[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   
   // Dialog State
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -64,16 +66,22 @@ export default function CategoriesPage() {
     if (token) {
       fetchCategories()
     }
-  }, [token])
+  }, [token, currentPage])
 
   const fetchCategories = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/categories", {
+      const res = await fetch(`http://127.0.0.1:8000/api/categories?page=${currentPage}&per_page=10`, {
         headers: { "Authorization": `Bearer ${token}` }
       })
       const data = await res.json()
-      setCategories(Array.isArray(data) ? data : [])
+      if (data && data.data) {
+        setCategories(data.data)
+        setTotalPages(data.last_page || 1)
+      } else {
+        setCategories(Array.isArray(data) ? data : [])
+        setTotalPages(1)
+      }
     } catch (error) {
       console.error("Error fetching categories:", error)
     } finally {
@@ -260,6 +268,28 @@ export default function CategoriesPage() {
           </Table>
         )}
       </div>
+
+      {!isLoading && totalPages > 1 && (
+        <div className="flex justify-between items-center mt-4 px-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+          >
+            Sebelumnya
+          </Button>
+          <span className="text-sm text-muted-foreground font-medium">
+            Halaman {currentPage} dari {totalPages}
+          </span>
+          <Button 
+            variant="outline" 
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+          >
+            Selanjutnya
+          </Button>
+        </div>
+      )}
 
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
         <DialogContent className="sm:max-w-[425px]">

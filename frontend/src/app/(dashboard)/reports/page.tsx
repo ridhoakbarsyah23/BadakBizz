@@ -86,7 +86,7 @@ export default function ReportsPage() {
       const downloadUrl = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = downloadUrl
-      a.download = `KivoPOS_Report_${dateRange}.csv`
+      a.download = `BadakBizPOS_Report_${dateRange}.csv`
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(downloadUrl)

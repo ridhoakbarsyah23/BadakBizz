@@ -34,6 +34,8 @@ export default function StaffPage() {
   const [staffList, setStaffList] = useState<Staff[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -54,14 +56,20 @@ export default function StaffPage() {
     try {
       const headers = { "Authorization": `Bearer ${token}` }
       const [staffRes, rolesRes] = await Promise.all([
-        fetch('http://127.0.0.1:8000/api/staff', { headers }),
+        fetch(`http://127.0.0.1:8000/api/staff?page=${currentPage}&per_page=10`, { headers }),
         fetch('http://127.0.0.1:8000/api/roles', { headers })
       ])
       
       const staffData = await staffRes.json()
       const rolesData = await rolesRes.json()
 
-      setStaffList(Array.isArray(staffData) ? staffData : [])
+      if (staffData && staffData.data) {
+        setStaffList(staffData.data)
+        setTotalPages(staffData.last_page || 1)
+      } else {
+        setStaffList(Array.isArray(staffData) ? staffData : [])
+        setTotalPages(1)
+      }
       setRoles(Array.isArray(rolesData) ? rolesData : [])
     } catch (error) {
       console.error("Error fetching data:", error)
@@ -74,7 +82,7 @@ export default function StaffPage() {
     if (token) {
       fetchData()
     }
-  }, [token])
+  }, [token, currentPage])
 
   const openDialog = (staff?: Staff) => {
     if (staff) {
@@ -241,6 +249,29 @@ export default function StaffPage() {
               </Table>
             )}
           </div>
+          {!isLoading && totalPages > 1 && (
+            <div className="flex justify-between items-center p-4 border-t">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                Sebelumnya
+              </Button>
+              <span className="text-sm text-slate-500 font-medium">
+                Halaman {currentPage} dari {totalPages}
+              </span>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              >
+                Selanjutnya
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
