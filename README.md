@@ -1,64 +1,78 @@
-# BadakBiz 🏪
+# BadakBiz
 
-BadakBiz adalah aplikasi Point of Sale (Kasir) modern dan responsif yang dirancang untuk membantu Anda mengelola toko, inventaris, dan transaksi secara efisien. Dibangun menggunakan arsitektur terpisah (separated architecture) dengan standar industri saat ini.
+BadakBiz adalah aplikasi Point of Sale (kasir) untuk mengelola transaksi, stok,
+produk, pelanggan, staf, laporan, dan pengaturan toko. Proyek ini memakai
+arsitektur terpisah: frontend Next.js dan backend Laravel REST API.
 
-## 🏗️ Arsitektur
+## Arsitektur
 
-- **Frontend**: [Next.js 15+](https://nextjs.org/) (App Router) dengan [shadcn/ui](https://ui.shadcn.com/) dan Tailwind CSS.
-- **Backend**: [Laravel 11](https://laravel.com/) dengan SQLite (bawaan) yang menyediakan RESTful API.
-- **Autentikasi**: Laravel Sanctum (Autentikasi API berbasis token).
+- **Frontend**: Next.js 16 App Router, React 19, Tailwind CSS, shadcn/ui, HeroUI, lucide-react, Recharts.
+- **Backend**: Laravel 13, Laravel Sanctum, SQLite default untuk pengembangan lokal.
+- **Pembayaran**: Tunai dan QRIS dinamis melalui Midtrans.
 
-## 🚀 Memulai Proyek
+## Memulai Proyek
 
-Karena proyek ini dipisahkan menjadi `frontend` dan `backend`, Anda perlu menjalankan dua server pengembangan (development server) yang terpisah.
+Jalankan backend dan frontend di terminal terpisah.
 
-### 1. Pengaturan Backend (Laravel)
+### 1. Backend Laravel
 
-Masuk ke direktori `backend`:
 ```bash
 cd backend
-```
-
-Instal dependensi dan jalankan server:
-```bash
 composer install
 php artisan migrate
-php artisan db:seed # Opsional: jika Anda ingin mengisi data awal
+php artisan db:seed
 php artisan serve
 ```
-API backend akan berjalan di `http://127.0.0.1:8000`.
 
-### 2. Pengaturan Frontend (Next.js)
+API backend default berjalan di `http://127.0.0.1:8000`.
 
-Buka terminal baru dan masuk ke direktori `frontend`:
+### 2. Frontend Next.js
+
 ```bash
 cd frontend
-```
-
-Instal dependensi dan jalankan server Next.js:
-```bash
 npm install
+copy .env.example .env.local
 npm run dev
 ```
-UI frontend akan tersedia di `http://localhost:3000`.
 
-## 🔐 Kredensial Bawaan
+UI frontend default tersedia di `http://localhost:3000`.
 
-Untuk masuk ke Dashboard BadakBiz, gunakan kredensial berikut (jika Anda telah menjalankan seeder database):
-- **Email:** `admin@badakbiz.com`
-- **Password:** `password123`
+`NEXT_PUBLIC_API_URL` mengatur base URL backend yang dipakai browser. Untuk
+lokal, nilai defaultnya:
 
-## 🌟 Fitur
+```env
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+```
 
-- **Dashboard**: Grafik real-time dan ringkasan transaksi terbaru.
-- **Kasir (POS) / Checkout**: Sistem keranjang interaktif dengan simulasi pembayaran tunai dan QRIS.
-- **Inventaris & Produk**: Kelola katalog, harga, dan pantau ketersediaan stok Anda.
-- **Kategori**: Mengelompokkan produk dengan rapi dan efisien.
-- **Transaksi & Laporan**: Riwayat transaksi dan metrik performa penjualan.
-- **Pengaturan**: Konfigurasi profil dan pengaturan toko.
+## Kredensial Bawaan
 
-## 💻 Sorotan Teknologi
-- `React 19` & `Next.js`
-- `Tailwind CSS` & ikon dari `lucide-react`
-- `Laravel 11` & `Eloquent ORM`
-- `Recharts` untuk visualisasi data interaktif
+Jika sudah menjalankan seeder:
+
+- **Admin**: `admin@badakbiz.com` / `password`
+- **Cashier**: `cashier@badakbiz.com` / `password`
+
+## Fitur
+
+- Dashboard ringkasan transaksi dan grafik penjualan.
+- POS checkout dengan keranjang, diskon, pajak, service charge, tunai, dan QRIS.
+- Produk, kategori, inventaris, dan restock.
+- Pelanggan dan riwayat transaksi.
+- Staff, role, shift kasir, laporan, dan pengaturan struk.
+- Struktur awal untuk fitur UMKM seperti varian produk dan meja dine-in.
+
+## Verifikasi
+
+Backend:
+
+```bash
+cd backend
+php artisan test
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm run lint
+npx tsc --noEmit
+```
