@@ -1,7 +1,7 @@
 "use client"
 
 import { apiUrl } from "@/lib/api"
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, type CSSProperties } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { useAuth } from "@/context/AuthContext"
 import {
@@ -590,26 +590,30 @@ export default function TransactionsPage() {
         <DialogContent className="sm:max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
           {isReceiptMode && selectedTransaction ? (
             <div className="flex flex-col items-center">
-              <div id="printable-receipt" className="w-full p-5 print:p-0 bg-white text-black text-sm print:text-xs font-mono flex flex-col gap-2 rounded-xl border print:border-none print:shadow-none mb-2 print:m-0 print:w-[300px] print:absolute print:top-0 print:left-0">
-                <div className="text-center font-bold text-lg print:text-base mb-1">
+              <div
+                id="printable-receipt"
+                style={{ "--receipt-width": `${Number(storeSettings.receipt_width || 80)}mm` } as CSSProperties}
+                className="bg-white text-black text-sm print:text-[10px] font-mono flex flex-col gap-2 rounded-xl border shadow-sm mx-auto mb-2 p-5 print:m-0"
+              >
+                <div className="receipt-text text-center font-bold text-lg print:text-[13px] leading-tight mb-1">
                   {storeSettings.receipt_header || storeSettings.name || 'BADAKBIZ'}
                 </div>
-                <div className="text-center text-xs print:text-[10px] font-normal text-gray-600 print:text-black mb-3 whitespace-pre-line">
+                <div className="receipt-text text-center text-xs print:text-[9px] leading-snug font-normal text-gray-600 print:text-black mb-3 whitespace-pre-line">
                   {storeSettings.address || 'Alamat Toko'}{storeSettings.address ? '\n' : ''}
                   Telp: {storeSettings.phone || '-'}
                 </div>
 
                 <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2"></div>
 
-                <div className="flex justify-between text-xs print:text-[10px] mb-2 font-medium text-gray-600 print:text-black">
-                  <span>{formatDate(selectedTransaction.created_at)}</span>
-                  <span>{selectedTransaction.transaction_number}</span>
+                <div className="receipt-row text-xs print:text-[9px] mb-2 font-medium text-gray-600 print:text-black">
+                  <span className="receipt-text">{formatDate(selectedTransaction.created_at)}</span>
+                  <span className="receipt-value receipt-text">{selectedTransaction.transaction_number}</span>
                 </div>
-                <div className="text-left text-xs print:text-[10px] mb-2 font-medium text-gray-600 print:text-black">
+                <div className="receipt-text text-left text-xs print:text-[9px] mb-2 font-medium text-gray-600 print:text-black">
                   Pelanggan: {selectedTransaction.customer?.name || 'Walk-in'}
                 </div>
                 {selectedTransaction.table && (
-                  <div className="text-left text-xs print:text-[10px] mb-2 font-medium text-gray-600 print:text-black">
+                  <div className="receipt-text text-left text-xs print:text-[9px] mb-2 font-medium text-gray-600 print:text-black">
                     Meja: {selectedTransaction.table.name}
                   </div>
                 )}
@@ -617,53 +621,53 @@ export default function TransactionsPage() {
                 <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 flex flex-col gap-2">
                   {selectedTransaction.items?.map((item: any, i: number) => (
                     <div key={i} className="flex flex-col">
-                      <div className="flex justify-between font-bold print:font-semibold print:text-black">
-                        <span className="truncate pr-2">{item.variant ? `${item.product?.name} - ${item.variant.name}` : item.product?.name}</span>
-                        <span className="whitespace-nowrap">Rp {Number(item.subtotal).toLocaleString("id-ID")}</span>
+                      <div className="receipt-row font-bold print:font-semibold print:text-black">
+                        <span className="receipt-text pr-1">{item.variant ? `${item.product?.name} - ${item.variant.name}` : item.product?.name}</span>
+                        <span className="receipt-value receipt-money">Rp {Number(item.subtotal).toLocaleString("id-ID")}</span>
                       </div>
-                      <div className="text-xs print:text-[10px] text-gray-500 print:text-black">
+                      <div className="text-xs print:text-[9px] text-gray-500 print:text-black">
                         {item.quantity} x Rp {Number(item.price).toLocaleString("id-ID")}
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="flex justify-between text-xs print:text-[10px] print:text-black">
+                <div className="receipt-row text-xs print:text-[9px] print:text-black">
                   <span>Subtotal</span>
-                  <span>Rp {Number(selectedTransaction.subtotal).toLocaleString("id-ID")}</span>
+                  <span className="receipt-value receipt-money">Rp {Number(selectedTransaction.subtotal).toLocaleString("id-ID")}</span>
                 </div>
                 {Number(selectedTransaction.discount) > 0 && (
-                  <div className="flex justify-between text-xs print:text-[10px] print:text-black">
+                  <div className="receipt-row text-xs print:text-[9px] print:text-black">
                     <span>Diskon</span>
-                    <span>- Rp {Number(selectedTransaction.discount).toLocaleString("id-ID")}</span>
+                    <span className="receipt-value receipt-money">- Rp {Number(selectedTransaction.discount).toLocaleString("id-ID")}</span>
                   </div>
                 )}
                 {Number(selectedTransaction.service_charge) > 0 && (
-                  <div className="flex justify-between text-xs print:text-[10px] print:text-black">
+                  <div className="receipt-row text-xs print:text-[9px] print:text-black">
                     <span>Biaya Layanan</span>
-                    <span>Rp {Number(selectedTransaction.service_charge).toLocaleString("id-ID")}</span>
+                    <span className="receipt-value receipt-money">Rp {Number(selectedTransaction.service_charge).toLocaleString("id-ID")}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-xs print:text-[10px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
+                <div className="receipt-row text-xs print:text-[9px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
                   <span>Pajak</span>
-                  <span>Rp {Number(selectedTransaction.tax).toLocaleString("id-ID")}</span>
+                  <span className="receipt-value receipt-money">Rp {Number(selectedTransaction.tax).toLocaleString("id-ID")}</span>
                 </div>
 
-                <div className="flex justify-between font-black text-lg print:text-base mb-2 print:text-black">
+                <div className="receipt-row font-black text-lg print:text-[13px] mb-2 print:text-black">
                   <span>TOTAL</span>
-                  <span>Rp {Number(selectedTransaction.total_amount).toLocaleString("id-ID")}</span>
+                  <span className="receipt-value receipt-money">Rp {Number(selectedTransaction.total_amount).toLocaleString("id-ID")}</span>
                 </div>
 
-                <div className="flex justify-between text-xs print:text-[10px] print:text-black">
+                <div className="receipt-row text-xs print:text-[9px] print:text-black">
                   <span>Bayar ({selectedTransaction.payment_method})</span>
-                  <span>Rp {Number(selectedTransaction.payment_amount).toLocaleString("id-ID")}</span>
+                  <span className="receipt-value receipt-money">Rp {Number(selectedTransaction.payment_amount).toLocaleString("id-ID")}</span>
                 </div>
-                <div className="flex justify-between text-xs print:text-[10px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
+                <div className="receipt-row text-xs print:text-[9px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
                   <span>Kembali</span>
-                  <span className="font-bold">Rp {(Number(selectedTransaction.payment_amount) - Number(selectedTransaction.total_amount)).toLocaleString("id-ID")}</span>
+                  <span className="receipt-value receipt-money font-bold">Rp {(Number(selectedTransaction.payment_amount) - Number(selectedTransaction.total_amount)).toLocaleString("id-ID")}</span>
                 </div>
 
-                <div className="text-center text-xs print:text-[10px] mt-2 print:mt-1 italic text-gray-500 print:text-black whitespace-pre-line">
+                <div className="receipt-text text-center text-xs print:text-[9px] mt-2 print:mt-1 italic text-gray-500 print:text-black whitespace-pre-line">
                   {storeSettings.receipt_footer || 'Terima kasih atas kunjungan Anda!\nSilakan datang kembali.'}
                 </div>
 

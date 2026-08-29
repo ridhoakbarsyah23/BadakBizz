@@ -1,7 +1,7 @@
 "use client"
 
 import { apiUrl } from "@/lib/api"
-import { useState, useEffect } from "react"
+import { useState, useEffect, type CSSProperties } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -423,33 +423,6 @@ export default function POSPage() {
   return (
     <>
     <div className="flex flex-row gap-6 relative h-[calc(100vh-8rem)] w-full overflow-hidden">
-      <style dangerouslySetInnerHTML={{__html: `
-        @media print {
-          @page {
-            margin: 0;
-            size: 58mm 200mm;
-          }
-          body * {
-            visibility: hidden;
-          }
-          #printable-receipt, #printable-receipt * {
-            visibility: visible;
-          }
-          #printable-receipt {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 58mm;
-            padding: 0;
-            margin: 0;
-            font-size: 11px !important;
-            color: #000 !important;
-            box-shadow: none !important;
-            border: none !important;
-          }
-        }
-      `}} />
-
       {/* LEFT: Product Grid */}
       <div className="flex-1 flex flex-col min-w-0 gap-4 lg:gap-6 overflow-hidden h-full">
         <div className="flex items-center justify-between gap-4 shrink-0">
@@ -949,82 +922,86 @@ export default function POSPage() {
               </div>
 
               {/* Printable Receipt Area */}
-              <div id="printable-receipt" className="p-5 print:p-0 bg-white text-black text-sm print:text-xs font-mono flex flex-col gap-2 rounded-xl border print:border-none print:shadow-none mx-2 mb-2 print:m-0 print:w-[300px] print:absolute print:top-0 print:left-0">
-                <div className="text-center font-bold text-lg print:text-base mb-1">
+              <div
+                id="printable-receipt"
+                style={{ "--receipt-width": `${Number(storeSettings.receipt_width || 80)}mm` } as CSSProperties}
+                className="bg-white text-black text-sm print:text-[10px] font-mono flex flex-col gap-2 rounded-xl border shadow-sm mx-auto mb-2 p-5 print:m-0"
+              >
+                <div className="receipt-text text-center font-bold text-lg print:text-[13px] leading-tight mb-1">
                   {storeSettings.receipt_header || storeSettings.name || 'Kivo POS'}
                 </div>
-                <div className="text-center text-xs print:text-[10px] font-normal text-gray-600 print:text-black mb-3">
+                <div className="receipt-text text-center text-xs print:text-[9px] leading-snug font-normal text-gray-600 print:text-black mb-3">
                   {storeSettings.address || 'Alamat Toko'}<br />
                   Telp: {storeSettings.phone || '-'}
                 </div>
 
                 <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2"></div>
 
-                <div className="flex justify-between text-xs print:text-[10px] mb-2 font-medium text-gray-600 print:text-black">
-                  <span>{receiptData?.date}</span>
-                  <span>{receiptData?.transaction_number}</span>
+                <div className="receipt-row text-xs print:text-[9px] mb-2 font-medium text-gray-600 print:text-black">
+                  <span className="receipt-text">{receiptData?.date}</span>
+                  <span className="receipt-value receipt-text">{receiptData?.transaction_number}</span>
                 </div>
-                <div className="flex justify-between text-xs print:text-[10px] mb-2 font-medium text-gray-600 print:text-black">
-                  <span>Kasir: {receiptData?.cashierName}</span>
-                  <span>Pelanggan: {receiptData?.customerName}</span>
+                <div className="receipt-row text-xs print:text-[9px] mb-2 font-medium text-gray-600 print:text-black">
+                  <span className="receipt-text">Kasir: {receiptData?.cashierName}</span>
+                  <span className="receipt-value receipt-text">Pelanggan: {receiptData?.customerName}</span>
                 </div>
                 {receiptData?.tableName && (
-                  <div className="flex justify-between text-xs print:text-[10px] mb-2 font-medium text-gray-600 print:text-black">
+                  <div className="receipt-row text-xs print:text-[9px] mb-2 font-medium text-gray-600 print:text-black">
                     <span>Meja</span>
-                    <span>{receiptData.tableName}</span>
+                    <span className="receipt-value receipt-text">{receiptData.tableName}</span>
                   </div>
                 )}
 
                 <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 flex flex-col gap-2">
                   {receiptData?.items.map((item: any, i: number) => (
                     <div key={i} className="flex flex-col">
-                      <div className="flex justify-between font-bold print:font-semibold print:text-black">
-                        <span className="truncate pr-2">{item.name}</span>
-                        <span className="whitespace-nowrap">Rp {(item.selling_price * item.qty).toLocaleString("id-ID")}</span>
+                      <div className="receipt-row font-bold print:font-semibold print:text-black">
+                        <span className="receipt-text pr-1">{item.name}</span>
+                        <span className="receipt-value receipt-money">Rp {(item.selling_price * item.qty).toLocaleString("id-ID")}</span>
                       </div>
-                      <div className="text-xs print:text-[10px] text-gray-500 print:text-black">
+                      <div className="text-xs print:text-[9px] text-gray-500 print:text-black">
                         {item.qty} x Rp {Number(item.selling_price).toLocaleString("id-ID")}
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="flex justify-between text-xs print:text-[10px] print:text-black">
+                <div className="receipt-row text-xs print:text-[9px] print:text-black">
                   <span>Subtotal</span>
-                  <span>Rp {receiptData?.subtotal.toLocaleString("id-ID")}</span>
+                  <span className="receipt-value receipt-money">Rp {receiptData?.subtotal.toLocaleString("id-ID")}</span>
                 </div>
                 {receiptData?.discount > 0 && (
-                  <div className="flex justify-between text-xs print:text-[10px] print:text-black">
+                  <div className="receipt-row text-xs print:text-[9px] print:text-black">
                     <span>Diskon Member</span>
-                    <span>- Rp {receiptData?.discount.toLocaleString("id-ID")}</span>
+                    <span className="receipt-value receipt-money">- Rp {receiptData?.discount.toLocaleString("id-ID")}</span>
                   </div>
                 )}
                 {receiptData?.service_charge > 0 && (
-                  <div className="flex justify-between text-xs print:text-[10px] print:text-black">
-                    <span>Service Charge ({storeSettings.service_charge_rate}%)</span>
-                    <span>Rp {receiptData?.service_charge.toLocaleString("id-ID")}</span>
+                  <div className="receipt-row text-xs print:text-[9px] print:text-black">
+                    <span className="receipt-text">Service Charge ({storeSettings.service_charge_rate}%)</span>
+                    <span className="receipt-value receipt-money">Rp {receiptData?.service_charge.toLocaleString("id-ID")}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-xs print:text-[10px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
+                <div className="receipt-row text-xs print:text-[9px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
                   <span>Tax ({storeSettings.tax_rate}%)</span>
-                  <span>Rp {receiptData?.tax.toLocaleString("id-ID")}</span>
+                  <span className="receipt-value receipt-money">Rp {receiptData?.tax.toLocaleString("id-ID")}</span>
                 </div>
                 
-                <div className="flex justify-between font-black text-lg print:text-base mb-2 print:text-black">
+                <div className="receipt-row font-black text-lg print:text-[13px] mb-2 print:text-black">
                   <span>TOTAL</span>
-                  <span>Rp {receiptData?.total.toLocaleString("id-ID")}</span>
+                  <span className="receipt-value receipt-money">Rp {receiptData?.total.toLocaleString("id-ID")}</span>
                 </div>
 
-                <div className="flex justify-between text-xs print:text-[10px] print:text-black">
+                <div className="receipt-row text-xs print:text-[9px] print:text-black">
                   <span>Bayar ({receiptData?.paymentMethod})</span>
-                  <span>Rp {receiptData?.paymentAmount.toLocaleString("id-ID")}</span>
+                  <span className="receipt-value receipt-money">Rp {receiptData?.paymentAmount.toLocaleString("id-ID")}</span>
                 </div>
-                <div className="flex justify-between text-xs print:text-[10px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
+                <div className="receipt-row text-xs print:text-[9px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
                   <span>Kembali</span>
-                  <span className="font-bold">Rp {receiptData?.change.toLocaleString("id-ID")}</span>
+                  <span className="receipt-value receipt-money font-bold">Rp {receiptData?.change.toLocaleString("id-ID")}</span>
                 </div>
 
-                <div className="text-center text-xs print:text-[10px] mt-2 print:mt-1 italic text-gray-500 print:text-black">
+                <div className="receipt-text text-center text-xs print:text-[9px] mt-2 print:mt-1 italic text-gray-500 print:text-black">
                   {storeSettings.receipt_footer || 'Terima kasih atas kunjungan Anda!'}
                 </div>
                 
