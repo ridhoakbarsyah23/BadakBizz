@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const token = request.cookies.get('token')?.value
   const role = request.cookies.get('user_role')?.value
   const path = request.nextUrl.pathname
@@ -24,7 +24,7 @@ export function middleware(request: NextRequest) {
 
   // Restrict cashier from accessing admin pages
   if (role === 'cashier') {
-    const adminRoutes = ['/', '/settings', '/staff', '/shifts', '/reports', '/products', '/categories', '/inventory']
+    const adminRoutes = ['/', '/settings', '/staff', '/shifts', '/reports', '/products', '/categories', '/inventory', '/tables']
     if (adminRoutes.some(route => path === route || path.startsWith(`${route}/`))) {
       return NextResponse.redirect(new URL('/pos', request.url))
     }

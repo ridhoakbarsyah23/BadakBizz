@@ -1,5 +1,6 @@
 "use client"
 
+import { apiUrl } from "@/lib/api"
 import React, { useState, useEffect } from "react"
 import { Package, ArrowRightLeft, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
@@ -25,8 +26,8 @@ export default function InventoryPage() {
     try {
       const headers = { "Authorization": `Bearer ${token}` }
       const [productsRes, movementsRes] = await Promise.all([
-        fetch(`http://127.0.0.1:8000/api/products?page=${stockPage}&per_page=10`, { headers }),
-        fetch(`http://127.0.0.1:8000/api/inventory/movements?page=${movementPage}&per_page=10`, { headers })
+        fetch(apiUrl(`/api/products?page=${stockPage}&per_page=10`), { headers }),
+        fetch(apiUrl(`/api/inventory/movements?page=${movementPage}&per_page=10`), { headers })
       ])
       
       const prodData = productsRes.ok ? await productsRes.json() : null

@@ -1,5 +1,6 @@
 "use client"
 
+import { apiUrl } from "@/lib/api"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
@@ -14,7 +15,7 @@ import {
 } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Store, Receipt, Coins, Loader2, Settings2 } from "lucide-react"
+import { Armchair, Store, Receipt, Coins, Loader2, Settings2 } from "lucide-react"
 
 import Link from "next/link"
 
@@ -39,7 +40,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/settings", {
+        const res = await fetch(apiUrl('/api/settings'), {
           headers: {
             "Authorization": `Bearer ${token}`
           }
@@ -73,7 +74,7 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/settings", {
+      const res = await fetch(apiUrl('/api/settings'), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -137,6 +138,30 @@ export default function SettingsPage() {
           <CardFooter>
             <Link href="/staff" className="w-full sm:w-auto">
               <Button className="w-full sm:w-auto">Kelola Akun Karyawan</Button>
+            </Link>
+          </CardFooter>
+        </Card>
+
+        <Card className="border-emerald-200 bg-emerald-50/60 shadow-md shadow-emerald-900/5">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <div className="rounded-lg bg-emerald-100 p-2">
+                <Armchair className="h-5 w-5 text-emerald-700" />
+              </div>
+              <CardTitle>Meja Dine-in</CardTitle>
+            </div>
+            <CardDescription>
+              Tambah meja, ubah status reservasi, dan pantau meja yang sedang terpakai.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-slate-600">
+              Daftar meja ini akan muncul di POS saat fitur Manajemen Meja diaktifkan.
+            </p>
+          </CardContent>
+          <CardFooter>
+            <Link href="/tables" className="w-full sm:w-auto">
+              <Button className="w-full sm:w-auto">Kelola Meja</Button>
             </Link>
           </CardFooter>
         </Card>

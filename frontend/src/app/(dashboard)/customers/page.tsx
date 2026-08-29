@@ -1,5 +1,6 @@
 "use client"
 
+import { apiUrl } from "@/lib/api"
 import React, { useState, useEffect } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
@@ -70,7 +71,7 @@ export default function CustomersPage() {
   const fetchData = async () => {
     try {
       setIsLoading(true)
-      const res = await fetch(`http://127.0.0.1:8000/api/customers?page=${currentPage}&per_page=10`, {
+      const res = await fetch(apiUrl(`/api/customers?page=${currentPage}&per_page=10`), {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -143,8 +144,8 @@ export default function CustomersPage() {
     try {
       setIsSubmitting(true)
       const url = modalMode === 'create' 
-        ? 'http://127.0.0.1:8000/api/customers'
-        : `http://127.0.0.1:8000/api/customers/${selectedCustomer?.id}`
+        ? apiUrl('/api/customers')
+        : apiUrl(`/api/customers/${selectedCustomer?.id}`)
       
       const method = modalMode === 'create' ? 'POST' : 'PUT'
 
@@ -173,7 +174,7 @@ export default function CustomersPage() {
     
     try {
       setIsSubmitting(true)
-      const res = await fetch(`http://127.0.0.1:8000/api/customers/${selectedCustomer.id}`, {
+      const res = await fetch(apiUrl(`/api/customers/${selectedCustomer.id}`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

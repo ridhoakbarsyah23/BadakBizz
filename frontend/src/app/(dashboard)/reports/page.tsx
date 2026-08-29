@@ -1,5 +1,6 @@
 "use client"
 
+import { apiUrl } from "@/lib/api"
 import { useState, useEffect } from "react"
 import { 
   Card,
@@ -8,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Bar, BarChart, CartesianGrid, XAxis, ResponsiveContainer, LineChart, Line } from "recharts"
+import { Bar, BarChart, CartesianGrid, XAxis, LineChart, Line } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { useAuth } from "@/context/AuthContext"
 import { Loader2, Download } from "lucide-react"
@@ -45,7 +46,7 @@ export default function ReportsPage() {
       setIsExporting(true)
       const now = new Date()
       let startDate = ''
-      let endDate = now.toISOString()
+      const endDate = now.toISOString()
       
       if (dateRange === 'today') {
         const start = new Date(now)
@@ -69,7 +70,7 @@ export default function ReportsPage() {
         startDate = start.toISOString()
       }
 
-      let url = 'http://127.0.0.1:8000/api/reports/export'
+      let url = apiUrl('/api/reports/export')
       if (startDate) {
         url += `?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`
       }
@@ -105,7 +106,7 @@ export default function ReportsPage() {
         
         const now = new Date()
         let startDate = ''
-        let endDate = now.toISOString()
+        const endDate = now.toISOString()
         
         if (dateRange === 'today') {
           const start = new Date(now)
@@ -129,7 +130,7 @@ export default function ReportsPage() {
           startDate = start.toISOString()
         }
 
-        let url = 'http://127.0.0.1:8000/api/reports'
+        let url = apiUrl('/api/reports')
         if (startDate) {
           url += `?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`
         }

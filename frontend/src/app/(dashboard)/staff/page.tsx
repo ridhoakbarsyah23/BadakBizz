@@ -1,5 +1,6 @@
 "use client"
 
+import { apiUrl } from "@/lib/api"
 import React, { useState, useEffect } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { 
@@ -56,8 +57,8 @@ export default function StaffPage() {
     try {
       const headers = { "Authorization": `Bearer ${token}` }
       const [staffRes, rolesRes] = await Promise.all([
-        fetch(`http://127.0.0.1:8000/api/staff?page=${currentPage}&per_page=10`, { headers }),
-        fetch('http://127.0.0.1:8000/api/roles', { headers })
+        fetch(apiUrl(`/api/staff?page=${currentPage}&per_page=10`), { headers }),
+        fetch(apiUrl('/api/roles'), { headers })
       ])
       
       const staffData = await staffRes.json()
@@ -111,8 +112,8 @@ export default function StaffPage() {
     setIsSaving(true)
     try {
       const url = editingStaff 
-        ? `http://127.0.0.1:8000/api/staff/${editingStaff.id}`
-        : `http://127.0.0.1:8000/api/staff`
+        ? apiUrl(`/api/staff/${editingStaff.id}`)
+        : apiUrl('/api/staff')
       
       const method = editingStaff ? "PUT" : "POST"
       

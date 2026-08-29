@@ -1,12 +1,12 @@
 "use client"
 
+import { apiUrl } from "@/lib/api"
 import { useState, useEffect } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   Search, 
@@ -17,8 +17,7 @@ import {
   Banknote,
   QrCode,
   Loader2,
-  CheckCircle2,
-  Clock
+  CheckCircle2
 } from "lucide-react"
 import {
   Dialog,
@@ -40,7 +39,9 @@ export default function POSPage() {
   const [activeCategory, setActiveCategory] = useState("All")
   const [cashAmount, setCashAmount] = useState("")
   const [customers, setCustomers] = useState<any[]>([])
+  const [tables, setTables] = useState<any[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("")
+  const [selectedTableId, setSelectedTableId] = useState<string>("")
   const [orderType, setOrderType] = useState<string>("dine_in")
   const [customDiscountPercent, setCustomDiscountPercent] = useState("")
   const [storeSettings, setStoreSettings] = useState<any>({
@@ -58,30 +59,31 @@ export default function POSPage() {
   const [isReceiptOpen, setIsReceiptOpen] = useState(false)
   const [receiptData, setReceiptData] = useState<any>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [variantProduct, setVariantProduct] = useState<any | null>(null)
 
   // QRIS dynamic state
   const [qrisString, setQrisString] = useState<string | null>(null)
-  const [qrisTransactionId, setQrisTransactionId] = useState<string | null>(null)
-  const [isPollingQris, setIsPollingQris] = useState(false)
-
   const [isCartModalOpen, setIsCartModalOpen] = useState(false)
 
   const fetchProductsAndCustomers = async () => {
     setIsLoading(true)
     try {
       const headers = { "Authorization": `Bearer ${token}` }
-      const [productsRes, customersRes, settingsRes] = await Promise.all([
-        fetch("http://127.0.0.1:8000/api/products", { headers }),
-        fetch("http://127.0.0.1:8000/api/customers", { headers }),
-        fetch("http://127.0.0.1:8000/api/settings", { headers })
+      const [productsRes, customersRes, settingsRes, tablesRes] = await Promise.all([
+        fetch(apiUrl('/api/products'), { headers }),
+        fetch(apiUrl('/api/customers'), { headers }),
+        fetch(apiUrl('/api/settings'), { headers }),
+        fetch(apiUrl('/api/tables'), { headers })
       ])
       
       const productsData = await productsRes.json()
       const customersData = await customersRes.json()
       const settingsData = await settingsRes.json()
+      const tablesData = await tablesRes.json()
       
       setProducts(Array.isArray(productsData) ? productsData : [])
       setCustomers(Array.isArray(customersData) ? customersData : [])
+      setTables(Array.isArray(tablesData) ? tablesData : [])
       if (settingsData && settingsData.name) {
         setStoreSettings(settingsData)
       }
@@ -97,6 +99,12 @@ export default function POSPage() {
       fetchProductsAndCustomers()
     }
   }, [token])
+
+  useEffect(() => {
+    if (orderType !== "dine_in") {
+      setSelectedTableId("")
+    }
+  }, [orderType])
 
   // --- BARCODE SCANNER LISTENER ---
   useEffect(() => {
@@ -115,9 +123,13 @@ export default function POSPage() {
       if (e.key === "Enter") {
         if (scannedStr.trim().length > 0) {
           e.preventDefault()
-          const matchedProduct = products.find(p => p.sku === scannedStr)
-          if (matchedProduct) {
-            addToCart(matchedProduct)
+          const matchedVariantProduct = products.find(p => p.variants?.some((variant: any) => variant.sku === scannedStr))
+          const matchedVariant = matchedVariantProduct?.variants?.find((variant: any) => variant.sku === scannedStr)
+          const matchedProduct = products.find(p => p.sku === scannedStr || p.barcode === scannedStr)
+          if (matchedVariantProduct && matchedVariant) {
+            addToCart(buildCartItem(matchedVariantProduct, matchedVariant))
+          } else if (matchedProduct) {
+            handleProductSelect(matchedProduct)
           } else {
             alert(`Produk dengan SKU / Barcode "${scannedStr}" tidak ditemukan!`)
           }
@@ -143,39 +155,73 @@ export default function POSPage() {
   // ---------------------------------
 
 
+  const productStock = (product: any) => product.has_variants
+    ? (product.variants || []).reduce((sum: number, variant: any) => sum + Number(variant.stock || 0), 0)
+    : Number(product.stock || 0)
+
+  const productPrice = (product: any) => {
+    if (!product.has_variants) {
+      return Number(product.selling_price)
+    }
+
+    const availableVariants = (product.variants || []).filter((variant: any) => Number(variant.stock || 0) > 0)
+    const prices = availableVariants.map((variant: any) => Number(product.selling_price) + Number(variant.price_adjustment || 0))
+
+    return prices.length > 0 ? Math.min(...prices) : Number(product.selling_price)
+  }
+
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(search.toLowerCase()) && 
     p.is_active && 
-    p.stock > 0 &&
+    productStock(p) > 0 &&
     (activeCategory === "All" || p.category?.name === activeCategory)
   )
 
   const categories = Array.from(new Set(products.map(p => p.category?.name).filter(Boolean))) as string[]
 
-  const addToCart = (product: any) => {
+  const buildCartItem = (product: any, variant?: any) => ({
+    cart_key: variant ? `${product.id}:${variant.id}` : `${product.id}`,
+    id: product.id,
+    product_id: product.id,
+    variant_id: variant?.id || null,
+    name: variant ? `${product.name} - ${variant.name}` : product.name,
+    selling_price: Number(product.selling_price) + Number(variant?.price_adjustment || 0),
+    stock: variant ? Number(variant.stock || 0) : Number(product.stock || 0),
+    qty: 1,
+  })
+
+  const handleProductSelect = (product: any) => {
+    if (product.has_variants) {
+      setVariantProduct(product)
+      return
+    }
+
+    addToCart(buildCartItem(product))
+  }
+
+  const addToCart = (cartProduct: any) => {
     setCart(prev => {
-      const existing = prev.find(item => item.id === product.id)
+      const existing = prev.find(item => item.cart_key === cartProduct.cart_key)
       if (existing) {
-        if (existing.qty >= product.stock) {
-          alert(`Stock for ${product.name} is only ${product.stock}`)
+        if (existing.qty >= cartProduct.stock) {
+          alert(`Stock for ${cartProduct.name} is only ${cartProduct.stock}`)
           return prev
         }
         return prev.map(item => 
-          item.id === product.id 
+          item.cart_key === cartProduct.cart_key
             ? { ...item, qty: item.qty + 1 } 
             : item
         )
       }
-      return [{ ...product, qty: 1 }, ...prev]
+      return [cartProduct, ...prev]
     })
   }
 
-  const updateQty = (id: string, delta: number) => {
+  const updateQty = (cartKey: string, delta: number) => {
     setCart(prev => {
       return prev.map(item => {
-        if (item.id === id) {
-          const product = products.find(p => p.id === id)
-          const newQty = Math.max(0, Math.min(item.qty + delta, product?.stock || 999))
+        if (item.cart_key === cartKey) {
+          const newQty = Math.max(0, Math.min(item.qty + delta, item.stock || 999))
           return { ...item, qty: newQty }
         }
         return item
@@ -183,12 +229,17 @@ export default function POSPage() {
     })
   }
 
-  const removeFromCart = (id: string) => {
-    setCart(prev => prev.filter(item => item.id !== id))
+  const removeFromCart = (cartKey: string) => {
+    setCart(prev => prev.filter(item => item.cart_key !== cartKey))
   }
 
   const subtotal = cart.reduce((sum, item) => sum + (item.selling_price * item.qty), 0)
   const selectedCustomer = customers.find(c => c.id.toString() === selectedCustomerId)
+  const selectedTable = tables.find(t => t.id.toString() === selectedTableId)
+  const tableManagementEnabled = storeSettings.enable_table_management == 1 || storeSettings.enable_table_management === true
+  const availableTables = tables.filter(table => table.status === "available" || table.id.toString() === selectedTableId)
+  const requiresTable = tableManagementEnabled && orderType === "dine_in"
+  const canCheckout = cart.length > 0 && (!requiresTable || Boolean(selectedTableId))
   
   const memberDiscountPercent = selectedCustomer ? 5 : 0
   const additionalDiscountPercent = Number(customDiscountPercent) || 0
@@ -205,7 +256,7 @@ export default function POSPage() {
   const handleCheckout = async (paymentMethod: string, paymentAmount: number) => {
     setIsProcessing(true)
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/transactions", {
+      const res = await fetch(apiUrl('/api/transactions'), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -214,10 +265,12 @@ export default function POSPage() {
         },
         body: JSON.stringify({
           items: cart.map(item => ({
-            product_id: item.id,
+            product_id: item.product_id,
+            variant_id: item.variant_id || undefined,
             quantity: item.qty
           })),
           customer_id: selectedCustomerId || null,
+          table_id: orderType === "dine_in" && selectedTableId ? selectedTableId : null,
           payment_method: paymentMethod,
           payment_amount: paymentAmount,
           discount: discount,
@@ -230,7 +283,7 @@ export default function POSPage() {
         const txn = data.data
         if (paymentMethod === 'QRIS') {
           // Hit QRIS generate API
-          const qrisRes = await fetch("http://127.0.0.1:8000/api/qris/generate", {
+          const qrisRes = await fetch(apiUrl('/api/qris/generate'), {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -246,12 +299,10 @@ export default function POSPage() {
           const qrisData = await qrisRes.json()
           if (qrisRes.ok && qrisData.status === 'success') {
             setQrisString(qrisData.qr_string)
-            setQrisTransactionId(txn.transaction_number)
-            setIsPollingQris(true)
             
             // Keep the receipt data ready for when polling finishes
             setReceiptData({
-              transaction_number: txn?.transaction_number || "TRX-" + Date.now(),
+              transaction_number: txn?.transaction_number || "TRX-PENDING",
               items: [...cart],
               subtotal: Number(txn?.subtotal ?? subtotal),
               discount: Number(txn?.discount ?? discount),
@@ -263,7 +314,8 @@ export default function POSPage() {
               change: paymentAmount - Number(txn?.total_amount ?? total),
               date: new Date().toLocaleString("id-ID"),
               cashierName: user?.name || 'Unknown',
-              customerName: selectedCustomer ? selectedCustomer.name : 'Walk-in'
+              customerName: selectedCustomer ? selectedCustomer.name : 'Walk-in',
+              tableName: selectedTable ? selectedTable.name : null
             })
             
             setIsCheckoutOpen(false)
@@ -273,7 +325,7 @@ export default function POSPage() {
           }
         } else {
           setReceiptData({
-            transaction_number: txn?.transaction_number || "TRX-" + Date.now(),
+            transaction_number: txn?.transaction_number || "TRX-PENDING",
             items: [...cart],
             subtotal: Number(txn?.subtotal ?? subtotal),
             discount: Number(txn?.discount ?? discount),
@@ -285,10 +337,12 @@ export default function POSPage() {
             change: paymentAmount - Number(txn?.total_amount ?? total),
             date: new Date().toLocaleString("id-ID"),
             cashierName: user?.name || 'Unknown',
-            customerName: selectedCustomer ? selectedCustomer.name : 'Walk-in'
+            customerName: selectedCustomer ? selectedCustomer.name : 'Walk-in',
+            tableName: selectedTable ? selectedTable.name : null
           })
           setCart([])
           setSelectedCustomerId("")
+          setSelectedTableId("")
           setIsCashOpen(false)
           setIsCheckoutOpen(false)
           setIsReceiptOpen(true)
@@ -302,7 +356,7 @@ export default function POSPage() {
       } else {
         alert("Error: " + (data.message || "Failed"))
       }
-    } catch (error) {
+    } catch {
       alert("Network error, please try again.")
     } finally {
       setIsProcessing(false)
@@ -402,7 +456,7 @@ export default function POSPage() {
                 >
                   <Card 
                     className="cursor-pointer border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-1 hover:border-primary/30 transition-all duration-300 flex flex-col bg-white overflow-hidden rounded-2xl h-full group"
-                    onClick={() => addToCart(product)}
+                    onClick={() => handleProductSelect(product)}
                   >
                     <CardContent className="p-4 flex flex-col items-center justify-center flex-1 text-center gap-2 relative">
                       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
@@ -412,9 +466,11 @@ export default function POSPage() {
                         {product.name.charAt(0)}
                       </div>
                       <div className="font-bold text-sm line-clamp-2 leading-tight text-slate-800 group-hover:text-primary transition-colors">{product.name}</div>
-                      <div className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 rounded-full text-slate-500 uppercase tracking-wider">Stok: {product.stock}</div>
+                      <div className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 rounded-full text-slate-500 uppercase tracking-wider">
+                        {product.has_variants ? `${product.variants?.length || 0} Varian` : `Stok: ${product.stock}`}
+                      </div>
                       <div className="text-primary font-black text-base mt-auto pt-1">
-                        Rp {Number(product.selling_price).toLocaleString("id-ID")}
+                        {product.has_variants ? "Mulai " : ""}Rp {productPrice(product).toLocaleString("id-ID")}
                       </div>
                     </CardContent>
                   </Card>
@@ -488,7 +544,7 @@ export default function POSPage() {
                     ) : (
                       cart.map(item => (
                         <motion.div 
-                          key={item.id}
+                          key={item.cart_key}
                           layout
                           initial={{ opacity: 0, scale: 0.95 }}
                           animate={{ opacity: 1, scale: 1 }}
@@ -506,16 +562,16 @@ export default function POSPage() {
                           </div>
                           
                           <div className="flex items-center gap-1 bg-slate-50 rounded-lg p-1 border border-slate-200">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md hover:bg-white hover:shadow-sm transition-all" onClick={() => updateQty(item.id, -1)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md hover:bg-white hover:shadow-sm transition-all" onClick={() => updateQty(item.cart_key, -1)}>
                               <Minus className="h-3 w-3" />
                             </Button>
                             <span className="w-6 text-center font-bold text-sm">{item.qty}</span>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md hover:bg-white hover:shadow-sm transition-all" onClick={() => updateQty(item.id, 1)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md hover:bg-white hover:shadow-sm transition-all" onClick={() => updateQty(item.cart_key, 1)}>
                               <Plus className="h-3 w-3" />
                             </Button>
                           </div>
                           
-                          <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-400 hover:text-destructive hover:bg-destructive/10 rounded-xl transition-colors" onClick={() => removeFromCart(item.id)}>
+                          <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-400 hover:text-destructive hover:bg-destructive/10 rounded-xl transition-colors" onClick={() => removeFromCart(item.cart_key)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </motion.div>
@@ -538,6 +594,27 @@ export default function POSPage() {
                 <option value="takeaway">Bungkus (Take Away)</option>
               </select>
             </div>
+
+            {tableManagementEnabled && orderType === "dine_in" && (
+              <div className="flex flex-col gap-1.5 mb-2">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Meja</label>
+                <select
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                  value={selectedTableId}
+                  onChange={(e) => setSelectedTableId(e.target.value)}
+                >
+                  <option value="">Pilih meja dine-in</option>
+                  {availableTables.map(table => (
+                    <option key={table.id} value={table.id.toString()}>
+                      {table.name}{table.status !== "available" ? ` (${table.status})` : ""}
+                    </option>
+                  ))}
+                </select>
+                {tables.length === 0 && (
+                  <p className="text-xs text-amber-600 font-medium">Belum ada data meja. Tambahkan meja dari backend atau seed database.</p>
+                )}
+              </div>
+            )}
 
             <div className="flex flex-col gap-1.5 mb-2">
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pelanggan (Opsional)</label>
@@ -599,7 +676,7 @@ export default function POSPage() {
                   
                   <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
                     <DialogTrigger render={
-                      <Button className="w-full h-16 text-xl font-black shadow-[0_10px_40px_-10px_rgba(79,70,229,0.5)] rounded-[1.25rem] transition-all hover:scale-[1.03] active:scale-[0.97] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border-none" disabled={cart.length === 0}>
+                      <Button className="w-full h-16 text-xl font-black shadow-[0_10px_40px_-10px_rgba(79,70,229,0.5)] rounded-[1.25rem] transition-all hover:scale-[1.03] active:scale-[0.97] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border-none" disabled={!canCheckout}>
                         <Banknote className="w-6 h-6 mr-2" /> Checkout Sekarang
                       </Button>
                     } />
@@ -644,6 +721,46 @@ export default function POSPage() {
                </div>
       </div>
     </div>
+        {/* Variant Picker Dialog */}
+          <Dialog open={Boolean(variantProduct)} onOpenChange={(open) => !open && setVariantProduct(null)}>
+            <DialogContent className="!max-w-md w-[95vw] sm:w-full rounded-2xl">
+              <DialogHeader>
+                <DialogTitle>Pilih Varian</DialogTitle>
+                <DialogDescription>
+                  {variantProduct?.name}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-3 py-2">
+                {(variantProduct?.variants || [])
+                  .filter((variant: any) => Number(variant.stock || 0) > 0)
+                  .map((variant: any) => (
+                    <button
+                      key={variant.id}
+                      type="button"
+                      className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-primary/40 hover:bg-primary/5"
+                      onClick={() => {
+                        addToCart(buildCartItem(variantProduct, variant))
+                        setVariantProduct(null)
+                      }}
+                    >
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-900 truncate">{variant.name}</div>
+                        <div className="text-xs font-medium text-slate-500">Stok: {variant.stock}</div>
+                      </div>
+                      <div className="text-right font-black text-primary">
+                        Rp {(Number(variantProduct?.selling_price || 0) + Number(variant.price_adjustment || 0)).toLocaleString("id-ID")}
+                      </div>
+                    </button>
+                  ))}
+                {(variantProduct?.variants || []).filter((variant: any) => Number(variant.stock || 0) > 0).length === 0 && (
+                  <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm font-medium text-slate-500">
+                    Semua varian sedang habis.
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
         {/* Cash Payment Dialog */}
           <Dialog open={isCashOpen} onOpenChange={setIsCashOpen}>
             <DialogContent className="!max-w-sm w-[95vw] sm:w-full rounded-2xl">
@@ -722,7 +839,6 @@ export default function POSPage() {
                   variant="outline"
                   className="w-full h-12 text-sm font-bold rounded-xl transition-transform hover:scale-[1.02] active:scale-[0.98]" 
                   onClick={() => {
-                    setIsPollingQris(false)
                     setIsQrisOpen(false)
                   }}
                 >
@@ -768,6 +884,12 @@ export default function POSPage() {
                   <span>Kasir: {receiptData?.cashierName}</span>
                   <span>Pelanggan: {receiptData?.customerName}</span>
                 </div>
+                {receiptData?.tableName && (
+                  <div className="flex justify-between text-xs print:text-[10px] mb-2 font-medium text-gray-600 print:text-black">
+                    <span>Meja</span>
+                    <span>{receiptData.tableName}</span>
+                  </div>
+                )}
 
                 <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 flex flex-col gap-2">
                   {receiptData?.items.map((item: any, i: number) => (

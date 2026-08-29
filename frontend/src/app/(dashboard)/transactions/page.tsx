@@ -1,5 +1,6 @@
 "use client"
 
+import { apiUrl } from "@/lib/api"
 import React, { useState, useEffect } from "react"
 import { useAuth } from "@/context/AuthContext"
 import {
@@ -79,7 +80,7 @@ export default function TransactionsPage() {
   const fetchData = async () => {
     try {
       setIsLoading(true)
-      const res = await fetch(`http://127.0.0.1:8000/api/transactions?page=${currentPage}&per_page=10`, {
+      const res = await fetch(apiUrl(`/api/transactions?page=${currentPage}&per_page=10`), {
         headers: { "Authorization": `Bearer ${token}` }
       })
       if (!res.ok) throw new Error('Failed to fetch data')
@@ -93,7 +94,7 @@ export default function TransactionsPage() {
         setTotalPages(1)
       }
 
-      const settingsRes = await fetch('http://127.0.0.1:8000/api/settings', {
+      const settingsRes = await fetch(apiUrl('/api/settings'), {
         headers: { "Authorization": `Bearer ${token}` }
       })
       if (settingsRes.ok) {
@@ -166,7 +167,7 @@ export default function TransactionsPage() {
     }
 
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/transactions/${selectedTransaction.id}/void`, {
+      const res = await fetch(apiUrl(`/api/transactions/${selectedTransaction.id}/void`), {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` }
       })

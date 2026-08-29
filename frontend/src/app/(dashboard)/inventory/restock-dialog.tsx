@@ -1,5 +1,6 @@
 "use client"
 
+import { apiUrl } from "@/lib/api"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Plus, Loader2 } from "lucide-react"
@@ -28,7 +29,7 @@ export function RestockDialog({ product }: { product: any }) {
     setIsLoading(true)
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/inventory/restock", {
+      const res = await fetch(apiUrl('/api/inventory/restock'), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -52,7 +53,7 @@ export function RestockDialog({ product }: { product: any }) {
       
       // Refresh the page data
       router.refresh()
-    } catch (error) {
+    } catch {
       alert("Terjadi kesalahan saat menambah stok.")
     } finally {
       setIsLoading(false)

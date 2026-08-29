@@ -1,5 +1,6 @@
 "use client"
 
+import { apiUrl } from "@/lib/api"
 import React, { useState, useEffect } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { 
@@ -71,7 +72,7 @@ export default function CategoriesPage() {
   const fetchCategories = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/categories?page=${currentPage}&per_page=10`, {
+      const res = await fetch(apiUrl(`/api/categories?page=${currentPage}&per_page=10`), {
         headers: { "Authorization": `Bearer ${token}` }
       })
       const data = await res.json()
@@ -105,8 +106,8 @@ export default function CategoriesPage() {
 
     try {
       const url = editingId 
-        ? `http://127.0.0.1:8000/api/categories/${editingId}`
-        : "http://127.0.0.1:8000/api/categories"
+        ? apiUrl(`/api/categories/${editingId}`)
+        : apiUrl('/api/categories')
         
       const res = await fetch(url, {
         method: editingId ? "PUT" : "POST",
@@ -137,7 +138,7 @@ export default function CategoriesPage() {
     if (!deleteCategory) return
     setIsSubmitting(true)
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/categories/${deleteCategory.id}`, {
+      const res = await fetch(apiUrl(`/api/categories/${deleteCategory.id}`), {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` }
       })

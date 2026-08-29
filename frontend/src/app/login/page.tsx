@@ -1,11 +1,12 @@
 "use client"
 
+import { apiUrl } from "@/lib/api"
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Loader2, Store, Eye, EyeOff } from 'lucide-react'
+import { Loader2, Eye, EyeOff } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -21,7 +22,7 @@ export default function LoginPage() {
     setError('')
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/login', {
+      const res = await fetch(apiUrl('/api/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -37,7 +38,7 @@ export default function LoginPage() {
       } else {
         setError(data.message || 'Kredensial tidak valid')
       }
-    } catch (err) {
+    } catch {
       setError('Terjadi kesalahan jaringan. Silakan coba lagi.')
     } finally {
       setIsSubmitting(false)

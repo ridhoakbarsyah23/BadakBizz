@@ -1,5 +1,6 @@
 "use client"
 
+import { apiUrl } from "@/lib/api"
 import React, { useState, useEffect } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { 
@@ -39,7 +40,7 @@ export default function ShiftsPage() {
   const fetchShifts = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/shifts', {
+      const res = await fetch(apiUrl('/api/shifts'), {
         headers: { "Authorization": `Bearer ${token}` }
       })
       if (!res.ok) throw new Error('Failed to fetch data')

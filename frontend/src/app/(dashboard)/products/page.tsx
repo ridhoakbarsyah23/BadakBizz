@@ -1,5 +1,6 @@
 "use client"
 
+import { apiUrl } from "@/lib/api"
 import React, { useState, useEffect } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { 
@@ -126,8 +127,8 @@ export default function ProductsPage() {
     try {
       const headers = { "Authorization": `Bearer ${token}` }
       const [prodRes, catRes] = await Promise.all([
-        fetch(`http://127.0.0.1:8000/api/products?page=${currentPage}&per_page=10`, { headers }),
-        fetch("http://127.0.0.1:8000/api/categories", { headers })
+        fetch(apiUrl(`/api/products?page=${currentPage}&per_page=10`), { headers }),
+        fetch(apiUrl('/api/categories'), { headers })
       ])
       
       const prodData = await prodRes.json()
@@ -164,8 +165,8 @@ export default function ProductsPage() {
 
     try {
       const url = editingId 
-        ? `http://127.0.0.1:8000/api/products/${editingId}`
-        : "http://127.0.0.1:8000/api/products"
+        ? apiUrl(`/api/products/${editingId}`)
+        : apiUrl('/api/products')
         
       const payload = {
         ...formData,
@@ -209,7 +210,7 @@ export default function ProductsPage() {
     if (!deleteProduct) return
     setIsSubmitting(true)
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/products/${deleteProduct.id}`, {
+      const res = await fetch(apiUrl(`/api/products/${deleteProduct.id}`), {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` }
       })
@@ -413,7 +414,7 @@ export default function ProductsPage() {
                     </Button>
                   </div>
                   {(!formData.variants || formData.variants.length === 0) ? (
-                    <div className="text-sm text-muted-foreground text-center py-2">Belum ada varian. Klik "Tambah Varian".</div>
+                    <div className="text-sm text-muted-foreground text-center py-2">Belum ada varian. Klik &quot;Tambah Varian&quot;.</div>
                   ) : (
                     formData.variants.map((variant, index) => (
                       <div key={index} className="grid grid-cols-12 gap-2 items-center">

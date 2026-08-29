@@ -1,7 +1,7 @@
 "use client";
 
+import { apiUrl } from "@/lib/api"
 import React from "react";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -18,7 +18,8 @@ import {
   History,
   ClipboardList,
   Loader2,
-  Edit3
+  Edit3,
+  Armchair
 } from "lucide-react";
 import { Button } from "@heroui/react";
 import {
@@ -50,6 +51,7 @@ const navGroups = [
       { title: "Data Produk", url: "/products", icon: Package, roles: ['admin'] },
       { title: "Kategori", url: "/categories", icon: Tags, roles: ['admin'] },
       { title: "Manajemen Stok", url: "/inventory", icon: ArrowRightLeft, roles: ['admin'] },
+      { title: "Manajemen Meja", url: "/tables", icon: Armchair, roles: ['admin'] },
     ]
   },
   {
@@ -96,7 +98,7 @@ export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: 
   const handleSaveProfile = async () => {
     setIsSavingProfile(true);
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/profile", {
+      const res = await fetch(apiUrl('/api/profile'), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

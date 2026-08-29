@@ -1,5 +1,6 @@
 "use client"
 
+import { apiUrl } from "@/lib/api"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
@@ -40,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Loader2, Plus, UserCog, AlertTriangle, Eye, EyeOff } from "lucide-react"
+import { Loader2, Plus, UserCog, Eye, EyeOff } from "lucide-react"
 
 export default function StaffManagementPage() {
   const { token, hasRole } = useAuth()
@@ -64,7 +65,7 @@ export default function StaffManagementPage() {
   const fetchStaff = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/staff", {
+      const res = await fetch(apiUrl('/api/staff'), {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -126,8 +127,8 @@ export default function StaffManagementPage() {
     setIsSubmitting(true)
     
     const url = isEditMode 
-      ? `http://127.0.0.1:8000/api/staff/${currentId}`
-      : `http://127.0.0.1:8000/api/staff`
+      ? apiUrl(`/api/staff/${currentId}`)
+      : apiUrl('/api/staff')
       
     const method = isEditMode ? 'PUT' : 'POST'
     
@@ -159,7 +160,7 @@ export default function StaffManagementPage() {
         const errorData = await res.json()
         alert(errorData.message || 'Failed to save staff')
       }
-    } catch (error) {
+    } catch {
       alert('Network error')
     } finally {
       setIsSubmitting(false)
@@ -176,7 +177,7 @@ export default function StaffManagementPage() {
       desc: `Are you sure you want to ${actionText} ${user.name}'s account?`,
       action: async () => {
         try {
-          await fetch(`http://127.0.0.1:8000/api/staff/${user.id}`, {
+          await fetch(apiUrl(`/api/staff/${user.id}`), {
             method: 'PUT',
             headers: {
               "Content-Type": "application/json",

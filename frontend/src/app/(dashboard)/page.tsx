@@ -1,5 +1,6 @@
 "use client"
 
+import { apiUrl } from "@/lib/api"
 import { useState, useEffect } from "react"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -20,7 +21,7 @@ export default function Dashboard() {
       if (!token) return
       setIsLoading(true)
       try {
-        const res = await fetch(`http://127.0.0.1:8000/api/dashboard?filter=${filter}`, {
+        const res = await fetch(apiUrl(`/api/dashboard?filter=${filter}`), {
           headers: { "Authorization": `Bearer ${token}` }
         })
         const result = await res.json()
