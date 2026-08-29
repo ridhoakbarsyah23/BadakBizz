@@ -422,6 +422,125 @@ class TransactionTest extends TestCase
         $this->assertDatabaseCount('transactions', 0);
     }
 
+    public function test_transactions_can_be_filtered_by_status_payment_and_search(): void
+    {
+        Sanctum::actingAs($this->cashier());
+
+        $customer = Customer::create([
+            'name' => 'Pending Member',
+            'phone' => '0800000020',
+        ]);
+
+        Transaction::create([
+            'transaction_number' => 'TRX-PENDING-001',
+            'customer_id' => $customer->id,
+            'subtotal' => 10_000,
+            'tax' => 0,
+            'service_charge' => 0,
+            'discount' => 0,
+            'total_amount' => 10_000,
+            'payment_amount' => 10_000,
+            'payment_method' => 'QRIS',
+            'status' => 'PENDING',
+            'order_type' => 'takeaway',
+            'qris_string' => '000201010212',
+        ]);
+
+        Transaction::create([
+            'transaction_number' => 'TRX-CASH-001',
+            'subtotal' => 8_000,
+            'tax' => 0,
+            'service_charge' => 0,
+            'discount' => 0,
+            'total_amount' => 8_000,
+            'payment_amount' => 8_000,
+            'payment_method' => 'CASH',
+            'status' => 'COMPLETED',
+            'order_type' => 'takeaway',
+        ]);
+
+        $this->getJson('/api/transactions?status=PENDING&payment_method=QRIS&search=Pending')
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.transaction_number', 'TRX-PENDING-001')
+            ->assertJsonPath('0.qris_string', '000201010212');
+    }
+
+    public function test_cashier_can_cancel_pending_qris_and_restore_stock_and_table(): void
+    {
+        $cashier = $this->cashier();
+        Sanctum::actingAs($cashier);
+
+        $table = Table::create(['name' => 'P1', 'status' => 'occupied']);
+        $product = Product::create([
+            'sku' => 'SKU-PENDING-CANCEL',
+            'name' => 'Pending Cancel Product',
+            'purchase_price' => 4_000,
+            'selling_price' => 9_000,
+            'stock' => 3,
+            'minimum_stock' => 1,
+            'is_active' => true,
+        ]);
+
+        $transaction = Transaction::create([
+            'transaction_number' => 'TRX-CANCEL-PENDING',
+            'subtotal' => 9_000,
+            'tax' => 0,
+            'service_charge' => 0,
+            'discount' => 0,
+            'total_amount' => 9_000,
+            'payment_amount' => 9_000,
+            'payment_method' => 'QRIS',
+            'status' => 'PENDING',
+            'order_type' => 'dine_in',
+            'table_id' => $table->id,
+        ]);
+
+        $transaction->items()->create([
+            'product_id' => $product->id,
+            'quantity' => 2,
+            'price' => 9_000,
+            'subtotal' => 18_000,
+        ]);
+        $product->decrement('stock', 2);
+
+        $this->postJson("/api/transactions/{$transaction->id}/cancel-pending-qris")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'CANCELLED');
+
+        $this->assertSame(3, $product->fresh()->stock);
+        $this->assertSame('available', $table->fresh()->status);
+        $this->assertDatabaseHas('inventory_movements', [
+            'product_id' => $product->id,
+            'type' => 'IN',
+            'quantity' => 2,
+            'user_id' => $cashier->id,
+            'notes' => 'Cancel Pending QRIS TRX-CANCEL-PENDING',
+        ]);
+    }
+
+    public function test_cancel_pending_qris_rejects_completed_transactions(): void
+    {
+        Sanctum::actingAs($this->cashier());
+
+        $transaction = Transaction::create([
+            'transaction_number' => 'TRX-COMPLETED-CANCEL',
+            'subtotal' => 10_000,
+            'tax' => 0,
+            'service_charge' => 0,
+            'discount' => 0,
+            'total_amount' => 10_000,
+            'payment_amount' => 10_000,
+            'payment_method' => 'QRIS',
+            'status' => 'COMPLETED',
+            'order_type' => 'takeaway',
+        ]);
+
+        $this->postJson("/api/transactions/{$transaction->id}/cancel-pending-qris")
+            ->assertStatus(400)
+            ->assertJsonPath('message', 'Only pending QRIS transactions can be cancelled from this action');
+    }
+
     private function cashier(): User
     {
         return $this->userWithRole('cashier', 'Cashier');

@@ -22,8 +22,26 @@ class TransactionController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Transaction::with(['items.product', 'items.variant', 'customer', 'cashier'])
+        $query = Transaction::with(['items.product', 'items.variant', 'customer', 'cashier', 'table'])
             ->latest();
+
+        if ($request->filled('status') && $request->status !== 'ALL') {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('payment_method') && $request->payment_method !== 'ALL') {
+            $query->where('payment_method', $request->payment_method);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('transaction_number', 'like', '%'.$search.'%')
+                    ->orWhereHas('customer', function ($customerQuery) use ($search) {
+                        $customerQuery->where('name', 'like', '%'.$search.'%');
+                    });
+            });
+        }
 
         if ($request->has('per_page')) {
             return response()->json($query->paginate($request->per_page));
@@ -255,6 +273,38 @@ class TransactionController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Failed to void transaction.',
+                'error' => $e->getMessage(),
+            ], 400);
+        }
+    }
+
+    public function cancelPendingQris(Request $request, $id)
+    {
+        try {
+            $transaction = Transaction::with(['items.product', 'items.variant'])->find($id);
+
+            if (! $transaction) {
+                return response()->json(['message' => 'Transaction not found'], 404);
+            }
+
+            if ($transaction->payment_method !== 'QRIS' || $transaction->status !== 'PENDING') {
+                return response()->json(['message' => 'Only pending QRIS transactions can be cancelled from this action'], 400);
+            }
+
+            $transaction = app(TransactionStatusService::class)->cancel(
+                $transaction,
+                $request->user() ? $request->user()->id : null,
+                'Cancel Pending QRIS'
+            );
+
+            return response()->json([
+                'message' => 'Pending QRIS transaction has been cancelled.',
+                'data' => $transaction,
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to cancel pending QRIS transaction.',
                 'error' => $e->getMessage(),
             ], 400);
         }

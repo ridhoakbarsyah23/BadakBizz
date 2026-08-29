@@ -45,6 +45,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Transactions
     Route::get('/transactions', [TransactionController::class, 'index']);
     Route::post('/transactions', [TransactionController::class, 'store']);
+    Route::post('/transactions/{id}/cancel-pending-qris', [TransactionController::class, 'cancelPendingQris']);
 
     // QRIS
     Route::post('/qris/generate', [MidtransController::class, 'generateQris']);

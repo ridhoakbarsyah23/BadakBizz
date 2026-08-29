@@ -20,6 +20,8 @@ class Transaction extends Model
         'total_amount',
         'payment_amount',
         'payment_method',
+        'midtrans_transaction_id',
+        'qris_string',
         'status',
         'order_type',
         'table_id',

@@ -42,6 +42,13 @@ class MidtransController extends Controller
                     }
                 }
 
+                Transaction::where('transaction_number', $request->order_id)
+                    ->where('payment_method', 'QRIS')
+                    ->update([
+                        'midtrans_transaction_id' => $response->transaction_id,
+                        'qris_string' => $qrString,
+                    ]);
+
                 return response()->json([
                     'status' => 'success',
                     'qr_string' => $qrString,
