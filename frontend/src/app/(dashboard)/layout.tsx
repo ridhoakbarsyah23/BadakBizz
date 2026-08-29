@@ -30,7 +30,7 @@ export default function DashboardLayout({
             <div className="w-7 h-7 bg-primary rounded-md flex items-center justify-center shadow-md shadow-primary/20">
               <span className="text-white text-xs">K</span>
             </div>
-            <span>BadakBiz</span>
+            <span>BadakBizz</span>
           </div>
         </div>
 

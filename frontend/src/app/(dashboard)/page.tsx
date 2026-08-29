@@ -121,7 +121,7 @@ export default function Dashboard() {
         <motion.div variants={itemVariants} className="flex flex-col gap-2">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Analitik Dasbor</h1>
           <p className="text-muted-foreground">
-            Selamat datang di BadakBiz. Berikut adalah ringkasan bisnis Anda.
+            Selamat datang di BadakBizz. Berikut adalah ringkasan bisnis Anda.
           </p>
         </motion.div>
 

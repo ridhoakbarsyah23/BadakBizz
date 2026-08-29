@@ -134,8 +134,8 @@ export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: 
     >
       <div className="flex items-center justify-between h-16 px-6 border-b border-slate-100 shrink-0 bg-white">
         <div className="flex items-center gap-2 font-black text-xl text-primary tracking-tight">
-          <img src="/BadakBiz.jpeg" alt="BadakBiz Logo" className="w-8 h-8 rounded-lg shadow-md shadow-primary/20 object-cover" />
-          <span>BadakBiz</span>
+          <img src="/BadakBizz.jpeg" alt="BadakBizz Logo" className="w-8 h-8 rounded-lg shadow-md shadow-primary/20 object-cover" />
+          <span>BadakBizz</span>
         </div>
         <Button
           isIconOnly

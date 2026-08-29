@@ -58,9 +58,9 @@ export default function LoginPage() {
       >
         <div className="p-8 sm:p-12">
           <div className="flex flex-col items-center text-center mb-10">
-            <img src="/BadakBiz.jpeg" alt="BadakBiz Logo" className="w-16 h-16 rounded-2xl shadow-xl shadow-primary/30 object-cover mb-6" />
+            <img src="/BadakBizz.jpeg" alt="BadakBizz Logo" className="w-16 h-16 rounded-2xl shadow-xl shadow-primary/30 object-cover mb-6" />
             <h2 className="text-3xl font-black text-slate-900 tracking-tight">Selamat Datang</h2>
-            <p className="text-slate-500 mt-2 font-medium">Silakan masuk ke akun BadakBiz Anda.</p>
+            <p className="text-slate-500 mt-2 font-medium">Silakan masuk ke akun BadakBizz Anda.</p>
           </div>
 
           {error && (

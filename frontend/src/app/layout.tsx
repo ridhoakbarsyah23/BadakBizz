@@ -8,10 +8,10 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "BadakBiz - Your Biz, But Stronger",
+  title: "BadakBizz - Your Biz, But Stronger",
   description: "Builtbfor Business",
   icons: {
-    icon: "/BadakBiz.jpeg",
+    icon: "/BadakBizz.jpeg",
   }
 };
 

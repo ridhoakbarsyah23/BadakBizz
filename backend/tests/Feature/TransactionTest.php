@@ -25,7 +25,7 @@ class TransactionTest extends TestCase
         Sanctum::actingAs($cashier);
 
         Store::create([
-            'name' => 'BadakBiz Test',
+            'name' => 'BadakBizz Test',
             'tax_rate' => 10,
             'service_charge_rate' => 5,
         ]);
@@ -336,7 +336,7 @@ class TransactionTest extends TestCase
         Sanctum::actingAs($this->cashier());
 
         Store::create([
-            'name' => 'BadakBiz Test',
+            'name' => 'BadakBizz Test',
             'tax_rate' => 0,
             'service_charge_rate' => 0,
         ]);

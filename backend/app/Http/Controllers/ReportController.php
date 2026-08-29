@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Transaction;
-use App\Models\TransactionItem;
 use Carbon\Carbon;
+use Carbon\CarbonPeriod;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
@@ -44,18 +44,18 @@ class ReportController extends Controller
         $transactionsTime = Transaction::select('created_at')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->get();
-            
+
         $busiestHourData = $transactionsTime->groupBy(function ($date) {
             return Carbon::parse($date->created_at)->format('H');
         })->map(function ($row) {
             return $row->count();
         })->sortDesc()->keys()->first();
 
-        $busiestHour = $busiestHourData ? $busiestHourData . ':00 - ' . str_pad((int)$busiestHourData + 1, 2, '0', STR_PAD_LEFT) . ':00' : 'N/A';
+        $busiestHour = $busiestHourData ? $busiestHourData.':00 - '.str_pad((int) $busiestHourData + 1, 2, '0', STR_PAD_LEFT).':00' : 'N/A';
 
         // 5. Chart Data
         $diffInDays = $startDate->diffInDays($endDate);
-        
+
         $chartTransactions = Transaction::with('items.product')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->get();
@@ -64,15 +64,15 @@ class ReportController extends Controller
 
         if ($diffInDays <= 31) {
             // Daily Chart
-            $period = \Carbon\CarbonPeriod::create($startDate, $endDate);
+            $period = CarbonPeriod::create($startDate, $endDate);
             foreach ($period as $date) {
                 $dateKey = $date->format('Y-m-d');
                 $dateLabel = $date->format('d M');
-                
-                $txsInDay = $chartTransactions->filter(function($t) use ($dateKey) {
+
+                $txsInDay = $chartTransactions->filter(function ($t) use ($dateKey) {
                     return Carbon::parse($t->created_at)->format('Y-m-d') === $dateKey;
                 });
-                
+
                 $sales = $txsInDay->sum('total_amount');
                 $profit = 0;
                 foreach ($txsInDay as $tx) {
@@ -81,24 +81,24 @@ class ReportController extends Controller
                         $profit += ($item->price - $purchasePrice) * $item->quantity;
                     }
                 }
-                
+
                 $chartData->push([
                     'label' => $dateLabel,
                     'sales' => $sales,
-                    'profit' => $profit
+                    'profit' => $profit,
                 ]);
             }
         } else {
             // Monthly Chart
-            $period = \Carbon\CarbonPeriod::create($startDate->copy()->startOfMonth(), '1 month', $endDate->copy()->startOfMonth());
+            $period = CarbonPeriod::create($startDate->copy()->startOfMonth(), '1 month', $endDate->copy()->startOfMonth());
             foreach ($period as $date) {
                 $monthKey = $date->format('Y-m');
                 $monthLabel = $date->format('M Y');
-                
-                $txsInMonth = $chartTransactions->filter(function($t) use ($monthKey) {
+
+                $txsInMonth = $chartTransactions->filter(function ($t) use ($monthKey) {
                     return Carbon::parse($t->created_at)->format('Y-m') === $monthKey;
                 });
-                
+
                 $sales = $txsInMonth->sum('total_amount');
                 $profit = 0;
                 foreach ($txsInMonth as $tx) {
@@ -107,11 +107,11 @@ class ReportController extends Controller
                         $profit += ($item->price - $purchasePrice) * $item->quantity;
                     }
                 }
-                
+
                 $chartData->push([
                     'label' => $monthLabel,
                     'sales' => $sales,
-                    'profit' => $profit
+                    'profit' => $profit,
                 ]);
             }
         }
@@ -121,10 +121,10 @@ class ReportController extends Controller
             'averageTransaction' => $averageTransaction,
             'topSellingItem' => $topSellingItem ? [
                 'name' => $topSellingItem->name,
-                'sold' => $topSellingItem->total_sold
+                'sold' => $topSellingItem->total_sold,
             ] : null,
             'busiestHour' => $busiestHour,
-            'chartData' => $chartData
+            'chartData' => $chartData,
         ]);
     }
 
@@ -148,19 +148,19 @@ class ReportController extends Controller
             ->get();
 
         $headers = [
-            "Content-type"        => "text/csv",
-            "Content-Disposition" => "attachment; filename=BadakBizPOS_Report_" . $startDate->format('Ymd') . "_to_" . $endDate->format('Ymd') . ".csv",
-            "Pragma"              => "no-cache",
-            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-            "Expires"             => "0"
+            'Content-type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename=BadakBizzPOS_Report_'.$startDate->format('Ymd').'_to_'.$endDate->format('Ymd').'.csv',
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
         ];
 
         $columns = [
             'Date', 'Transaction Number', 'Cashier', 'Customer', 'Payment Method',
-            'Subtotal', 'Discount', 'Tax', 'Service Charge', 'Total Amount', 'Status'
+            'Subtotal', 'Discount', 'Tax', 'Service Charge', 'Total Amount', 'Status',
         ];
 
-        $callback = function() use($transactions, $columns) {
+        $callback = function () use ($transactions, $columns) {
             $file = fopen('php://output', 'w');
             fputcsv($file, $columns);
 

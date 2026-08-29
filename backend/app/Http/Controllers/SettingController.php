@@ -10,14 +10,14 @@ class SettingController extends Controller
     public function show()
     {
         $store = Store::first();
-        
-        if (!$store) {
+
+        if (! $store) {
             $store = Store::create([
-                'name' => 'BadakBiz Coffee & Eatery',
+                'name' => 'BadakBizz Coffee & Eatery',
                 'currency' => 'IDR',
                 'tax_rate' => 11.00,
                 'service_charge_rate' => 5.00,
-                'receipt_header' => 'BadakBiz Coffee & Eatery',
+                'receipt_header' => 'BadakBizz Coffee & Eatery',
                 'receipt_footer' => 'Terima kasih atas kunjungan Anda!',
             ]);
         }
@@ -28,7 +28,7 @@ class SettingController extends Controller
     public function update(Request $request)
     {
         $store = Store::first();
-        if (!$store) {
+        if (! $store) {
             return response()->json(['message' => 'Store setting not found'], 404);
         }
 
@@ -50,7 +50,7 @@ class SettingController extends Controller
 
         return response()->json([
             'message' => 'Settings updated successfully',
-            'store' => $store
+            'store' => $store,
         ]);
     }
 }

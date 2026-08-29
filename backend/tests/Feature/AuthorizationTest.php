@@ -20,7 +20,7 @@ class AuthorizationTest extends TestCase
     {
         Sanctum::actingAs($this->userWithRole('cashier', 'Cashier'));
 
-        Store::create(['name' => 'BadakBiz Test']);
+        Store::create(['name' => 'BadakBizz Test']);
         $category = Category::create(['name' => 'Food', 'slug' => 'food']);
         $product = Product::create([
             'sku' => 'SKU-AUTH',
