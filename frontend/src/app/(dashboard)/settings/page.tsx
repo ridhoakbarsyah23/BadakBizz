@@ -1,7 +1,7 @@
 "use client"
 
 import { apiUrl } from "@/lib/api"
-import { useState, useEffect } from "react"
+import { useState, useEffect, type CSSProperties } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -332,38 +332,97 @@ export default function SettingsPage() {
               Sesuaikan teks yang dicetak di bagian atas dan bawah struk Anda.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="receiptWidth">Lebar Kertas Printer (Thermal)</Label>
-              <select 
-                id="receiptWidth"
-                className="flex h-10 w-full md:w-[200px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                value={settings.receipt_width}
-                onChange={(e) => setSettings({...settings, receipt_width: e.target.value})}
-              >
-                <option value="80">80mm (Standar)</option>
-                <option value="58">58mm (Kecil)</option>
-              </select>
-              <p className="text-xs text-muted-foreground">Pilih sesuai ukuran kertas printer struk yang Anda gunakan agar hasil cetakan proporsional.</p>
-            </div>
-            <div className="grid md:grid-cols-2 gap-6">
+          <CardContent className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="receiptHeader">Header Struk</Label>
-                <Input 
-                  id="receiptHeader" 
-                  value={settings.receipt_header} 
-                  onChange={(e) => setSettings({...settings, receipt_header: e.target.value})} 
-                />
-                <p className="text-xs text-muted-foreground">Muncul di bagian paling atas struk yang dicetak.</p>
+                <Label htmlFor="receiptWidth">Lebar Kertas Printer (Thermal)</Label>
+                <select
+                  id="receiptWidth"
+                  className="flex h-10 w-full md:w-[200px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={settings.receipt_width}
+                  onChange={(e) => setSettings({...settings, receipt_width: e.target.value})}
+                >
+                  <option value="80">80mm (Standar)</option>
+                  <option value="58">58mm (Kecil)</option>
+                </select>
+                <p className="text-xs text-muted-foreground">Pilih sesuai ukuran kertas printer struk yang Anda gunakan agar hasil cetakan proporsional.</p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="receiptFooter">Footer Struk / Pesan Terima Kasih</Label>
-                <Input 
-                  id="receiptFooter" 
-                  value={settings.receipt_footer} 
-                  onChange={(e) => setSettings({...settings, receipt_footer: e.target.value})} 
-                />
-                <p className="text-xs text-muted-foreground">Muncul di bagian paling bawah.</p>
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="receiptHeader">Header Struk</Label>
+                  <Input
+                    id="receiptHeader"
+                    value={settings.receipt_header}
+                    onChange={(e) => setSettings({...settings, receipt_header: e.target.value})}
+                  />
+                  <p className="text-xs text-muted-foreground">Muncul di bagian paling atas struk yang dicetak.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="receiptFooter">Footer Struk / Pesan Terima Kasih</Label>
+                  <Input
+                    id="receiptFooter"
+                    value={settings.receipt_footer}
+                    onChange={(e) => setSettings({...settings, receipt_footer: e.target.value})}
+                  />
+                  <p className="text-xs text-muted-foreground">Muncul di bagian paling bawah.</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-center rounded-lg border border-dashed bg-slate-50 p-4">
+              <div
+                style={{ "--receipt-width": `${Number(settings.receipt_width || 80)}mm` } as CSSProperties}
+                className="w-[var(--receipt-width)] max-w-full bg-white p-4 font-mono text-[10px] text-black shadow-sm"
+              >
+                <div className="receipt-text text-center text-[13px] font-bold leading-tight">
+                  {settings.receipt_header || settings.name || "BadakBiz Coffee & Eatery"}
+                </div>
+                <div className="receipt-text mt-2 text-center text-[9px] leading-snug">
+                  {settings.address || "Alamat Toko"}<br />
+                  Telp: {settings.phone || "-"}
+                </div>
+                <div className="my-3 border-b-2 border-dashed border-black" />
+                <div className="receipt-row text-[9px]">
+                  <span>29/08/2026, 10.15</span>
+                  <span className="receipt-value receipt-text">TRX-20260829-001</span>
+                </div>
+                <div className="receipt-row mt-2 text-[9px]">
+                  <span className="receipt-text">Kasir: Cashier Staff</span>
+                  <span className="receipt-value receipt-text">Walk-in</span>
+                </div>
+                <div className="my-3 border-b-2 border-dashed border-black" />
+                <div className="space-y-2">
+                  <div>
+                    <div className="receipt-row font-semibold">
+                      <span className="receipt-text">Kopi Black Aren</span>
+                      <span className="receipt-value receipt-money">Rp 19.000</span>
+                    </div>
+                    <div className="text-[9px]">1 x Rp 19.000</div>
+                  </div>
+                  <div>
+                    <div className="receipt-row font-semibold">
+                      <span className="receipt-text">Nasi Telor Orak Arik</span>
+                      <span className="receipt-value receipt-money">Rp 12.000</span>
+                    </div>
+                    <div className="text-[9px]">1 x Rp 12.000</div>
+                  </div>
+                </div>
+                <div className="my-3 border-b-2 border-dashed border-black" />
+                <div className="receipt-row">
+                  <span>Subtotal</span>
+                  <span className="receipt-value receipt-money">Rp 31.000</span>
+                </div>
+                <div className="receipt-row">
+                  <span>Pajak ({settings.tax_rate || 0}%)</span>
+                  <span className="receipt-value receipt-money">Rp 3.410</span>
+                </div>
+                <div className="receipt-row mt-2 text-[13px] font-black">
+                  <span>TOTAL</span>
+                  <span className="receipt-value receipt-money">Rp 34.410</span>
+                </div>
+                <div className="my-3 border-b-2 border-dashed border-black" />
+                <div className="receipt-text text-center text-[9px] italic">
+                  {settings.receipt_footer || "Terima kasih atas kunjungan Anda!"}
+                </div>
               </div>
             </div>
           </CardContent>
