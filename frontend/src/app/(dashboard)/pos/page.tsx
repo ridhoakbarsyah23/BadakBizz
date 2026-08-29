@@ -17,7 +17,9 @@ import {
   Banknote,
   QrCode,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw
 } from "lucide-react"
 import {
   Dialog,
@@ -60,6 +62,10 @@ export default function POSPage() {
   const [receiptData, setReceiptData] = useState<any>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [variantProduct, setVariantProduct] = useState<any | null>(null)
+  const [notice, setNotice] = useState<{
+    type: "error" | "success" | "info"
+    message: string
+  } | null>(null)
 
   // QRIS dynamic state
   const [qrisString, setQrisString] = useState<string | null>(null)
@@ -89,6 +95,10 @@ export default function POSPage() {
       }
     } catch (error) {
       console.error("Failed to fetch data:", error)
+      setNotice({
+        type: "error",
+        message: "Gagal memuat data POS. Periksa koneksi backend lalu coba refresh.",
+      })
     } finally {
       setIsLoading(false)
     }
@@ -131,7 +141,10 @@ export default function POSPage() {
           } else if (matchedProduct) {
             handleProductSelect(matchedProduct)
           } else {
-            alert(`Produk dengan SKU / Barcode "${scannedStr}" tidak ditemukan!`)
+            setNotice({
+              type: "error",
+              message: `Produk dengan SKU / Barcode "${scannedStr}" tidak ditemukan.`,
+            })
           }
           scannedStr = ""
         }
@@ -200,11 +213,15 @@ export default function POSPage() {
   }
 
   const addToCart = (cartProduct: any) => {
+    setNotice(null)
     setCart(prev => {
       const existing = prev.find(item => item.cart_key === cartProduct.cart_key)
       if (existing) {
         if (existing.qty >= cartProduct.stock) {
-          alert(`Stock for ${cartProduct.name} is only ${cartProduct.stock}`)
+          setNotice({
+            type: "error",
+            message: `Stok ${cartProduct.name} hanya ${cartProduct.stock}.`,
+          })
           return prev
         }
         return prev.map(item => 
@@ -240,6 +257,11 @@ export default function POSPage() {
   const availableTables = tables.filter(table => table.status === "available" || table.id.toString() === selectedTableId)
   const requiresTable = tableManagementEnabled && orderType === "dine_in"
   const canCheckout = cart.length > 0 && (!requiresTable || Boolean(selectedTableId))
+  const checkoutHint = cart.length === 0
+    ? "Tambahkan produk ke keranjang untuk mulai checkout."
+    : requiresTable && !selectedTableId
+      ? "Pilih meja terlebih dahulu untuk pesanan dine-in."
+      : null
   
   const memberDiscountPercent = selectedCustomer ? 5 : 0
   const additionalDiscountPercent = Number(customDiscountPercent) || 0
@@ -254,6 +276,15 @@ export default function POSPage() {
   const total = netAfterDiscount + serviceCharge + tax
 
   const handleCheckout = async (paymentMethod: string, paymentAmount: number) => {
+    if (!canCheckout) {
+      setNotice({
+        type: "error",
+        message: checkoutHint || "Lengkapi pesanan sebelum checkout.",
+      })
+      return
+    }
+
+    setNotice(null)
     setIsProcessing(true)
     try {
       const res = await fetch(apiUrl('/api/transactions'), {
@@ -318,10 +349,22 @@ export default function POSPage() {
               tableName: selectedTable ? selectedTable.name : null
             })
             
+            setCart([])
+            setSelectedCustomerId("")
+            setSelectedTableId("")
+            setCashAmount("")
             setIsCheckoutOpen(false)
             setIsQrisOpen(true)
+            setNotice({
+              type: "info",
+              message: "Transaksi QRIS dibuat sebagai pending. Stok dan meja sudah diperbarui.",
+            })
+            fetchProductsAndCustomers()
           } else {
-            alert("Gagal memuat QRIS: " + (qrisData.message || "Kesalahan API"))
+            setNotice({
+              type: "error",
+              message: "Gagal memuat QRIS: " + (qrisData.message || "Kesalahan API"),
+            })
           }
         } else {
           setReceiptData({
@@ -347,6 +390,10 @@ export default function POSPage() {
           setIsCheckoutOpen(false)
           setIsReceiptOpen(true)
           setCashAmount("")
+          setNotice({
+            type: "success",
+            message: "Transaksi tunai berhasil disimpan.",
+          })
           fetchProductsAndCustomers() // refresh stock
           
           setTimeout(() => {
@@ -354,10 +401,16 @@ export default function POSPage() {
           }, 800)
         }
       } else {
-        alert("Error: " + (data.message || "Failed"))
+        setNotice({
+          type: "error",
+          message: data.error || data.message || "Transaksi gagal diproses.",
+        })
       }
     } catch {
-      alert("Network error, please try again.")
+      setNotice({
+        type: "error",
+        message: "Terjadi gangguan jaringan. Periksa backend lalu coba lagi.",
+      })
     } finally {
       setIsProcessing(false)
     }
@@ -599,9 +652,14 @@ export default function POSPage() {
               <div className="flex flex-col gap-1.5 mb-2">
                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Meja</label>
                 <select
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                  className={`w-full h-10 px-3 rounded-xl border bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer ${
+                    requiresTable && !selectedTableId ? "border-amber-300" : "border-slate-200"
+                  }`}
                   value={selectedTableId}
-                  onChange={(e) => setSelectedTableId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedTableId(e.target.value)
+                    setNotice(null)
+                  }}
                 >
                   <option value="">Pilih meja dine-in</option>
                   {availableTables.map(table => (
@@ -612,6 +670,9 @@ export default function POSPage() {
                 </select>
                 {tables.length === 0 && (
                   <p className="text-xs text-amber-600 font-medium">Belum ada data meja. Tambahkan meja dari backend atau seed database.</p>
+                )}
+                {requiresTable && !selectedTableId && tables.length > 0 && (
+                  <p className="text-xs text-amber-600 font-medium">Meja wajib dipilih untuk pesanan makan di tempat.</p>
                 )}
               </div>
             )}
@@ -669,10 +730,29 @@ export default function POSPage() {
         </div>
 
                <div className="p-5 bg-slate-50 border-t border-slate-100 shadow-[0_-15px_40px_-15px_rgba(0,0,0,0.05)] z-20 shrink-0">
+                  {notice && (
+                    <div className={`mb-3 flex items-start gap-2 rounded-xl border px-3 py-2 text-sm font-medium ${
+                      notice.type === "error"
+                        ? "border-red-200 bg-red-50 text-red-700"
+                        : notice.type === "success"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "border-blue-200 bg-blue-50 text-blue-700"
+                    }`}>
+                      {notice.type === "error" ? (
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      ) : (
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                      )}
+                      <span>{notice.message}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-black text-2xl text-slate-900 mb-4">
                     <span>Total</span>
                     <span className="text-primary">Rp {total.toLocaleString("id-ID")}</span>
                   </div>
+                  {checkoutHint && (
+                    <p className="mb-3 text-center text-xs font-semibold text-amber-600">{checkoutHint}</p>
+                  )}
                   
                   <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
                     <DialogTrigger render={
@@ -831,7 +911,9 @@ export default function POSPage() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">Scan menggunakan e-Wallet atau Mobile Banking</p>
+                  <p className="text-xs font-semibold text-slate-500">{receiptData?.transaction_number}</p>
                   <div className="text-3xl font-black text-primary">Rp {total.toLocaleString("id-ID")}</div>
+                  <p className="text-xs font-medium text-blue-600">Status transaksi: menunggu pembayaran</p>
                 </div>
               </div>
               <DialogFooter>
@@ -840,9 +922,11 @@ export default function POSPage() {
                   className="w-full h-12 text-sm font-bold rounded-xl transition-transform hover:scale-[1.02] active:scale-[0.98]" 
                   onClick={() => {
                     setIsQrisOpen(false)
+                    fetchProductsAndCustomers()
                   }}
                 >
-                  Batal / Tutup
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Tutup & Refresh POS
                 </Button>
               </DialogFooter>
             </DialogContent>
