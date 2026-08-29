@@ -2,8 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use App\Models\Role;
+use App\Models\Table;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -37,5 +38,12 @@ class DatabaseSeeder extends Seeder
                 'role_id' => $cashierRole->id,
             ]
         );
+
+        foreach (range(1, 8) as $number) {
+            Table::firstOrCreate(
+                ['name' => 'Meja '.$number],
+                ['status' => 'available']
+            );
+        }
     }
 }

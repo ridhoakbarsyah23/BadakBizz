@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Transaction;
+use App\Services\TransactionStatusService;
 use Illuminate\Http\Request;
 use Midtrans\Config;
 use Midtrans\CoreApi;
 use Midtrans\Notification;
-use App\Models\Transaction;
 
 class MidtransController extends Controller
 {
@@ -27,12 +28,12 @@ class MidtransController extends Controller
             'transaction_details' => [
                 'order_id' => $request->order_id,
                 'gross_amount' => (int) round($request->gross_amount),
-            ]
+            ],
         ];
 
         try {
             $response = CoreApi::charge($params);
-            
+
             // Midtrans Core API returns the QR string in actions array
             if (isset($response->actions)) {
                 $qrString = null;
@@ -41,11 +42,11 @@ class MidtransController extends Controller
                         $qrString = $action->url; // For GoPay/QRIS, URL is actually the raw QR string
                     }
                 }
-                
+
                 return response()->json([
                     'status' => 'success',
                     'qr_string' => $qrString,
-                    'transaction_id' => $response->transaction_id
+                    'transaction_id' => $response->transaction_id,
                 ]);
             }
 
@@ -59,43 +60,41 @@ class MidtransController extends Controller
     public function webhook(Request $request)
     {
         try {
-            $notif = new Notification();
+            $notif = new Notification;
 
             $transaction = $notif->transaction_status;
-            $type = $notif->payment_type;
             $order_id = $notif->order_id;
-            $fraud = $notif->fraud_status;
 
             $posTransaction = Transaction::where('transaction_number', $order_id)->first();
-            
-            if (!$posTransaction) {
+
+            if (! $posTransaction) {
                 return response()->json(['message' => 'Transaction not found'], 404);
             }
 
             if ($transaction == 'settlement' || $transaction == 'capture') {
-                $posTransaction->update(['status' => 'COMPLETED']);
-            } else if ($transaction == 'cancel' || $transaction == 'deny' || $transaction == 'expire') {
-                $posTransaction->update(['status' => 'CANCELLED']);
-            } else if ($transaction == 'pending') {
+                app(TransactionStatusService::class)->complete($posTransaction);
+            } elseif ($transaction == 'cancel' || $transaction == 'deny' || $transaction == 'expire') {
+                app(TransactionStatusService::class)->cancel($posTransaction, null, 'Midtrans '.ucfirst($transaction));
+            } elseif ($transaction == 'pending' && $posTransaction->status !== 'COMPLETED') {
                 $posTransaction->update(['status' => 'PENDING']);
             }
 
             return response()->json(['message' => 'Webhook received']);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Webhook error: ' . $e->getMessage()], 500);
+            return response()->json(['message' => 'Webhook error: '.$e->getMessage()], 500);
         }
     }
 
     public function checkStatus($order_id)
     {
         $posTransaction = Transaction::where('transaction_number', $order_id)->first();
-        if (!$posTransaction) {
+        if (! $posTransaction) {
             return response()->json(['status' => 'error', 'message' => 'Not found'], 404);
         }
-        
+
         return response()->json([
-            'status' => 'success', 
-            'transaction_status' => $posTransaction->status
+            'status' => 'success',
+            'transaction_status' => $posTransaction->status,
         ]);
     }
 }
