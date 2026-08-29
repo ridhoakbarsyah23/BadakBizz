@@ -7,14 +7,13 @@ use App\Services\TransactionStatusService;
 use Illuminate\Http\Request;
 use Midtrans\Config;
 use Midtrans\CoreApi;
-use Midtrans\Notification;
 
 class MidtransController extends Controller
 {
     public function generateQris(Request $request)
     {
-        Config::$serverKey = env('MIDTRANS_SERVER_KEY');
-        Config::$isProduction = filter_var(env('MIDTRANS_IS_PRODUCTION', false), FILTER_VALIDATE_BOOLEAN);
+        Config::$serverKey = config('services.midtrans.server_key');
+        Config::$isProduction = filter_var(config('services.midtrans.is_production'), FILTER_VALIDATE_BOOLEAN);
         Config::$isSanitized = true;
         Config::$is3ds = true;
 
@@ -60,22 +59,36 @@ class MidtransController extends Controller
     public function webhook(Request $request)
     {
         try {
-            $notif = new Notification;
+            $serverKey = config('services.midtrans.server_key');
+            if (! $serverKey) {
+                return response()->json(['message' => 'Midtrans server key is not configured'], 500);
+            }
 
-            $transaction = $notif->transaction_status;
-            $order_id = $notif->order_id;
+            $validated = $request->validate([
+                'order_id' => 'required|string',
+                'status_code' => 'required|string',
+                'gross_amount' => 'required',
+                'signature_key' => 'required|string',
+                'transaction_status' => 'required|string',
+            ]);
 
-            $posTransaction = Transaction::where('transaction_number', $order_id)->first();
+            if (! $this->hasValidSignature($validated, $serverKey)) {
+                return response()->json(['message' => 'Invalid Midtrans signature'], 403);
+            }
+
+            $posTransaction = Transaction::where('transaction_number', $validated['order_id'])->first();
 
             if (! $posTransaction) {
                 return response()->json(['message' => 'Transaction not found'], 404);
             }
 
-            if ($transaction == 'settlement' || $transaction == 'capture') {
+            $transactionStatus = $validated['transaction_status'];
+
+            if ($transactionStatus == 'settlement' || $transactionStatus == 'capture') {
                 app(TransactionStatusService::class)->complete($posTransaction);
-            } elseif ($transaction == 'cancel' || $transaction == 'deny' || $transaction == 'expire') {
-                app(TransactionStatusService::class)->cancel($posTransaction, null, 'Midtrans '.ucfirst($transaction));
-            } elseif ($transaction == 'pending' && $posTransaction->status !== 'COMPLETED') {
+            } elseif ($transactionStatus == 'cancel' || $transactionStatus == 'deny' || $transactionStatus == 'expire') {
+                app(TransactionStatusService::class)->cancel($posTransaction, null, 'Midtrans '.ucfirst($transactionStatus));
+            } elseif ($transactionStatus == 'pending' && $posTransaction->status !== 'COMPLETED') {
                 $posTransaction->update(['status' => 'PENDING']);
             }
 
@@ -83,6 +96,19 @@ class MidtransController extends Controller
         } catch (\Exception $e) {
             return response()->json(['message' => 'Webhook error: '.$e->getMessage()], 500);
         }
+    }
+
+    private function hasValidSignature(array $payload, string $serverKey): bool
+    {
+        $signaturePayload = $payload['order_id']
+            .$payload['status_code']
+            .$payload['gross_amount']
+            .$serverKey;
+
+        return hash_equals(
+            hash('sha512', $signaturePayload),
+            $payload['signature_key']
+        );
     }
 
     public function checkStatus($order_id)
