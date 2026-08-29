@@ -1,6 +1,6 @@
-# BadakBiz
+# BadakBizz
 
-BadakBiz adalah aplikasi Point of Sale (kasir) untuk mengelola transaksi, stok,
+BadakBizz adalah aplikasi Point of Sale (kasir) untuk mengelola transaksi, stok,
 produk, pelanggan, staf, laporan, dan pengaturan toko. Proyek ini memakai
 arsitektur terpisah: frontend Next.js dan backend Laravel REST API.
 
