@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Armchair, Store, Receipt, Coins, Loader2, Settings2 } from "lucide-react"
+import { AlertTriangle, Armchair, CheckCircle2, Coins, Loader2, Receipt, Settings2, Store, X } from "lucide-react"
 
 import Link from "next/link"
 
@@ -23,6 +23,10 @@ export default function SettingsPage() {
   const { token } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [notice, setNotice] = useState<{
+    type: "success" | "error"
+    message: string
+  } | null>(null)
   const [settings, setSettings] = useState({
     name: "",
     business_type: "retail",
@@ -63,6 +67,10 @@ export default function SettingsPage() {
         }
       } catch (error) {
         console.error("Failed to fetch settings:", error)
+        setNotice({
+          type: "error",
+          message: "Gagal memuat pengaturan toko. Periksa koneksi backend lalu coba refresh.",
+        })
       } finally {
         setIsLoading(false)
       }
@@ -73,6 +81,7 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     setIsSaving(true)
+    setNotice(null)
     try {
       const res = await fetch(apiUrl('/api/settings'), {
         method: "PUT",
@@ -83,16 +92,40 @@ export default function SettingsPage() {
         },
         body: JSON.stringify(settings)
       })
+      const data = await res.json().catch(() => null)
 
       if (res.ok) {
-        alert("Pengaturan berhasil disimpan!")
+        if (data?.store) {
+          setSettings({
+            name: data.store.name || "",
+            business_type: data.store.business_type || "retail",
+            enable_table_management: data.store.enable_table_management == 1 || data.store.enable_table_management === true,
+            enable_kitchen_receipts: data.store.enable_kitchen_receipts == 1 || data.store.enable_kitchen_receipts === true,
+            phone: data.store.phone || "",
+            address: data.store.address || "",
+            tax_rate: data.store.tax_rate?.toString() || "11",
+            service_charge_rate: data.store.service_charge_rate?.toString() || "0",
+            receipt_header: data.store.receipt_header || "",
+            receipt_footer: data.store.receipt_footer || "",
+            receipt_width: data.store.receipt_width?.toString() || "80",
+          })
+        }
+        setNotice({
+          type: "success",
+          message: "Pengaturan berhasil disimpan.",
+        })
       } else {
-        const err = await res.json()
-        alert("Gagal menyimpan: " + (err.message || "Unknown error"))
+        setNotice({
+          type: "error",
+          message: data?.message || "Gagal menyimpan pengaturan.",
+        })
       }
     } catch (error) {
       console.error("Save error:", error)
-      alert("Terjadi kesalahan jaringan.")
+      setNotice({
+        type: "error",
+        message: "Terjadi kesalahan jaringan. Periksa backend lalu coba lagi.",
+      })
     } finally {
       setIsSaving(false)
     }
@@ -114,6 +147,31 @@ export default function SettingsPage() {
           Kelola preferensi toko, format struk, dan akses karyawan.
         </p>
       </div>
+
+      {notice && (
+        <div className={`flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-medium ${
+          notice.type === "success"
+            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+            : "border-red-200 bg-red-50 text-red-700"
+        }`}>
+          <div className="flex items-start gap-2">
+            {notice.type === "success" ? (
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            ) : (
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            )}
+            <span>{notice.message}</span>
+          </div>
+          <button
+            type="button"
+            className="rounded-md p-1 opacity-70 transition hover:bg-black/5 hover:opacity-100"
+            aria-label="Tutup notifikasi"
+            onClick={() => setNotice(null)}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         
@@ -374,7 +432,7 @@ export default function SettingsPage() {
                 className="w-[var(--receipt-width)] max-w-full bg-white p-4 font-mono text-[10px] text-black shadow-sm"
               >
                 <div className="receipt-text text-center text-[13px] font-bold leading-tight">
-                  {settings.receipt_header || settings.name || "BadakBiz Coffee & Eatery"}
+                  {settings.receipt_header || settings.name || "BadakBizz Coffee & Eatery"}
                 </div>
                 <div className="receipt-text mt-2 text-center text-[9px] leading-snug">
                   {settings.address || "Alamat Toko"}<br />

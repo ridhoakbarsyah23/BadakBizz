@@ -111,15 +111,19 @@ export default function TransactionsPage() {
   const [isQrisOpen, setIsQrisOpen] = useState(false)
   const [isReceiptMode, setIsReceiptMode] = useState(false)
   const [isActionLoading, setIsActionLoading] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<{
+    type: "cancel-qris" | "void"
+    transaction: Transaction
+  } | null>(null)
   const [notice, setNotice] = useState<{
     type: "error" | "success" | "info"
     message: string
   } | null>(null)
   const [storeSettings, setStoreSettings] = useState<any>({
-    name: "BadakBiz",
+    name: "BadakBizz",
     address: "",
     phone: "",
-    receipt_header: "BadakBiz",
+    receipt_header: "BadakBizz",
     receipt_footer: "Thank you!"
   })
 
@@ -268,10 +272,6 @@ export default function TransactionsPage() {
   }
 
   const handleCancelPendingQris = async (transaction: Transaction) => {
-    if (!window.confirm(`Batalkan QRIS pending ${transaction.transaction_number}? Stok dan meja akan dikembalikan.`)) {
-      return
-    }
-
     setIsActionLoading(true)
     setNotice(null)
 
@@ -291,6 +291,7 @@ export default function TransactionsPage() {
         type: "success",
         message: `QRIS pending ${transaction.transaction_number} berhasil dibatalkan.`,
       })
+      setConfirmAction(null)
       fetchData()
     } catch (error: any) {
       setNotice({
@@ -304,10 +305,6 @@ export default function TransactionsPage() {
 
   const handleVoidTransaction = async () => {
     if (!selectedTransaction) return;
-
-    if (!window.confirm("Apakah Anda yakin ingin membatalkan transaksi ini? Tindakan ini tidak dapat dibatalkan dan stok akan dikembalikan.")) {
-      return;
-    }
 
     try {
       setIsActionLoading(true)
@@ -335,6 +332,7 @@ export default function TransactionsPage() {
         type: "success",
         message: "Transaksi telah berhasil dibatalkan.",
       })
+      setConfirmAction(null)
 
     } catch (error: any) {
       console.error('Void error:', error)
@@ -796,7 +794,7 @@ export default function TransactionsPage() {
                     <Button
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       isDisabled={isActionLoading}
-                      onPress={() => handleCancelPendingQris(selectedTransaction)}
+                      onPress={() => setConfirmAction({ type: "cancel-qris", transaction: selectedTransaction })}
                     >
                       Batalkan QRIS
                     </Button>
@@ -806,7 +804,7 @@ export default function TransactionsPage() {
                   <Button
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     isDisabled={isActionLoading}
-                    onPress={handleVoidTransaction}
+                    onPress={() => setConfirmAction({ type: "void", transaction: selectedTransaction })}
                   >
                     Batalkan Transaksi
                   </Button>
@@ -859,6 +857,58 @@ export default function TransactionsPage() {
             </Button>
             <Button variant="ghost" onPress={() => setIsQrisOpen(false)}>
               Tutup
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(confirmAction)} onOpenChange={(open) => !open && setConfirmAction(null)}>
+        <DialogContent className="sm:max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <AlertTriangle className="h-5 w-5" />
+              {confirmAction?.type === "void" ? "Batalkan Transaksi?" : "Batalkan QRIS Pending?"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 text-sm text-slate-600">
+            <p>
+              {confirmAction?.type === "void"
+                ? "Transaksi selesai ini akan dibatalkan dan stok produk akan dikembalikan."
+                : "Transaksi QRIS pending ini akan dibatalkan. Stok produk dan status meja akan dikembalikan."}
+            </p>
+            {confirmAction?.transaction && (
+              <div className="rounded-xl border bg-slate-50 p-3">
+                <div className="font-bold text-slate-900">{confirmAction.transaction.transaction_number}</div>
+                <div className="mt-1 text-xs font-medium text-slate-500">
+                  Total Rp {Number(confirmAction.transaction.total_amount).toLocaleString("id-ID")}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              isDisabled={isActionLoading}
+              onPress={() => setConfirmAction(null)}
+            >
+              Tidak Jadi
+            </Button>
+            <Button
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              isDisabled={isActionLoading || !confirmAction}
+              onPress={() => {
+                if (!confirmAction) return
+                if (confirmAction.type === "cancel-qris") {
+                  handleCancelPendingQris(confirmAction.transaction)
+                  return
+                }
+                handleVoidTransaction()
+              }}
+            >
+              {isActionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {confirmAction?.type === "void" ? "Batalkan Transaksi" : "Batalkan QRIS"}
             </Button>
           </DialogFooter>
         </DialogContent>

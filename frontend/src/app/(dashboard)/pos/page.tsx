@@ -2,6 +2,7 @@
 
 import { apiUrl } from "@/lib/api"
 import { useState, useEffect, type CSSProperties } from "react"
+import Link from "next/link"
 import { QRCodeSVG } from "qrcode.react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,7 +20,13 @@ import {
   Loader2,
   CheckCircle2,
   AlertTriangle,
-  RefreshCw
+  Armchair,
+  Clock3,
+  Eye,
+  ExternalLink,
+  RefreshCw,
+  UserRound,
+  XCircle
 } from "lucide-react"
 import {
   Dialog,
@@ -47,10 +54,10 @@ export default function POSPage() {
   const [orderType, setOrderType] = useState<string>("dine_in")
   const [customDiscountPercent, setCustomDiscountPercent] = useState("")
   const [storeSettings, setStoreSettings] = useState<any>({
-    name: "Kivo POS",
+    name: "BadakBizz",
     tax_rate: 11,
     service_charge_rate: 0,
-    receipt_header: "Kivo POS",
+    receipt_header: "BadakBizz",
     receipt_footer: "Thank you!"
   })
   
@@ -69,27 +76,36 @@ export default function POSPage() {
 
   // QRIS dynamic state
   const [qrisString, setQrisString] = useState<string | null>(null)
+  const [qrisDialogTransaction, setQrisDialogTransaction] = useState<any | null>(null)
+  const [pendingQrisTransactions, setPendingQrisTransactions] = useState<any[]>([])
+  const [pendingQrisActionId, setPendingQrisActionId] = useState<number | null>(null)
+  const [pendingQrisLastRefresh, setPendingQrisLastRefresh] = useState<Date | null>(null)
+  const [pendingCancelQrisTransaction, setPendingCancelQrisTransaction] = useState<any | null>(null)
   const [isCartModalOpen, setIsCartModalOpen] = useState(false)
 
   const fetchProductsAndCustomers = async () => {
     setIsLoading(true)
     try {
       const headers = { "Authorization": `Bearer ${token}` }
-      const [productsRes, customersRes, settingsRes, tablesRes] = await Promise.all([
+      const [productsRes, customersRes, settingsRes, tablesRes, pendingQrisRes] = await Promise.all([
         fetch(apiUrl('/api/products'), { headers }),
         fetch(apiUrl('/api/customers'), { headers }),
         fetch(apiUrl('/api/settings'), { headers }),
-        fetch(apiUrl('/api/tables'), { headers })
+        fetch(apiUrl('/api/tables'), { headers }),
+        fetch(apiUrl('/api/transactions?status=PENDING&payment_method=QRIS&per_page=5'), { headers })
       ])
       
       const productsData = await productsRes.json()
       const customersData = await customersRes.json()
       const settingsData = await settingsRes.json()
       const tablesData = await tablesRes.json()
+      const pendingQrisData = await pendingQrisRes.json()
       
       setProducts(Array.isArray(productsData) ? productsData : [])
       setCustomers(Array.isArray(customersData) ? customersData : [])
       setTables(Array.isArray(tablesData) ? tablesData : [])
+      setPendingQrisTransactions(Array.isArray(pendingQrisData?.data) ? pendingQrisData.data : [])
+      setPendingQrisLastRefresh(new Date())
       if (settingsData && settingsData.name) {
         setStoreSettings(settingsData)
       }
@@ -330,6 +346,10 @@ export default function POSPage() {
           const qrisData = await qrisRes.json()
           if (qrisRes.ok && qrisData.status === 'success') {
             setQrisString(qrisData.qr_string)
+            setQrisDialogTransaction({
+              ...txn,
+              qris_string: qrisData.qr_string,
+            })
             
             // Keep the receipt data ready for when polling finishes
             setReceiptData({
@@ -418,6 +438,147 @@ export default function POSPage() {
 
   const handlePrint = () => {
     window.print()
+  }
+
+  const formatPendingQrisTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  const formatPendingQrisAge = (dateString: string) => {
+    const createdAt = new Date(dateString).getTime()
+    const referenceTime = pendingQrisLastRefresh?.getTime() ?? createdAt
+    const diffInMinutes = Math.max(0, Math.floor((referenceTime - createdAt) / 60000))
+
+    if (diffInMinutes < 1) {
+      return "< 1 menit"
+    }
+
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes} menit`
+    }
+
+    const hours = Math.floor(diffInMinutes / 60)
+    const minutes = diffInMinutes % 60
+
+    return minutes > 0 ? `${hours} jam ${minutes} menit` : `${hours} jam`
+  }
+
+  const formatLastPendingQrisRefresh = () => {
+    if (!pendingQrisLastRefresh) {
+      return "belum diperbarui"
+    }
+
+    return pendingQrisLastRefresh.toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  const refreshPendingQris = async () => {
+    if (!token) return
+
+    try {
+      const res = await fetch(apiUrl('/api/transactions?status=PENDING&payment_method=QRIS&per_page=5'), {
+        headers: { "Authorization": `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setPendingQrisTransactions(Array.isArray(data?.data) ? data.data : [])
+        setPendingQrisLastRefresh(new Date())
+      }
+    } catch {
+      setNotice({
+        type: "error",
+        message: "Gagal memuat daftar QRIS pending.",
+      })
+    }
+  }
+
+  useEffect(() => {
+    if (!token) return
+
+    const intervalId = setInterval(() => {
+      refreshPendingQris()
+    }, 45000)
+
+    return () => clearInterval(intervalId)
+  }, [token])
+
+  const handleShowPendingQris = (transaction: any) => {
+    if (!transaction.qris_string) {
+      setNotice({
+        type: "error",
+        message: "QRIS transaksi ini belum tersimpan. Cek dari Riwayat Transaksi atau buat ulang pembayaran.",
+      })
+      return
+    }
+
+    setQrisString(transaction.qris_string)
+    setQrisDialogTransaction(transaction)
+    setIsQrisOpen(true)
+  }
+
+  const handleCheckPendingQrisStatus = async (transaction: any) => {
+    setPendingQrisActionId(transaction.id)
+    setNotice(null)
+
+    try {
+      const res = await fetch(apiUrl(`/api/qris/status/${transaction.transaction_number}`), {
+        headers: { "Authorization": `Bearer ${token}` }
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.message || "Gagal mengecek status QRIS")
+      }
+
+      setNotice({
+        type: data.transaction_status === "PENDING" ? "info" : "success",
+        message: `Status ${transaction.transaction_number}: ${data.transaction_status}`,
+      })
+      fetchProductsAndCustomers()
+    } catch (error: any) {
+      setNotice({
+        type: "error",
+        message: error.message || "Gagal mengecek status QRIS",
+      })
+    } finally {
+      setPendingQrisActionId(null)
+    }
+  }
+
+  const handleCancelPendingQris = async (transaction: any) => {
+    setPendingQrisActionId(transaction.id)
+    setNotice(null)
+
+    try {
+      const res = await fetch(apiUrl(`/api/transactions/${transaction.id}/cancel-pending-qris`), {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` }
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.message || "Gagal membatalkan QRIS pending")
+      }
+
+      setNotice({
+        type: "success",
+        message: `QRIS pending ${transaction.transaction_number} berhasil dibatalkan.`,
+      })
+      setPendingCancelQrisTransaction(null)
+      fetchProductsAndCustomers()
+    } catch (error: any) {
+      setNotice({
+        type: "error",
+        message: error.message || "Gagal membatalkan QRIS pending",
+      })
+    } finally {
+      setPendingQrisActionId(null)
+    }
   }
 
   return (
@@ -551,6 +712,113 @@ export default function POSPage() {
                   </Badge>
                </div>
 
+               {pendingQrisTransactions.length > 0 && (
+                 <div className="border-b border-slate-100 bg-amber-50/70 p-4">
+                   <div className="mb-3 flex items-center justify-between gap-3">
+                     <div>
+                       <div className="flex items-center gap-2 text-sm font-black text-amber-800">
+                         <Clock3 className="h-4 w-4" />
+                         QRIS Pending
+                       </div>
+                       <div className="mt-0.5 text-[11px] font-medium text-amber-700">
+                         Auto-refresh tiap 45 detik. Terakhir {formatLastPendingQrisRefresh()}.
+                       </div>
+                     </div>
+                     <Button
+                       variant="ghost"
+                       size="icon"
+                       className="h-8 w-8 rounded-lg text-amber-700 hover:bg-amber-100"
+                       onClick={refreshPendingQris}
+                       disabled={pendingQrisActionId !== null}
+                     >
+                       <RefreshCw className="h-4 w-4" />
+                     </Button>
+                   </div>
+                   <div className="space-y-2">
+                     {pendingQrisTransactions.map(transaction => (
+                       <div
+                         key={transaction.id}
+                         className="rounded-xl border border-amber-200 bg-white p-3 shadow-sm"
+                       >
+                         <div className="flex items-start justify-between gap-3">
+                           <div className="min-w-0">
+                             <div className="truncate text-xs font-bold text-slate-900">
+                               {transaction.transaction_number}
+                             </div>
+                             <div className="mt-1 text-[11px] font-medium text-slate-500">
+                               {formatPendingQrisTime(transaction.created_at)} - {transaction.customer?.name || "Walk-in"}
+                             </div>
+                           </div>
+                           <div className="shrink-0 text-right text-sm font-black text-amber-700">
+                             Rp {Number(transaction.total_amount || 0).toLocaleString("id-ID")}
+                           </div>
+                         </div>
+                         <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-amber-50/70 p-2 text-[11px] font-medium text-slate-600">
+                           <div className="flex min-w-0 items-center gap-1.5">
+                             <Clock3 className="h-3.5 w-3.5 shrink-0 text-amber-700" />
+                             <span className="truncate">Umur {formatPendingQrisAge(transaction.created_at)}</span>
+                           </div>
+                           <div className="flex min-w-0 items-center gap-1.5">
+                             <Armchair className="h-3.5 w-3.5 shrink-0 text-amber-700" />
+                             <span className="truncate">{transaction.table?.name || "Takeaway"}</span>
+                           </div>
+                           <div className="col-span-2 flex min-w-0 items-center gap-1.5">
+                             <UserRound className="h-3.5 w-3.5 shrink-0 text-amber-700" />
+                             <span className="truncate">Kasir: {transaction.cashier?.name || "Tidak tercatat"}</span>
+                           </div>
+                         </div>
+                         <div className="mt-3 grid grid-cols-2 gap-2">
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             className="h-9 rounded-lg border-slate-200 px-2 text-xs"
+                             onClick={() => handleShowPendingQris(transaction)}
+                             disabled={pendingQrisActionId !== null}
+                           >
+                             <Eye className="mr-1 h-3.5 w-3.5" />
+                             QR
+                           </Button>
+                           <Link href="/transactions">
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               className="h-9 w-full rounded-lg border-slate-200 px-2 text-xs"
+                               disabled={pendingQrisActionId !== null}
+                             >
+                               <ExternalLink className="mr-1 h-3.5 w-3.5" />
+                               Riwayat
+                             </Button>
+                           </Link>
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             className="h-9 rounded-lg border-blue-200 px-2 text-xs text-blue-700 hover:bg-blue-50"
+                             onClick={() => handleCheckPendingQrisStatus(transaction)}
+                             disabled={pendingQrisActionId !== null}
+                           >
+                             {pendingQrisActionId === transaction.id ? (
+                               <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                             ) : (
+                               <RefreshCw className="mr-1 h-3.5 w-3.5" />
+                             )}
+                             Cek
+                           </Button>
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             className="h-9 rounded-lg border-red-200 px-2 text-xs text-red-700 hover:bg-red-50"
+                             onClick={() => setPendingCancelQrisTransaction(transaction)}
+                             disabled={pendingQrisActionId !== null}
+                           >
+                             <XCircle className="mr-1 h-3.5 w-3.5" />
+                             Batal
+                           </Button>
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+               )}
 
 
                <div className="p-6 flex flex-col gap-3 shrink-0">
@@ -774,6 +1042,48 @@ export default function POSPage() {
                </div>
       </div>
     </div>
+        {/* Cancel Pending QRIS Confirmation */}
+          <Dialog
+            open={Boolean(pendingCancelQrisTransaction)}
+            onOpenChange={(open) => !open && setPendingCancelQrisTransaction(null)}
+          >
+            <DialogContent className="!max-w-sm w-[95vw] sm:w-full rounded-2xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-red-700">
+                  <AlertTriangle className="h-5 w-5" />
+                  Batalkan QRIS Pending?
+                </DialogTitle>
+                <DialogDescription>
+                  Transaksi {pendingCancelQrisTransaction?.transaction_number} akan dibatalkan. Stok produk dan status meja akan dikembalikan.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  className="rounded-xl font-semibold"
+                  onClick={() => setPendingCancelQrisTransaction(null)}
+                  disabled={pendingQrisActionId !== null}
+                >
+                  Tidak Jadi
+                </Button>
+                <Button
+                  className="rounded-xl bg-red-600 font-bold text-white hover:bg-red-700"
+                  onClick={() => pendingCancelQrisTransaction && handleCancelPendingQris(pendingCancelQrisTransaction)}
+                  disabled={pendingQrisActionId !== null}
+                >
+                  {pendingQrisActionId === pendingCancelQrisTransaction?.id ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Membatalkan...
+                    </>
+                  ) : (
+                    "Batalkan QRIS"
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
         {/* Variant Picker Dialog */}
           <Dialog open={Boolean(variantProduct)} onOpenChange={(open) => !open && setVariantProduct(null)}>
             <DialogContent className="!max-w-md w-[95vw] sm:w-full rounded-2xl">
@@ -866,7 +1176,15 @@ export default function POSPage() {
           </Dialog>
 
           {/* QRIS Payment Dialog */}
-          <Dialog open={isQrisOpen} onOpenChange={setIsQrisOpen}>
+          <Dialog
+            open={isQrisOpen}
+            onOpenChange={(open) => {
+              setIsQrisOpen(open)
+              if (!open) {
+                setQrisDialogTransaction(null)
+              }
+            }}
+          >
             <DialogContent className="!max-w-sm w-[95vw] sm:w-full text-center rounded-2xl">
               <DialogHeader>
                 <DialogTitle className="text-center">Pembayaran QRIS</DialogTitle>
@@ -884,8 +1202,12 @@ export default function POSPage() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">Scan menggunakan e-Wallet atau Mobile Banking</p>
-                  <p className="text-xs font-semibold text-slate-500">{receiptData?.transaction_number}</p>
-                  <div className="text-3xl font-black text-primary">Rp {total.toLocaleString("id-ID")}</div>
+                  <p className="text-xs font-semibold text-slate-500">
+                    {qrisDialogTransaction?.transaction_number || receiptData?.transaction_number}
+                  </p>
+                  <div className="text-3xl font-black text-primary">
+                    Rp {Number(qrisDialogTransaction?.total_amount ?? total).toLocaleString("id-ID")}
+                  </div>
                   <p className="text-xs font-medium text-blue-600">Status transaksi: menunggu pembayaran</p>
                 </div>
               </div>
@@ -928,7 +1250,7 @@ export default function POSPage() {
                 className="bg-white text-black text-sm print:text-[10px] font-mono flex flex-col gap-2 rounded-xl border shadow-sm mx-auto mb-2 p-5 print:m-0"
               >
                 <div className="receipt-text text-center font-bold text-lg print:text-[13px] leading-tight mb-1">
-                  {storeSettings.receipt_header || storeSettings.name || 'Kivo POS'}
+                  {storeSettings.receipt_header || storeSettings.name || 'BadakBizz'}
                 </div>
                 <div className="receipt-text text-center text-xs print:text-[9px] leading-snug font-normal text-gray-600 print:text-black mb-3">
                   {storeSettings.address || 'Alamat Toko'}<br />
