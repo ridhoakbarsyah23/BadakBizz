@@ -24,7 +24,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { AlertTriangle, Download, Eye, Filter, Loader2, Printer, QrCode, Receipt, RefreshCw, Search, XCircle } from "lucide-react"
+import { AlertTriangle, CalendarDays, Download, Eye, Loader2, Printer, QrCode, Receipt, RefreshCw, RotateCcw, Search, XCircle } from "lucide-react"
 
 interface TransactionItem {
   id: number
@@ -77,9 +77,6 @@ interface Transaction {
   items: TransactionItem[]
 }
 
-const statusOptions = ["ALL", "PENDING", "COMPLETED", "CANCELLED"]
-const paymentOptions = ["ALL", "QRIS", "CASH", "TRANSFER", "CARD"]
-
 const statusLabel: Record<string, string> = {
   ALL: "Semua Status",
   PENDING: "Pending",
@@ -87,12 +84,155 @@ const statusLabel: Record<string, string> = {
   CANCELLED: "Batal",
 }
 
-const paymentLabel: Record<string, string> = {
-  ALL: "Semua Pembayaran",
-  QRIS: "QRIS",
-  CASH: "Tunai",
-  TRANSFER: "Transfer",
-  CARD: "Kartu",
+const datePresetOptions = [
+  { value: "ALL", label: "Semua Tanggal" },
+  { value: "TODAY", label: "Hari Ini" },
+  { value: "YESTERDAY", label: "Kemarin" },
+  { value: "LAST_7_DAYS", label: "7 Hari Terakhir" },
+  { value: "THIS_MONTH", label: "Bulan Ini" },
+  { value: "SINGLE", label: "Tanggal Tertentu" },
+  { value: "CUSTOM", label: "Rentang Tanggal" },
+]
+
+const formatInputDate = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+
+  return `${year}-${month}-${day}`
+}
+
+const formatFilterDate = (dateString: string) => {
+  return new Date(`${dateString}T00:00:00`).toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })
+}
+
+const parseInputDate = (dateString: string) => {
+  return dateString ? new Date(`${dateString}T00:00:00`) : null
+}
+
+const monthNames = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+]
+
+const weekdayNames = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"]
+
+function CalendarPicker({
+  mode,
+  startDate,
+  endDate,
+  onChange,
+}: {
+  mode: "single" | "range"
+  startDate: string
+  endDate: string
+  onChange: (start: string, end: string) => void
+}) {
+  const [visibleMonth, setVisibleMonth] = useState(() => parseInputDate(startDate) || new Date())
+  const selectedStart = parseInputDate(startDate)
+  const selectedEnd = parseInputDate(endDate)
+  const year = visibleMonth.getFullYear()
+  const month = visibleMonth.getMonth()
+  const firstDay = new Date(year, month, 1)
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const leadingDays = firstDay.getDay()
+  const cells = [
+    ...Array.from({ length: leadingDays }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, index) => new Date(year, month, index + 1)),
+  ]
+
+  useEffect(() => {
+    const nextVisibleMonth = parseInputDate(startDate)
+    if (nextVisibleMonth) {
+      setVisibleMonth(nextVisibleMonth)
+    }
+  }, [startDate])
+
+  const moveMonth = (delta: number) => {
+    setVisibleMonth(new Date(year, month + delta, 1))
+  }
+
+  const isSameDate = (a: Date | null, b: Date | null) => {
+    return Boolean(a && b && formatInputDate(a) === formatInputDate(b))
+  }
+
+  const isInRange = (date: Date) => {
+    if (!selectedStart || !selectedEnd) return false
+
+    return date > selectedStart && date < selectedEnd
+  }
+
+  const handleSelectDate = (date: Date) => {
+    const value = formatInputDate(date)
+
+    if (mode === "single") {
+      onChange(value, "")
+      return
+    }
+
+    if (!selectedStart || selectedEnd || date < selectedStart) {
+      onChange(value, "")
+      return
+    }
+
+    onChange(formatInputDate(selectedStart), value)
+  }
+
+  return (
+    <div className="absolute left-0 top-full z-30 mt-2 w-[min(92vw,320px)] rounded-2xl border border-default-200 bg-white p-4 shadow-xl">
+      <div className="mb-3 flex items-center justify-between">
+        <Button isIconOnly size="sm" variant="ghost" onPress={() => moveMonth(-1)} aria-label="Bulan sebelumnya">
+          <span aria-hidden="true">‹</span>
+        </Button>
+        <div className="text-sm font-bold text-default-900">
+          {monthNames[month]} {year}
+        </div>
+        <Button isIconOnly size="sm" variant="ghost" onPress={() => moveMonth(1)} aria-label="Bulan berikutnya">
+          <span aria-hidden="true">›</span>
+        </Button>
+      </div>
+      <div className="mb-2 grid grid-cols-7 text-center text-[11px] font-bold text-default-400">
+        {weekdayNames.map((day) => (
+          <span key={day}>{day}</span>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((date, index) => {
+          const isSelected = isSameDate(date, selectedStart) || isSameDate(date, selectedEnd)
+          const rangeClass = date && isInRange(date) ? "bg-blue-50 text-blue-700" : ""
+
+          return date ? (
+            <button
+              key={date.toISOString()}
+              type="button"
+              className={`h-9 rounded-lg text-sm font-semibold transition-colors hover:bg-blue-50 hover:text-blue-700 ${rangeClass} ${
+                isSelected ? "bg-blue-600 text-white hover:bg-blue-600 hover:text-white" : "text-default-700"
+              }`}
+              onClick={() => handleSelectDate(date)}
+            >
+              {date.getDate()}
+            </button>
+          ) : (
+            <span key={`empty-${index}`} className="h-9" />
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 export default function TransactionsPage() {
@@ -103,8 +243,10 @@ export default function TransactionsPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
   const [appliedSearchQuery, setAppliedSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("ALL")
-  const [paymentFilter, setPaymentFilter] = useState("ALL")
+  const [datePreset, setDatePreset] = useState("ALL")
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [qrisTransaction, setQrisTransaction] = useState<Transaction | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
@@ -119,6 +261,7 @@ export default function TransactionsPage() {
     type: "error" | "success" | "info"
     message: string
   } | null>(null)
+  const [isNoticeVisible, setIsNoticeVisible] = useState(false)
   const [storeSettings, setStoreSettings] = useState<any>({
     name: "BadakBizz",
     address: "",
@@ -127,17 +270,83 @@ export default function TransactionsPage() {
     receipt_footer: "Thank you!"
   })
 
+  useEffect(() => {
+    if (!notice) return
+
+    setIsNoticeVisible(true)
+
+    const hideTimerId = window.setTimeout(() => {
+      setIsNoticeVisible(false)
+    }, 15000)
+
+    const removeTimerId = window.setTimeout(() => {
+      setNotice(null)
+    }, 15300)
+
+    return () => {
+      window.clearTimeout(hideTimerId)
+      window.clearTimeout(removeTimerId)
+    }
+  }, [notice])
+
+  const getEffectiveDateRange = () => {
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(today.getDate() - 1)
+    const last7DaysStart = new Date(today)
+    last7DaysStart.setDate(today.getDate() - 6)
+    const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+
+    if (datePreset === "TODAY") {
+      const value = formatInputDate(today)
+      return { start: value, end: value }
+    }
+
+    if (datePreset === "YESTERDAY") {
+      const value = formatInputDate(yesterday)
+      return { start: value, end: value }
+    }
+
+    if (datePreset === "LAST_7_DAYS") {
+      return { start: formatInputDate(last7DaysStart), end: formatInputDate(today) }
+    }
+
+    if (datePreset === "THIS_MONTH") {
+      return { start: formatInputDate(thisMonthStart), end: formatInputDate(today) }
+    }
+
+    if (datePreset === "SINGLE") {
+      return startDate ? { start: startDate, end: startDate } : { start: "", end: "" }
+    }
+
+    if (datePreset === "CUSTOM") {
+      return { start: startDate, end: endDate || startDate }
+    }
+
+    return { start: "", end: "" }
+  }
+
+  const buildTransactionParams = (includePagination = true) => {
+    const params = new URLSearchParams()
+
+    if (includePagination) {
+      params.set("page", currentPage.toString())
+      params.set("per_page", "10")
+    }
+
+    if (appliedSearchQuery) params.set("search", appliedSearchQuery)
+
+    const effectiveRange = getEffectiveDateRange()
+    if (effectiveRange.start) params.set("start_date", effectiveRange.start)
+    if (effectiveRange.end) params.set("end_date", effectiveRange.end)
+
+    return params
+  }
+
   const fetchData = async () => {
     try {
       setIsLoading(true)
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        per_page: "10",
-      })
-
-      if (statusFilter !== "ALL") params.set("status", statusFilter)
-      if (paymentFilter !== "ALL") params.set("payment_method", paymentFilter)
-      if (appliedSearchQuery) params.set("search", appliedSearchQuery)
+      const params = buildTransactionParams()
 
       const res = await fetch(apiUrl(`/api/transactions?${params.toString()}`), {
         headers: { "Authorization": `Bearer ${token}` }
@@ -173,7 +382,7 @@ export default function TransactionsPage() {
     if (token) {
       fetchData()
     }
-  }, [token, currentPage, statusFilter, paymentFilter, appliedSearchQuery])
+  }, [token, currentPage, appliedSearchQuery, datePreset, startDate, endDate])
 
   const pendingTransactions = transactions.filter(trx => trx.status === "PENDING" && trx.payment_method === "QRIS")
 
@@ -188,37 +397,90 @@ export default function TransactionsPage() {
     })
   }
 
-  const exportToCSV = () => {
-    const headers = ["RECEIPT NO", "DATE", "CUSTOMER", "PAYMENT", "SUBTOTAL", "DISCOUNT", "SERVICE CHARGE", "TAX", "TOTAL", "STATUS"]
-    const rows = transactions.map(trx => [
-      trx.transaction_number,
-      formatDate(trx.created_at),
-      trx.customer?.name || "Walk-in",
-      trx.payment_method,
-      trx.subtotal,
-      trx.discount,
-      trx.service_charge,
-      trx.tax,
-      trx.total_amount,
-      trx.status
-    ])
+  const exportToCSV = async () => {
+    setNotice(null)
 
-    const csvContent = "data:text/csv;charset=utf-8,"
-      + [headers.join(","), ...rows.map(e => e.join(","))].join("\n")
+    try {
+      const params = buildTransactionParams(false)
+      params.set("format", "excel")
+      const res = await fetch(apiUrl(`/api/reports/export?${params.toString()}`), {
+        headers: { "Authorization": `Bearer ${token}` },
+      })
 
-    const encodedUri = encodeURI(csvContent)
-    const link = document.createElement("a")
-    link.setAttribute("href", encodedUri)
-    link.setAttribute("download", `transactions_export_${new Date().getTime()}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
+      if (!res.ok) {
+        throw new Error("Gagal mengekspor Excel")
+      }
+
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const contentDisposition = res.headers.get("Content-Disposition") || ""
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/)
+      const filename = filenameMatch?.[1] || `transaksi_${Date.now()}.xlsx`
+
+      const link = document.createElement("a")
+      link.href = url
+      link.setAttribute("download", filename)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+
+      setNotice({
+        type: "success",
+        message: "Excel transaksi berhasil diekspor sesuai filter aktif.",
+      })
+    } catch (error: any) {
+      setNotice({
+        type: "error",
+        message: error.message || "Gagal mengekspor Excel.",
+      })
+    }
   }
 
   const applySearch = () => {
     setCurrentPage(1)
     setAppliedSearchQuery(searchQuery.trim())
   }
+
+  const handleDatePresetChange = (value: string) => {
+    setDatePreset(value)
+    setCurrentPage(1)
+
+    if (value !== "SINGLE" && value !== "CUSTOM") {
+      setStartDate("")
+      setEndDate("")
+      setIsDatePickerOpen(false)
+    }
+
+    if (value === "SINGLE" && !startDate) {
+      setStartDate(formatInputDate(new Date()))
+      setEndDate("")
+      setIsDatePickerOpen(true)
+    }
+
+    if (value === "CUSTOM" && !startDate) {
+      setStartDate(formatInputDate(new Date()))
+      setEndDate(formatInputDate(new Date()))
+      setIsDatePickerOpen(true)
+    }
+
+    if (value === "SINGLE" || value === "CUSTOM") {
+      setIsDatePickerOpen(true)
+    }
+  }
+
+  const resetFilters = () => {
+    setSearchQuery("")
+    setAppliedSearchQuery("")
+    setDatePreset("ALL")
+    setStartDate("")
+    setEndDate("")
+    setCurrentPage(1)
+  }
+
+  const effectiveDateRange = getEffectiveDateRange()
+  const hasActiveFilters = Boolean(appliedSearchQuery)
+    || Boolean(effectiveDateRange.start || effectiveDateRange.end)
 
   const updateTransactionInState = (updated: Transaction) => {
     setTransactions(prev => prev.map(trx => (
@@ -363,7 +625,7 @@ export default function TransactionsPage() {
             : notice.type === "success"
               ? "border-emerald-200 bg-emerald-50 text-emerald-700"
               : "border-blue-200 bg-blue-50 text-blue-700"
-        }`}>
+        } transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`}>
           {notice.type === "error" ? (
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           ) : (
@@ -388,67 +650,105 @@ export default function TransactionsPage() {
             variant="secondary"
             size="sm"
             onPress={() => {
-              setStatusFilter("PENDING")
-              setPaymentFilter("QRIS")
+              setAppliedSearchQuery("")
+              setDatePreset("ALL")
+              setStartDate("")
+              setEndDate("")
               setCurrentPage(1)
             }}
           >
-            Fokus Pending
+            Lihat Semua
           </Button>
         </div>
       )}
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
-          <Input
-            type="search"
-            placeholder="Cari nomor struk atau pelanggan..."
-            className="pl-8"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                applySearch()
-              }
-            }}
-          />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {statusOptions.map((status) => (
-            <Button
-              key={status}
-              size="sm"
-              variant={statusFilter === status ? "primary" : "outline"}
-              onPress={() => {
-                setStatusFilter(status)
-                setCurrentPage(1)
+      <div className="flex flex-col gap-3 rounded-2xl border border-default-200 bg-white p-4 shadow-sm">
+        <div className="grid gap-3 xl:grid-cols-[minmax(260px,1fr)_220px_auto_auto_auto] xl:items-center">
+          <div className="relative min-w-0">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+            <Input
+              type="search"
+              placeholder="Cari nomor struk atau pelanggan..."
+              className="pl-8"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  applySearch()
+                }
               }}
-            >
-              {statusLabel[status]}
+            />
+          </div>
+          <select
+            className="h-10 rounded-xl border border-default-200 bg-background px-3 text-sm font-medium shadow-sm"
+            value={datePreset}
+            onChange={(e) => handleDatePresetChange(e.target.value)}
+          >
+            {datePresetOptions.map((preset) => (
+              <option key={preset.value} value={preset.value}>{preset.label}</option>
+            ))}
+          </select>
+          {(datePreset === "SINGLE" || datePreset === "CUSTOM") && (
+            <div className="relative xl:col-span-2">
+              <Button
+                variant="outline"
+                className="w-full justify-start sm:w-[360px]"
+                onPress={() => setIsDatePickerOpen((open) => !open)}
+              >
+                <CalendarDays className="h-4 w-4 mr-2" inline-block="true" />
+                {datePreset === "SINGLE"
+                  ? (startDate ? formatFilterDate(startDate) : "Pilih tanggal")
+                  : effectiveDateRange.start && effectiveDateRange.end
+                    ? `${formatFilterDate(effectiveDateRange.start)} - ${formatFilterDate(effectiveDateRange.end)}`
+                    : "Pilih rentang tanggal"}
+              </Button>
+              {isDatePickerOpen && (
+                <CalendarPicker
+                  mode={datePreset === "SINGLE" ? "single" : "range"}
+                  startDate={startDate}
+                  endDate={datePreset === "SINGLE" ? "" : endDate}
+                  onChange={(start, end) => {
+                    setStartDate(start)
+                    setEndDate(end)
+                    setCurrentPage(1)
+                    if (datePreset === "SINGLE" || end) {
+                      setIsDatePickerOpen(false)
+                    }
+                  }}
+                />
+              )}
+            </div>
+          )}
+          <Button variant="outline" onPress={applySearch}>
+            <Search className="h-4 w-4 mr-2" inline-block="true" />
+            Cari
+          </Button>
+          {hasActiveFilters && (
+            <Button variant="ghost" onPress={resetFilters}>
+              <RotateCcw className="h-4 w-4 mr-2" inline-block="true" />
+              Reset
             </Button>
-          ))}
+          )}
+          <Button variant="primary" onPress={exportToCSV}>
+            <Download className="h-4 w-4 mr-2" inline-block="true" />
+            Export Excel
+          </Button>
         </div>
-        <select
-          className="h-10 rounded-xl border border-default-200 bg-background px-3 text-sm font-medium shadow-sm"
-          value={paymentFilter}
-          onChange={(e) => {
-            setPaymentFilter(e.target.value)
-            setCurrentPage(1)
-          }}
-        >
-          {paymentOptions.map((payment) => (
-            <option key={payment} value={payment}>{paymentLabel[payment]}</option>
-          ))}
-        </select>
-        <Button variant="outline" onPress={applySearch}>
-          <Filter className="h-4 w-4 mr-2" inline-block="true" />
-          Terapkan
-        </Button>
-        <Button variant="outline" onPress={exportToCSV}>
-          <Download className="h-4 w-4 mr-2" inline-block="true" />
-          Ekspor CSV
-        </Button>
+
+        {hasActiveFilters && (
+          <div className="flex flex-wrap gap-2 border-t border-default-100 pt-3">
+            {appliedSearchQuery && (
+              <Chip variant="soft" color="default">Cari: {appliedSearchQuery}</Chip>
+            )}
+            {effectiveDateRange.start && effectiveDateRange.end && (
+              <Chip variant="soft" color="warning">
+                Tanggal: {effectiveDateRange.start === effectiveDateRange.end
+                  ? formatFilterDate(effectiveDateRange.start)
+                  : `${formatFilterDate(effectiveDateRange.start)} - ${formatFilterDate(effectiveDateRange.end)}`}
+              </Chip>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="bg-background rounded-xl border border-default-200 shadow-sm overflow-x-auto w-full">
@@ -490,7 +790,7 @@ export default function TransactionsPage() {
                         variant="soft"
                         size="sm"
                       >
-                        {trx.status}
+                        {statusLabel[trx.status] || trx.status}
                       </Chip>
                     </TableCell>
                     <TableCell className="py-3 px-4">

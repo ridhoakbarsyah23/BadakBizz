@@ -2,7 +2,6 @@
 
 import { apiUrl } from "@/lib/api"
 import { useState, useEffect, type CSSProperties } from "react"
-import Link from "next/link"
 import { QRCodeSVG } from "qrcode.react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,13 +19,7 @@ import {
   Loader2,
   CheckCircle2,
   AlertTriangle,
-  Armchair,
-  Clock3,
-  Eye,
-  ExternalLink,
-  RefreshCw,
-  UserRound,
-  XCircle
+  RefreshCw
 } from "lucide-react"
 import {
   Dialog,
@@ -77,35 +70,27 @@ export default function POSPage() {
   // QRIS dynamic state
   const [qrisString, setQrisString] = useState<string | null>(null)
   const [qrisDialogTransaction, setQrisDialogTransaction] = useState<any | null>(null)
-  const [pendingQrisTransactions, setPendingQrisTransactions] = useState<any[]>([])
-  const [pendingQrisActionId, setPendingQrisActionId] = useState<number | null>(null)
-  const [pendingQrisLastRefresh, setPendingQrisLastRefresh] = useState<Date | null>(null)
-  const [pendingCancelQrisTransaction, setPendingCancelQrisTransaction] = useState<any | null>(null)
   const [isCartModalOpen, setIsCartModalOpen] = useState(false)
 
   const fetchProductsAndCustomers = async () => {
     setIsLoading(true)
     try {
       const headers = { "Authorization": `Bearer ${token}` }
-      const [productsRes, customersRes, settingsRes, tablesRes, pendingQrisRes] = await Promise.all([
+      const [productsRes, customersRes, settingsRes, tablesRes] = await Promise.all([
         fetch(apiUrl('/api/products'), { headers }),
         fetch(apiUrl('/api/customers'), { headers }),
         fetch(apiUrl('/api/settings'), { headers }),
-        fetch(apiUrl('/api/tables'), { headers }),
-        fetch(apiUrl('/api/transactions?status=PENDING&payment_method=QRIS&per_page=5'), { headers })
+        fetch(apiUrl('/api/tables'), { headers })
       ])
       
       const productsData = await productsRes.json()
       const customersData = await customersRes.json()
       const settingsData = await settingsRes.json()
       const tablesData = await tablesRes.json()
-      const pendingQrisData = await pendingQrisRes.json()
       
       setProducts(Array.isArray(productsData) ? productsData : [])
       setCustomers(Array.isArray(customersData) ? customersData : [])
       setTables(Array.isArray(tablesData) ? tablesData : [])
-      setPendingQrisTransactions(Array.isArray(pendingQrisData?.data) ? pendingQrisData.data : [])
-      setPendingQrisLastRefresh(new Date())
       if (settingsData && settingsData.name) {
         setStoreSettings(settingsData)
       }
@@ -291,6 +276,20 @@ export default function POSPage() {
   const tax = Math.round((netAfterDiscount + serviceCharge) * taxRate)
   const total = netAfterDiscount + serviceCharge + tax
 
+  const formatCurrency = (value: number | string | null | undefined) => {
+    return Math.round(Number(value || 0)).toLocaleString("id-ID")
+  }
+
+  const formatReceiptDate = () => {
+    return new Date().toLocaleString("id-ID", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
   const handleCheckout = async (paymentMethod: string, paymentAmount: number) => {
     if (!canCheckout) {
       setNotice({
@@ -363,7 +362,7 @@ export default function POSPage() {
               paymentMethod,
               paymentAmount,
               change: paymentAmount - Number(txn?.total_amount ?? total),
-              date: new Date().toLocaleString("id-ID"),
+              date: formatReceiptDate(),
               cashierName: user?.name || 'Unknown',
               customerName: selectedCustomer ? selectedCustomer.name : 'Walk-in',
               tableName: selectedTable ? selectedTable.name : null
@@ -398,7 +397,7 @@ export default function POSPage() {
             paymentMethod,
             paymentAmount,
             change: paymentAmount - Number(txn?.total_amount ?? total),
-            date: new Date().toLocaleString("id-ID"),
+            date: formatReceiptDate(),
             cashierName: user?.name || 'Unknown',
             customerName: selectedCustomer ? selectedCustomer.name : 'Walk-in',
             tableName: selectedTable ? selectedTable.name : null
@@ -437,148 +436,26 @@ export default function POSPage() {
   }
 
   const handlePrint = () => {
+    const receiptWidth = Number(storeSettings.receipt_width || 80)
+    const itemCount = Math.max(receiptData?.items?.length || 1, 1)
+    const receiptHeight = Math.min(260, Math.max(105, 82 + itemCount * 10))
+    const printStyleId = "receipt-print-page-size"
+    const previousStyle = document.getElementById(printStyleId)
+    previousStyle?.remove()
+
+    const printStyle = document.createElement("style")
+    printStyle.id = printStyleId
+    printStyle.textContent = `@page { size: ${receiptWidth}mm ${receiptHeight}mm; margin: 0; }`
+    document.head.appendChild(printStyle)
+
+    const removePrintStyle = () => {
+      printStyle.remove()
+      window.removeEventListener("afterprint", removePrintStyle)
+    }
+
+    window.addEventListener("afterprint", removePrintStyle)
+    window.setTimeout(removePrintStyle, 2000)
     window.print()
-  }
-
-  const formatPendingQrisTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
-  const formatPendingQrisAge = (dateString: string) => {
-    const createdAt = new Date(dateString).getTime()
-    const referenceTime = pendingQrisLastRefresh?.getTime() ?? createdAt
-    const diffInMinutes = Math.max(0, Math.floor((referenceTime - createdAt) / 60000))
-
-    if (diffInMinutes < 1) {
-      return "< 1 menit"
-    }
-
-    if (diffInMinutes < 60) {
-      return `${diffInMinutes} menit`
-    }
-
-    const hours = Math.floor(diffInMinutes / 60)
-    const minutes = diffInMinutes % 60
-
-    return minutes > 0 ? `${hours} jam ${minutes} menit` : `${hours} jam`
-  }
-
-  const formatLastPendingQrisRefresh = () => {
-    if (!pendingQrisLastRefresh) {
-      return "belum diperbarui"
-    }
-
-    return pendingQrisLastRefresh.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
-  const refreshPendingQris = async () => {
-    if (!token) return
-
-    try {
-      const res = await fetch(apiUrl('/api/transactions?status=PENDING&payment_method=QRIS&per_page=5'), {
-        headers: { "Authorization": `Bearer ${token}` }
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setPendingQrisTransactions(Array.isArray(data?.data) ? data.data : [])
-        setPendingQrisLastRefresh(new Date())
-      }
-    } catch {
-      setNotice({
-        type: "error",
-        message: "Gagal memuat daftar QRIS pending.",
-      })
-    }
-  }
-
-  useEffect(() => {
-    if (!token) return
-
-    const intervalId = setInterval(() => {
-      refreshPendingQris()
-    }, 45000)
-
-    return () => clearInterval(intervalId)
-  }, [token])
-
-  const handleShowPendingQris = (transaction: any) => {
-    if (!transaction.qris_string) {
-      setNotice({
-        type: "error",
-        message: "QRIS transaksi ini belum tersimpan. Cek dari Riwayat Transaksi atau buat ulang pembayaran.",
-      })
-      return
-    }
-
-    setQrisString(transaction.qris_string)
-    setQrisDialogTransaction(transaction)
-    setIsQrisOpen(true)
-  }
-
-  const handleCheckPendingQrisStatus = async (transaction: any) => {
-    setPendingQrisActionId(transaction.id)
-    setNotice(null)
-
-    try {
-      const res = await fetch(apiUrl(`/api/qris/status/${transaction.transaction_number}`), {
-        headers: { "Authorization": `Bearer ${token}` }
-      })
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.message || "Gagal mengecek status QRIS")
-      }
-
-      setNotice({
-        type: data.transaction_status === "PENDING" ? "info" : "success",
-        message: `Status ${transaction.transaction_number}: ${data.transaction_status}`,
-      })
-      fetchProductsAndCustomers()
-    } catch (error: any) {
-      setNotice({
-        type: "error",
-        message: error.message || "Gagal mengecek status QRIS",
-      })
-    } finally {
-      setPendingQrisActionId(null)
-    }
-  }
-
-  const handleCancelPendingQris = async (transaction: any) => {
-    setPendingQrisActionId(transaction.id)
-    setNotice(null)
-
-    try {
-      const res = await fetch(apiUrl(`/api/transactions/${transaction.id}/cancel-pending-qris`), {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}` }
-      })
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.message || "Gagal membatalkan QRIS pending")
-      }
-
-      setNotice({
-        type: "success",
-        message: `QRIS pending ${transaction.transaction_number} berhasil dibatalkan.`,
-      })
-      setPendingCancelQrisTransaction(null)
-      fetchProductsAndCustomers()
-    } catch (error: any) {
-      setNotice({
-        type: "error",
-        message: error.message || "Gagal membatalkan QRIS pending",
-      })
-    } finally {
-      setPendingQrisActionId(null)
-    }
   }
 
   return (
@@ -711,115 +588,6 @@ export default function POSPage() {
                     {cart.reduce((sum, item) => sum + item.qty, 0)} items
                   </Badge>
                </div>
-
-               {pendingQrisTransactions.length > 0 && (
-                 <div className="border-b border-slate-100 bg-amber-50/70 p-4">
-                   <div className="mb-3 flex items-center justify-between gap-3">
-                     <div>
-                       <div className="flex items-center gap-2 text-sm font-black text-amber-800">
-                         <Clock3 className="h-4 w-4" />
-                         QRIS Pending
-                       </div>
-                       <div className="mt-0.5 text-[11px] font-medium text-amber-700">
-                         Auto-refresh tiap 45 detik. Terakhir {formatLastPendingQrisRefresh()}.
-                       </div>
-                     </div>
-                     <Button
-                       variant="ghost"
-                       size="icon"
-                       className="h-8 w-8 rounded-lg text-amber-700 hover:bg-amber-100"
-                       onClick={refreshPendingQris}
-                       disabled={pendingQrisActionId !== null}
-                     >
-                       <RefreshCw className="h-4 w-4" />
-                     </Button>
-                   </div>
-                   <div className="space-y-2">
-                     {pendingQrisTransactions.map(transaction => (
-                       <div
-                         key={transaction.id}
-                         className="rounded-xl border border-amber-200 bg-white p-3 shadow-sm"
-                       >
-                         <div className="flex items-start justify-between gap-3">
-                           <div className="min-w-0">
-                             <div className="truncate text-xs font-bold text-slate-900">
-                               {transaction.transaction_number}
-                             </div>
-                             <div className="mt-1 text-[11px] font-medium text-slate-500">
-                               {formatPendingQrisTime(transaction.created_at)} - {transaction.customer?.name || "Walk-in"}
-                             </div>
-                           </div>
-                           <div className="shrink-0 text-right text-sm font-black text-amber-700">
-                             Rp {Number(transaction.total_amount || 0).toLocaleString("id-ID")}
-                           </div>
-                         </div>
-                         <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-amber-50/70 p-2 text-[11px] font-medium text-slate-600">
-                           <div className="flex min-w-0 items-center gap-1.5">
-                             <Clock3 className="h-3.5 w-3.5 shrink-0 text-amber-700" />
-                             <span className="truncate">Umur {formatPendingQrisAge(transaction.created_at)}</span>
-                           </div>
-                           <div className="flex min-w-0 items-center gap-1.5">
-                             <Armchair className="h-3.5 w-3.5 shrink-0 text-amber-700" />
-                             <span className="truncate">{transaction.table?.name || "Takeaway"}</span>
-                           </div>
-                           <div className="col-span-2 flex min-w-0 items-center gap-1.5">
-                             <UserRound className="h-3.5 w-3.5 shrink-0 text-amber-700" />
-                             <span className="truncate">Kasir: {transaction.cashier?.name || "Tidak tercatat"}</span>
-                           </div>
-                         </div>
-                         <div className="mt-3 grid grid-cols-2 gap-2">
-                           <Button
-                             variant="outline"
-                             size="sm"
-                             className="h-9 rounded-lg border-slate-200 px-2 text-xs"
-                             onClick={() => handleShowPendingQris(transaction)}
-                             disabled={pendingQrisActionId !== null}
-                           >
-                             <Eye className="mr-1 h-3.5 w-3.5" />
-                             QR
-                           </Button>
-                           <Link href="/transactions">
-                             <Button
-                               variant="outline"
-                               size="sm"
-                               className="h-9 w-full rounded-lg border-slate-200 px-2 text-xs"
-                               disabled={pendingQrisActionId !== null}
-                             >
-                               <ExternalLink className="mr-1 h-3.5 w-3.5" />
-                               Riwayat
-                             </Button>
-                           </Link>
-                           <Button
-                             variant="outline"
-                             size="sm"
-                             className="h-9 rounded-lg border-blue-200 px-2 text-xs text-blue-700 hover:bg-blue-50"
-                             onClick={() => handleCheckPendingQrisStatus(transaction)}
-                             disabled={pendingQrisActionId !== null}
-                           >
-                             {pendingQrisActionId === transaction.id ? (
-                               <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                             ) : (
-                               <RefreshCw className="mr-1 h-3.5 w-3.5" />
-                             )}
-                             Cek
-                           </Button>
-                           <Button
-                             variant="outline"
-                             size="sm"
-                             className="h-9 rounded-lg border-red-200 px-2 text-xs text-red-700 hover:bg-red-50"
-                             onClick={() => setPendingCancelQrisTransaction(transaction)}
-                             disabled={pendingQrisActionId !== null}
-                           >
-                             <XCircle className="mr-1 h-3.5 w-3.5" />
-                             Batal
-                           </Button>
-                         </div>
-                       </div>
-                     ))}
-                   </div>
-                 </div>
-               )}
-
 
                <div className="p-6 flex flex-col gap-3 shrink-0">
                   <AnimatePresence>
@@ -1042,48 +810,6 @@ export default function POSPage() {
                </div>
       </div>
     </div>
-        {/* Cancel Pending QRIS Confirmation */}
-          <Dialog
-            open={Boolean(pendingCancelQrisTransaction)}
-            onOpenChange={(open) => !open && setPendingCancelQrisTransaction(null)}
-          >
-            <DialogContent className="!max-w-sm w-[95vw] sm:w-full rounded-2xl">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-red-700">
-                  <AlertTriangle className="h-5 w-5" />
-                  Batalkan QRIS Pending?
-                </DialogTitle>
-                <DialogDescription>
-                  Transaksi {pendingCancelQrisTransaction?.transaction_number} akan dibatalkan. Stok produk dan status meja akan dikembalikan.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  className="rounded-xl font-semibold"
-                  onClick={() => setPendingCancelQrisTransaction(null)}
-                  disabled={pendingQrisActionId !== null}
-                >
-                  Tidak Jadi
-                </Button>
-                <Button
-                  className="rounded-xl bg-red-600 font-bold text-white hover:bg-red-700"
-                  onClick={() => pendingCancelQrisTransaction && handleCancelPendingQris(pendingCancelQrisTransaction)}
-                  disabled={pendingQrisActionId !== null}
-                >
-                  {pendingQrisActionId === pendingCancelQrisTransaction?.id ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Membatalkan...
-                    </>
-                  ) : (
-                    "Batalkan QRIS"
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
         {/* Variant Picker Dialog */}
           <Dialog open={Boolean(variantProduct)} onOpenChange={(open) => !open && setVariantProduct(null)}>
             <DialogContent className="!max-w-md w-[95vw] sm:w-full rounded-2xl">
@@ -1229,110 +955,120 @@ export default function POSPage() {
 
           {/* Receipt Dialog */}
           <Dialog open={isReceiptOpen} onOpenChange={setIsReceiptOpen}>
-            <DialogContent className="!max-w-sm w-[95vw] sm:w-full rounded-2xl">
-              <div className="flex flex-col items-center pt-6 pb-2 text-center">
+            <DialogContent className="flex h-[min(92dvh,860px)] !max-w-[min(96vw,440px)] w-[96vw] max-h-[calc(100dvh-1rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0">
+              <div className="shrink-0 px-5 pt-5 pb-3 text-center sm:pt-6">
                 <motion.div 
                   initial={{ scale: 0, rotate: -180 }}
                   animate={{ scale: 1, rotate: 0 }}
                   transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                  className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-4"
+                  className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 sm:mb-4 sm:h-16 sm:w-16"
                 >
-                  <CheckCircle2 className="w-10 h-10" />
+                  <CheckCircle2 className="h-7 w-7 sm:h-10 sm:w-10" />
                 </motion.div>
-                <h2 className="text-2xl font-black text-default-900">Pembayaran Berhasil!</h2>
-                <p className="text-default-500 mt-1">Transaksi telah tersimpan.</p>
+                <h2 className="text-xl font-black text-default-900 sm:text-2xl">Pembayaran Berhasil!</h2>
+                <p className="mt-1 text-sm text-default-500 sm:text-base">Transaksi telah tersimpan.</p>
               </div>
 
               {/* Printable Receipt Area */}
-              <div
-                id="printable-receipt"
-                style={{ "--receipt-width": `${Number(storeSettings.receipt_width || 80)}mm` } as CSSProperties}
-                className="bg-white text-black text-sm print:text-[10px] font-mono flex flex-col gap-2 rounded-xl border shadow-sm mx-auto mb-2 p-5 print:m-0"
-              >
-                <div className="receipt-text text-center font-bold text-lg print:text-[13px] leading-tight mb-1">
-                  {storeSettings.receipt_header || storeSettings.name || 'BadakBizz'}
-                </div>
-                <div className="receipt-text text-center text-xs print:text-[9px] leading-snug font-normal text-gray-600 print:text-black mb-3">
-                  {storeSettings.address || 'Alamat Toko'}<br />
-                  Telp: {storeSettings.phone || '-'}
-                </div>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3 sm:px-5">
+                <div
+                  id="printable-receipt"
+                  style={{ "--receipt-width": `${Number(storeSettings.receipt_width || 80)}mm` } as CSSProperties}
+                  className="bg-white text-black text-[13px] sm:text-sm print:text-[10px] font-mono flex max-w-full flex-col gap-2 rounded-xl border shadow-sm mx-auto mb-2 p-4 sm:p-5 print:m-0"
+                >
+                  <div className="receipt-text text-center font-bold text-lg print:text-[13px] leading-tight mb-1">
+                    {storeSettings.receipt_header || storeSettings.name || 'BadakBizz'}
+                  </div>
+                  <div className="receipt-text text-center text-xs print:text-[9px] leading-snug font-normal text-gray-600 print:text-black mb-3">
+                    {storeSettings.address || 'Alamat Toko'}<br />
+                    Telp: {storeSettings.phone || '-'}
+                  </div>
 
-                <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2"></div>
+                  <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2"></div>
 
-                <div className="receipt-row text-xs print:text-[9px] mb-2 font-medium text-gray-600 print:text-black">
-                  <span className="receipt-text">{receiptData?.date}</span>
-                  <span className="receipt-value receipt-text">{receiptData?.transaction_number}</span>
-                </div>
-                <div className="receipt-row text-xs print:text-[9px] mb-2 font-medium text-gray-600 print:text-black">
-                  <span className="receipt-text">Kasir: {receiptData?.cashierName}</span>
-                  <span className="receipt-value receipt-text">Pelanggan: {receiptData?.customerName}</span>
-                </div>
-                {receiptData?.tableName && (
+                  <div className="receipt-row text-xs print:text-[9px] font-medium text-gray-600 print:text-black">
+                    <span>Tanggal</span>
+                    <span className="receipt-value receipt-text">{receiptData?.date}</span>
+                  </div>
+                  <div className="receipt-row text-xs print:text-[9px] font-medium text-gray-600 print:text-black">
+                    <span>No</span>
+                    <span className="receipt-value receipt-text">{receiptData?.transaction_number}</span>
+                  </div>
+                  <div className="receipt-row text-xs print:text-[9px] font-medium text-gray-600 print:text-black">
+                    <span>Kasir</span>
+                    <span className="receipt-value receipt-text">{receiptData?.cashierName}</span>
+                  </div>
                   <div className="receipt-row text-xs print:text-[9px] mb-2 font-medium text-gray-600 print:text-black">
-                    <span>Meja</span>
-                    <span className="receipt-value receipt-text">{receiptData.tableName}</span>
+                    <span>Pelanggan</span>
+                    <span className="receipt-value receipt-text">{receiptData?.customerName}</span>
                   </div>
-                )}
-
-                <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 flex flex-col gap-2">
-                  {receiptData?.items.map((item: any, i: number) => (
-                    <div key={i} className="flex flex-col">
-                      <div className="receipt-row font-bold print:font-semibold print:text-black">
-                        <span className="receipt-text pr-1">{item.name}</span>
-                        <span className="receipt-value receipt-money">Rp {(item.selling_price * item.qty).toLocaleString("id-ID")}</span>
-                      </div>
-                      <div className="text-xs print:text-[9px] text-gray-500 print:text-black">
-                        {item.qty} x Rp {Number(item.selling_price).toLocaleString("id-ID")}
-                      </div>
+                  {receiptData?.tableName && (
+                    <div className="receipt-row text-xs print:text-[9px] mb-2 font-medium text-gray-600 print:text-black">
+                      <span>Meja</span>
+                      <span className="receipt-value receipt-text">{receiptData.tableName}</span>
                     </div>
-                  ))}
-                </div>
+                  )}
 
-                <div className="receipt-row text-xs print:text-[9px] print:text-black">
-                  <span>Subtotal</span>
-                  <span className="receipt-value receipt-money">Rp {receiptData?.subtotal.toLocaleString("id-ID")}</span>
-                </div>
-                {receiptData?.discount > 0 && (
-                  <div className="receipt-row text-xs print:text-[9px] print:text-black">
-                    <span>Diskon Member</span>
-                    <span className="receipt-value receipt-money">- Rp {receiptData?.discount.toLocaleString("id-ID")}</span>
+                  <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 flex flex-col gap-2">
+                    {receiptData?.items.map((item: any, i: number) => (
+                      <div key={i} className="receipt-item flex flex-col gap-0.5">
+                        <div className="receipt-text font-bold leading-snug print:font-semibold print:text-black">
+                          {item.name}
+                        </div>
+                        <div className="receipt-row text-xs text-gray-500 print:text-[9px] print:text-black">
+                          <span>{item.qty} x Rp {formatCurrency(item.selling_price)}</span>
+                          <span className="receipt-value receipt-money">Rp {formatCurrency(item.selling_price * item.qty)}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                )}
-                {receiptData?.service_charge > 0 && (
+
                   <div className="receipt-row text-xs print:text-[9px] print:text-black">
-                    <span className="receipt-text">Service Charge ({storeSettings.service_charge_rate}%)</span>
-                    <span className="receipt-value receipt-money">Rp {receiptData?.service_charge.toLocaleString("id-ID")}</span>
+                    <span>Subtotal</span>
+                    <span className="receipt-value receipt-money">Rp {formatCurrency(receiptData?.subtotal)}</span>
                   </div>
-                )}
-                <div className="receipt-row text-xs print:text-[9px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
-                  <span>Tax ({storeSettings.tax_rate}%)</span>
-                  <span className="receipt-value receipt-money">Rp {receiptData?.tax.toLocaleString("id-ID")}</span>
-                </div>
-                
-                <div className="receipt-row font-black text-lg print:text-[13px] mb-2 print:text-black">
-                  <span>TOTAL</span>
-                  <span className="receipt-value receipt-money">Rp {receiptData?.total.toLocaleString("id-ID")}</span>
-                </div>
+                  {receiptData?.discount > 0 && (
+                    <div className="receipt-row text-xs print:text-[9px] print:text-black">
+                      <span>Diskon Member</span>
+                      <span className="receipt-value receipt-money">- Rp {formatCurrency(receiptData?.discount)}</span>
+                    </div>
+                  )}
+                  {receiptData?.service_charge > 0 && (
+                    <div className="receipt-row text-xs print:text-[9px] print:text-black">
+                      <span className="receipt-text">Service Charge ({storeSettings.service_charge_rate}%)</span>
+                      <span className="receipt-value receipt-money">Rp {formatCurrency(receiptData?.service_charge)}</span>
+                    </div>
+                  )}
+                  <div className="receipt-row text-xs print:text-[9px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
+                    <span>Tax ({storeSettings.tax_rate}%)</span>
+                    <span className="receipt-value receipt-money">Rp {formatCurrency(receiptData?.tax)}</span>
+                  </div>
 
-                <div className="receipt-row text-xs print:text-[9px] print:text-black">
-                  <span>Bayar ({receiptData?.paymentMethod})</span>
-                  <span className="receipt-value receipt-money">Rp {receiptData?.paymentAmount.toLocaleString("id-ID")}</span>
-                </div>
-                <div className="receipt-row text-xs print:text-[9px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
-                  <span>Kembali</span>
-                  <span className="receipt-value receipt-money font-bold">Rp {receiptData?.change.toLocaleString("id-ID")}</span>
-                </div>
+                  <div className="receipt-row font-black text-lg print:text-[13px] mb-2 print:text-black">
+                    <span>TOTAL</span>
+                    <span className="receipt-value receipt-money">Rp {formatCurrency(receiptData?.total)}</span>
+                  </div>
 
-                <div className="receipt-text text-center text-xs print:text-[9px] mt-2 print:mt-1 italic text-gray-500 print:text-black">
-                  {storeSettings.receipt_footer || 'Terima kasih atas kunjungan Anda!'}
-                </div>
-                
-                <div className="print:hidden border-t border-dashed mt-4 pt-4 text-center text-xs text-muted-foreground">
-                  Ini adalah pratinjau struk yang akan dicetak.
+                  <div className="receipt-row text-xs print:text-[9px] print:text-black">
+                    <span>Bayar ({receiptData?.paymentMethod})</span>
+                    <span className="receipt-value receipt-money">Rp {formatCurrency(receiptData?.paymentAmount)}</span>
+                  </div>
+                  <div className="receipt-row text-xs print:text-[9px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
+                    <span>Kembali</span>
+                    <span className="receipt-value receipt-money font-bold">Rp {formatCurrency(receiptData?.change)}</span>
+                  </div>
+
+                  <div className="receipt-text text-center text-xs print:text-[9px] mt-2 print:mt-1 italic text-gray-500 print:text-black">
+                    {storeSettings.receipt_footer || 'Terima kasih atas kunjungan Anda!'}
+                  </div>
+
+                  <div className="print:hidden border-t border-dashed mt-4 pt-4 text-center text-xs text-muted-foreground">
+                    Ini adalah pratinjau struk yang akan dicetak.
+                  </div>
                 </div>
               </div>
 
-              <DialogFooter className="sm:justify-between px-2 pb-2">
+              <DialogFooter className="!mx-0 !mb-0 shrink-0 border-t px-5 py-3 sm:justify-between sm:py-4">
                 <Button variant="outline" className="rounded-xl font-semibold" onClick={() => setIsReceiptOpen(false)}>
                   Tutup
                 </Button>
