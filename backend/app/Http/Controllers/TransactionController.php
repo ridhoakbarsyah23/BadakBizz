@@ -11,10 +11,10 @@ use App\Models\Table;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
 use App\Services\TransactionStatusService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Carbon\Carbon;
 
 class TransactionController extends Controller
 {
@@ -221,6 +221,7 @@ class TransactionController extends Controller
                 // Record movement
                 InventoryMovement::create([
                     'product_id' => $product->id,
+                    'variant_id' => $item['variant'] ? $item['variant']->id : null,
                     'type' => 'OUT',
                     'quantity' => $item['quantity'],
                     'notes' => 'Sales Transaction '.$transaction->transaction_number.($item['variant'] ? ' - '.$item['variant']->name : ''),

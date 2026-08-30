@@ -376,6 +376,12 @@ class TransactionTest extends TestCase
 
         $this->assertSame(0, $product->fresh()->stock);
         $this->assertSame(2, $variant->fresh()->stock);
+        $this->assertDatabaseHas('inventory_movements', [
+            'product_id' => $product->id,
+            'variant_id' => $variant->id,
+            'type' => 'OUT',
+            'quantity' => 2,
+        ]);
 
         Sanctum::actingAs($this->admin());
 
@@ -383,6 +389,12 @@ class TransactionTest extends TestCase
 
         $this->assertSame(0, $product->fresh()->stock);
         $this->assertSame(4, $variant->fresh()->stock);
+        $this->assertDatabaseHas('inventory_movements', [
+            'product_id' => $product->id,
+            'variant_id' => $variant->id,
+            'type' => 'IN',
+            'quantity' => 2,
+        ]);
     }
 
     public function test_product_with_variants_requires_variant_id(): void

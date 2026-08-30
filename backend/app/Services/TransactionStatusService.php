@@ -60,6 +60,7 @@ class TransactionStatusService
 
                 InventoryMovement::create([
                     'product_id' => $item->product_id,
+                    'variant_id' => $item->variant_id,
                     'type' => 'IN',
                     'quantity' => $item->quantity,
                     'notes' => $notesPrefix.' '.$lockedTransaction->transaction_number.($item->variant ? ' - '.$item->variant->name : ''),

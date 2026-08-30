@@ -256,7 +256,7 @@ export default function POSPage() {
   const selectedTable = tables.find(t => t.id.toString() === selectedTableId)
   const tableManagementEnabled = storeSettings.enable_table_management == 1 || storeSettings.enable_table_management === true
   const availableTables = tables.filter(table => table.status === "available" || table.id.toString() === selectedTableId)
-  const requiresTable = tableManagementEnabled && orderType === "dine_in"
+  const requiresTable = tableManagementEnabled && orderType === "dine_in" && tables.length > 0
   const canCheckout = cart.length > 0 && (!requiresTable || Boolean(selectedTableId))
   const checkoutHint = cart.length === 0
     ? "Tambahkan produk ke keranjang untuk mulai checkout."
@@ -316,7 +316,7 @@ export default function POSPage() {
             quantity: item.qty
           })),
           customer_id: selectedCustomerId || null,
-          table_id: orderType === "dine_in" && selectedTableId ? selectedTableId : null,
+          table_id: tableManagementEnabled && orderType === "dine_in" && selectedTableId ? selectedTableId : null,
           payment_method: paymentMethod,
           payment_amount: paymentAmount,
           discount: discount,
@@ -659,7 +659,7 @@ export default function POSPage() {
 
             {tableManagementEnabled && orderType === "dine_in" && (
               <div className="flex flex-col gap-1.5 mb-2">
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Meja</label>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Nomor Meja</label>
                 <select
                   className={`w-full h-10 px-3 rounded-xl border bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer ${
                     requiresTable && !selectedTableId ? "border-amber-300" : "border-slate-200"
@@ -669,8 +669,9 @@ export default function POSPage() {
                     setSelectedTableId(e.target.value)
                     setNotice(null)
                   }}
+                  disabled={availableTables.length === 0}
                 >
-                  <option value="">Pilih meja dine-in</option>
+                  <option value="">{availableTables.length === 0 ? "Belum ada meja tersedia" : "Pilih nomor meja"}</option>
                   {availableTables.map(table => (
                     <option key={table.id} value={table.id.toString()}>
                       {table.name}{table.status !== "available" ? ` (${table.status})` : ""}
@@ -678,10 +679,13 @@ export default function POSPage() {
                   ))}
                 </select>
                 {tables.length === 0 && (
-                  <p className="text-xs text-amber-600 font-medium">Belum ada data meja. Tambahkan meja dari backend atau seed database.</p>
+                  <p className="text-xs text-amber-600 font-medium">Belum ada data meja. Tambahkan meja dari menu Manajemen Meja.</p>
+                )}
+                {tables.length > 0 && availableTables.length === 0 && (
+                  <p className="text-xs text-amber-600 font-medium">Semua meja sedang terpakai atau belum tersedia.</p>
                 )}
                 {requiresTable && !selectedTableId && tables.length > 0 && (
-                  <p className="text-xs text-amber-600 font-medium">Meja wajib dipilih untuk pesanan makan di tempat.</p>
+                  <p className="text-xs text-amber-600 font-medium">Nomor meja wajib dipilih untuk pesanan makan di tempat.</p>
                 )}
               </div>
             )}
