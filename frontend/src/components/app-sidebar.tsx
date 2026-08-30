@@ -16,7 +16,6 @@ import {
   X,
   UserCog,
   History,
-  ClipboardList,
   Loader2,
   Edit3,
   Armchair
@@ -65,7 +64,6 @@ const navGroups = [
     label: "Laporan",
     items: [
       { title: "Riwayat Transaksi", url: "/transactions", icon: History, roles: ['admin', 'cashier'] },
-      { title: "Laporan Shift", url: "/shifts", icon: ClipboardList, roles: ['admin'] },
       { title: "Laporan Keuangan", url: "/reports", icon: BarChart3, roles: ['admin'] },
     ]
   }

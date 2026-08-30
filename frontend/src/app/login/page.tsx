@@ -1,17 +1,17 @@
 "use client"
 
 import { apiUrl } from "@/lib/api"
-import React, { useState } from 'react'
-import { motion } from 'framer-motion'
-import { useAuth } from '@/context/AuthContext'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { Loader2, Eye, EyeOff } from 'lucide-react'
+import React, { useState } from "react"
+import { motion } from "framer-motion"
+import { useAuth } from "@/context/AuthContext"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Loader2, Eye, EyeOff } from "lucide-react"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const { login } = useAuth()
@@ -19,16 +19,16 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
-    setError('')
+    setError("")
 
     try {
-      const res = await fetch(apiUrl('/api/login'), {
-        method: 'POST',
+      const res = await fetch(apiUrl("/api/login"), {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          "Content-Type": "application/json",
+          Accept: "application/json",
         },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
       })
 
       const data = await res.json()
@@ -36,71 +36,79 @@ export default function LoginPage() {
       if (res.ok) {
         login(data.access_token || data.token, data.user)
       } else {
-        setError(data.message || 'Kredensial tidak valid')
+        setError(data.message || "Kredensial tidak valid")
       }
     } catch {
-      setError('Terjadi kesalahan jaringan. Silakan coba lagi.')
+      setError("Terjadi kesalahan jaringan. Silakan coba lagi.")
     } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-slate-50 p-4 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute top-0 left-0 w-full h-96 bg-primary/5 -skew-y-6 transform origin-top-left -z-10" />
+    <main className="relative grid h-dvh w-full place-items-center overflow-hidden bg-slate-50 px-4 py-3 sm:px-6 sm:py-4">
+      <div className="pointer-events-none absolute left-0 top-0 -z-10 h-72 w-full origin-top-left -skew-y-6 bg-primary/5 sm:h-96" />
 
-      <motion.div
+      <motion.section
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
-        className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden z-10"
+        className="z-10 w-full max-w-md overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-xl"
       >
-        <div className="p-8 sm:p-12">
-          <div className="flex flex-col items-center text-center mb-10">
-            <img src="/BadakBizz.jpeg" alt="BadakBizz Logo" className="w-16 h-16 rounded-2xl shadow-xl shadow-primary/30 object-cover mb-6" />
-            <h2 className="text-3xl font-black text-slate-900 tracking-tight">Selamat Datang</h2>
-            <p className="text-slate-500 mt-2 font-medium">Silakan masuk ke akun BadakBizz Anda.</p>
+        <div className="px-5 py-5 sm:px-8 sm:py-6 lg:px-10 lg:py-7 max-[700px]:py-4">
+          <div className="mb-5 flex flex-col items-center text-center sm:mb-6 max-[700px]:mb-4">
+            <img
+              src="/BadakBizz.jpeg"
+              alt="BadakBizz Logo"
+              className="mb-3 h-12 w-12 rounded-2xl object-cover shadow-xl shadow-primary/30 sm:h-14 sm:w-14 max-[700px]:h-10 max-[700px]:w-10"
+            />
+            <h2 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl max-[700px]:text-xl">
+              Selamat Datang
+            </h2>
+            <p className="mt-1.5 text-sm font-medium text-slate-500 sm:text-base max-[700px]:text-xs">
+              Silakan masuk ke akun BadakBizz Anda.
+            </p>
           </div>
 
           {error && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="bg-red-50 text-red-600 text-sm p-4 rounded-xl font-bold mb-6 border border-red-100 flex items-center justify-center text-center"
+              animate={{ opacity: 1, height: "auto" }}
+              className="mb-4 flex items-center justify-center rounded-xl border border-red-100 bg-red-50 p-3 text-center text-sm font-bold text-red-600 max-[700px]:p-2 max-[700px]:text-xs"
             >
               {error}
             </motion.div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700">Alamat Email</label>
+          <form onSubmit={handleSubmit} className="space-y-3 max-[700px]:space-y-2.5">
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-slate-700 max-[700px]:text-xs">Alamat Email</label>
               <Input
                 type="email"
                 placeholder="admin@badakbiz.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="h-12 rounded-xl bg-slate-50 border-slate-200 focus-visible:ring-primary focus-visible:bg-white transition-all font-medium"
+                className="h-10 rounded-xl border-slate-200 bg-slate-50 font-medium transition-all focus-visible:bg-white focus-visible:ring-primary sm:h-11 max-[700px]:h-9"
                 required
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700">Kata Sandi</label>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-slate-700 max-[700px]:text-xs">Kata Sandi</label>
               <div className="relative">
                 <Input
                   type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  placeholder="Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-12 rounded-xl bg-slate-50 border-slate-200 pr-12 focus-visible:ring-primary focus-visible:bg-white transition-all font-medium"
+                  className="h-10 rounded-xl border-slate-200 bg-slate-50 pr-12 font-medium transition-all focus-visible:bg-white focus-visible:ring-primary sm:h-11 max-[700px]:h-9"
                   required
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10 text-slate-400 hover:text-slate-700"
+                  className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-slate-400 hover:text-slate-700"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -110,12 +118,12 @@ export default function LoginPage() {
 
             <Button
               type="submit"
-              className="w-full h-14 rounded-xl font-black text-lg mt-4 shadow-lg shadow-primary/25 transition-transform hover:scale-[1.02] active:scale-[0.98]"
+              className="mt-3 h-11 w-full rounded-xl text-base font-black shadow-lg shadow-primary/25 transition-transform hover:scale-[1.02] active:scale-[0.98] sm:h-12 max-[700px]:h-10"
               disabled={isSubmitting}
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                   Sedang Masuk...
                 </>
               ) : (
@@ -124,25 +132,29 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 text-center">Akses Cepat (Demo)</p>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div
-                className="p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all group text-center"
-                onClick={() => { setEmail('admin@badakbiz.com'); setPassword('password'); }}
+          <div className="mt-5 border-t border-slate-100 pt-4 sm:mt-6 sm:pt-5 max-[700px]:mt-4 max-[700px]:pt-3">
+            <p className="mb-3 text-center text-xs font-bold uppercase tracking-wider text-slate-400 max-[700px]:mb-2">
+              Akses Cepat (Demo)
+            </p>
+            <div className="grid grid-cols-2 gap-3 text-sm max-[700px]:gap-2">
+              <button
+                type="button"
+                className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-center transition-all hover:border-primary/50 hover:bg-primary/5 group sm:p-3 max-[700px]:p-2"
+                onClick={() => { setEmail("admin@badakbiz.com"); setPassword("password") }}
               >
-                <div className="font-black text-slate-900 group-hover:text-primary">Admin</div>
-              </div>
-              <div
-                className="p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all group text-center"
-                onClick={() => { setEmail('cashier@badakbiz.com'); setPassword('password'); }}
+                <span className="font-black text-slate-900 group-hover:text-primary">Admin</span>
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-center transition-all hover:border-primary/50 hover:bg-primary/5 group sm:p-3 max-[700px]:p-2"
+                onClick={() => { setEmail("cashier@badakbiz.com"); setPassword("password") }}
               >
-                <div className="font-black text-slate-900 group-hover:text-primary">Kasir</div>
-              </div>
+                <span className="font-black text-slate-900 group-hover:text-primary">Kasir</span>
+              </button>
             </div>
           </div>
         </div>
-      </motion.div>
-    </div>
+      </motion.section>
+    </main>
   )
 }
