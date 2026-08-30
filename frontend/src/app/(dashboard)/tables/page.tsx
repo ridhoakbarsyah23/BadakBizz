@@ -31,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { AlertTriangle, Armchair, Edit2, Loader2, Plus, Trash2 } from "lucide-react"
+import { AlertTriangle, Armchair, CheckCircle2, Edit2, Loader2, Plus, Trash2 } from "lucide-react"
 
 type DiningTable = {
   id: number
@@ -64,6 +64,29 @@ export default function TablesPage() {
     status: "available" as DiningTable["status"],
   })
   const [error, setError] = useState("")
+  const [notice, setNotice] = useState<{
+    type: "success" | "error"
+    message: string
+  } | null>(null)
+  const [isNoticeVisible, setIsNoticeVisible] = useState(false)
+
+  useEffect(() => {
+    if (!notice) return
+
+    setIsNoticeVisible(true)
+
+    const hideTimerId = window.setTimeout(() => {
+      setIsNoticeVisible(false)
+    }, 15000)
+    const removeTimerId = window.setTimeout(() => {
+      setNotice(null)
+    }, 15300)
+
+    return () => {
+      window.clearTimeout(hideTimerId)
+      window.clearTimeout(removeTimerId)
+    }
+  }, [notice])
 
   const fetchTables = async () => {
     setIsLoading(true)
@@ -87,6 +110,7 @@ export default function TablesPage() {
   }, [token])
 
   const openCreate = () => {
+    setNotice(null)
     setEditingTable(null)
     setFormData({ name: "", status: "available" })
     setError("")
@@ -94,6 +118,7 @@ export default function TablesPage() {
   }
 
   const openEdit = (table: DiningTable) => {
+    setNotice(null)
     setEditingTable(table)
     setFormData({ name: table.name, status: table.status })
     setError("")
@@ -104,6 +129,7 @@ export default function TablesPage() {
     event.preventDefault()
     setIsSubmitting(true)
     setError("")
+    const actionLabel = editingTable ? "diperbarui" : "ditambahkan"
 
     try {
       const res = await fetch(
@@ -126,6 +152,10 @@ export default function TablesPage() {
 
       await fetchTables()
       setIsFormOpen(false)
+      setNotice({
+        type: "success",
+        message: `Meja ${formData.name} berhasil ${actionLabel}.`,
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal menyimpan meja")
     } finally {
@@ -137,6 +167,7 @@ export default function TablesPage() {
     if (!deleteTable) return
 
     setIsSubmitting(true)
+    const tableName = deleteTable.name
     try {
       const res = await fetch(apiUrl(`/api/tables/${deleteTable.id}`), {
         method: "DELETE",
@@ -150,8 +181,15 @@ export default function TablesPage() {
 
       await fetchTables()
       setDeleteTable(null)
+      setNotice({
+        type: "success",
+        message: `Meja ${tableName} berhasil dihapus.`,
+      })
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Gagal menghapus meja")
+      setNotice({
+        type: "error",
+        message: err instanceof Error ? err.message : "Gagal menghapus meja",
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -232,6 +270,23 @@ export default function TablesPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {notice && (
+        <div
+          className={
+            notice.type === "success"
+              ? `flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
+              : `flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
+          }
+        >
+          {notice.type === "success" ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+          )}
+          <span className="flex-1">{notice.message}</span>
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-3">
         {(["available", "occupied", "reserved"] as DiningTable["status"][]).map((status) => (

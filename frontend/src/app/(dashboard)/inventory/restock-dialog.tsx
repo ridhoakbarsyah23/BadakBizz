@@ -2,8 +2,8 @@
 
 import { apiUrl } from "@/lib/api"
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { Plus, Loader2 } from "lucide-react"
+import { useAuth } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,44 +17,64 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
-export function RestockDialog({ product }: { product: any }) {
+interface RestockDialogProps {
+  product: any
+  onRestocked?: (quantity: number) => Promise<void> | void
+}
+
+const onlyDigits = (value: string) => value.replace(/\D/g, "")
+const formatIndonesianNumber = (value: string) => {
+  const digits = onlyDigits(value)
+  return digits ? Number(digits).toLocaleString("id-ID") : ""
+}
+
+export function RestockDialog({ product, onRestocked }: RestockDialogProps) {
+  const { token } = useAuth()
   const [open, setOpen] = useState(false)
   const [quantity, setQuantity] = useState("")
   const [notes, setNotes] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
+  const [error, setError] = useState("")
 
   const handleRestock = async (e: React.FormEvent) => {
     e.preventDefault()
+    const parsedQuantity = Number(onlyDigits(quantity))
+
+    if (!parsedQuantity || parsedQuantity < 1) {
+      setError("Jumlah stok minimal 1.")
+      return
+    }
+
     setIsLoading(true)
+    setError("")
 
     try {
       const res = await fetch(apiUrl('/api/inventory/restock'), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json"
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
           product_id: product.id,
-          quantity: parseInt(quantity),
-          notes: notes
+          quantity: parsedQuantity,
+          notes: notes.trim() || null
         })
       })
 
+      const data = await res.json().catch(() => null)
+
       if (!res.ok) {
-        throw new Error("Gagal menambah stok")
+        throw new Error(data?.message || "Gagal menambah stok")
       }
 
-      alert(`Stok ${product.name} berhasil ditambahkan!`)
       setOpen(false)
       setQuantity("")
       setNotes("")
-      
-      // Refresh the page data
-      router.refresh()
-    } catch {
-      alert("Terjadi kesalahan saat menambah stok.")
+      await onRestocked?.(parsedQuantity)
+    } catch (err: any) {
+      setError(err.message || "Terjadi kesalahan saat menambah stok.")
     } finally {
       setIsLoading(false)
     }
@@ -77,14 +97,19 @@ export function RestockDialog({ product }: { product: any }) {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            {error && (
+              <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="quantity">Jumlah</Label>
               <Input
                 id="quantity"
-                type="number"
+                inputMode="numeric"
                 placeholder="Misal: 50"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
+                value={formatIndonesianNumber(quantity)}
+                onChange={(e) => setQuantity(onlyDigits(e.target.value))}
                 required
                 min="1"
                 disabled={isLoading}

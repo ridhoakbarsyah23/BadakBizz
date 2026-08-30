@@ -20,6 +20,29 @@ export default function InventoryPage() {
   
   const [movementPage, setMovementPage] = useState(1)
   const [totalMovementPages, setTotalMovementPages] = useState(1)
+  const [notice, setNotice] = useState<{
+    type: "success" | "error" | "info"
+    message: string
+  } | null>(null)
+  const [isNoticeVisible, setIsNoticeVisible] = useState(false)
+
+  useEffect(() => {
+    if (!notice) return
+
+    setIsNoticeVisible(true)
+
+    const hideTimerId = window.setTimeout(() => {
+      setIsNoticeVisible(false)
+    }, 15000)
+    const removeTimerId = window.setTimeout(() => {
+      setNotice(null)
+    }, 15300)
+
+    return () => {
+      window.clearTimeout(hideTimerId)
+      window.clearTimeout(removeTimerId)
+    }
+  }, [notice])
 
   const fetchData = async () => {
     setIsLoading(true)
@@ -63,6 +86,14 @@ export default function InventoryPage() {
 
   const lowStockCount = products.filter((p: any) => p.stock <= p.minimum_stock).length
 
+  const handleRestocked = async (product: any, quantity: number) => {
+    await fetchData()
+    setNotice({
+      type: "success",
+      message: `Stok ${product.name} berhasil ditambahkan sebanyak ${quantity.toLocaleString("id-ID")}.`,
+    })
+  }
+
   if (isLoading) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
@@ -77,6 +108,19 @@ export default function InventoryPage() {
         <h1 className="text-3xl font-bold tracking-tight">Stok Gudang</h1>
         <p className="text-muted-foreground">Kelola ketersediaan barang dan riwayat mutasi.</p>
       </div>
+
+      {notice && (
+        <div
+          className={
+            notice.type === "success"
+              ? `flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
+              : `flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
+          }
+        >
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <span className="flex-1">{notice.message}</span>
+        </div>
+      )}
 
       {lowStockCount > 0 && (
         <Card className="bg-red-50 border-red-200 shadow-none">
@@ -150,7 +194,7 @@ export default function InventoryPage() {
                               )}
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <RestockDialog product={product} />
+                              <RestockDialog product={product} onRestocked={(quantity) => handleRestocked(product, quantity)} />
                             </td>
                           </tr>
                         )

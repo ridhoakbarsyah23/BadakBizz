@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from "@/components/ui/dialog"
-import { Loader2, Plus, Edit2, ShieldAlert, ShieldCheck, Search } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Loader2, Plus, Edit2, ShieldAlert, ShieldCheck, Search } from "lucide-react"
 
 interface Role {
   id: number
@@ -51,6 +51,29 @@ export default function StaffPage() {
     role_id: "",
     is_active: true
   })
+  const [notice, setNotice] = useState<{
+    type: "success" | "error"
+    message: string
+  } | null>(null)
+  const [isNoticeVisible, setIsNoticeVisible] = useState(false)
+
+  useEffect(() => {
+    if (!notice) return
+
+    setIsNoticeVisible(true)
+
+    const hideTimerId = window.setTimeout(() => {
+      setIsNoticeVisible(false)
+    }, 15000)
+    const removeTimerId = window.setTimeout(() => {
+      setNotice(null)
+    }, 15300)
+
+    return () => {
+      window.clearTimeout(hideTimerId)
+      window.clearTimeout(removeTimerId)
+    }
+  }, [notice])
 
   const fetchData = async () => {
     setIsLoading(true)
@@ -86,6 +109,7 @@ export default function StaffPage() {
   }, [token, currentPage])
 
   const openDialog = (staff?: Staff) => {
+    setNotice(null)
     if (staff) {
       setEditingStaff(staff)
       setFormData({
@@ -111,6 +135,7 @@ export default function StaffPage() {
   const handleSave = async () => {
     setIsSaving(true)
     try {
+      const actionLabel = editingStaff ? "diperbarui" : "ditambahkan"
       const url = editingStaff 
         ? apiUrl(`/api/staff/${editingStaff.id}`)
         : apiUrl('/api/staff')
@@ -139,15 +164,25 @@ export default function StaffPage() {
       })
 
       if (res.ok) {
-        fetchData()
+        await fetchData()
         setIsDialogOpen(false)
+        setNotice({
+          type: "success",
+          message: `Data karyawan ${formData.name} berhasil ${actionLabel}.`,
+        })
       } else {
         const error = await res.json()
-        alert("Failed to save: " + (error.message || JSON.stringify(error.errors)))
+        setNotice({
+          type: "error",
+          message: error.message || JSON.stringify(error.errors) || "Gagal menyimpan data karyawan.",
+        })
       }
     } catch (error) {
       console.error("Save error:", error)
-      alert("Network error occurred")
+      setNotice({
+        type: "error",
+        message: "Terjadi gangguan jaringan saat menyimpan data karyawan.",
+      })
     } finally {
       setIsSaving(false)
     }
@@ -171,6 +206,23 @@ export default function StaffPage() {
           <Plus className="w-4 h-4 mr-2" /> Tambah Staf
         </Button>
       </div>
+
+      {notice && (
+        <div
+          className={
+            notice.type === "success"
+              ? `flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
+              : `flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
+          }
+        >
+          {notice.type === "success" ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+          )}
+          <span className="flex-1">{notice.message}</span>
+        </div>
+      )}
 
       <Card>
         <CardHeader className="py-4 px-6 border-b bg-slate-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

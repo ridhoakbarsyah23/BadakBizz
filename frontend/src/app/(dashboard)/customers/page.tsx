@@ -33,7 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Plus, Edit2, Trash2, Loader2, AlertTriangle, Search } from "lucide-react"
+import { Plus, Edit2, Trash2, Loader2, AlertTriangle, Search, CheckCircle2 } from "lucide-react"
 
 interface Customer {
   id: number
@@ -66,6 +66,29 @@ export default function CustomersPage() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, action: null as any, title: "", desc: "" })
+  const [notice, setNotice] = useState<{
+    type: "success" | "error"
+    message: string
+  } | null>(null)
+  const [isNoticeVisible, setIsNoticeVisible] = useState(false)
+
+  useEffect(() => {
+    if (!notice) return
+
+    setIsNoticeVisible(true)
+
+    const hideTimerId = window.setTimeout(() => {
+      setIsNoticeVisible(false)
+    }, 15000)
+    const removeTimerId = window.setTimeout(() => {
+      setNotice(null)
+    }, 15300)
+
+    return () => {
+      window.clearTimeout(hideTimerId)
+      window.clearTimeout(removeTimerId)
+    }
+  }, [notice])
 
   // Fetch data
   const fetchData = async () => {
@@ -108,6 +131,7 @@ export default function CustomersPage() {
 
   // Handlers
   const openCreateModal = () => {
+    setNotice(null)
     setModalMode("create")
     setFormData({ name: "", phone: "", email: "" })
     setSelectedCustomer(null)
@@ -115,6 +139,7 @@ export default function CustomersPage() {
   }
 
   const openEditModal = (customer: Customer) => {
+    setNotice(null)
     setModalMode("edit")
     setFormData({
       name: customer.name,
@@ -143,6 +168,7 @@ export default function CustomersPage() {
   const executeSubmit = async () => {
     try {
       setIsSubmitting(true)
+      const actionLabel = modalMode === 'create' ? 'ditambahkan' : 'diperbarui'
       const url = modalMode === 'create' 
         ? apiUrl('/api/customers')
         : apiUrl(`/api/customers/${selectedCustomer?.id}`)
@@ -158,12 +184,21 @@ export default function CustomersPage() {
         body: JSON.stringify(formData)
       })
 
-      if (!res.ok) throw new Error('Gagal menyimpan pelanggan')
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) throw new Error(data?.message || 'Gagal menyimpan pelanggan')
 
       await fetchData()
       setIsModalOpen(false)
-    } catch (error) {
-      console.error('Error saving customer:', error)
+      setNotice({
+        type: "success",
+        message: `Pelanggan ${formData.name} berhasil ${actionLabel}.`,
+      })
+    } catch (error: any) {
+      setNotice({
+        type: "error",
+        message: error.message || "Gagal menyimpan pelanggan.",
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -171,6 +206,7 @@ export default function CustomersPage() {
 
   const handleDelete = async () => {
     if (!selectedCustomer) return
+    const customerName = selectedCustomer.name
     
     try {
       setIsSubmitting(true)
@@ -181,12 +217,21 @@ export default function CustomersPage() {
         }
       })
 
-      if (!res.ok) throw new Error('Gagal menghapus pelanggan')
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) throw new Error(data?.message || 'Gagal menghapus pelanggan')
 
       await fetchData()
       setIsDeleteModalOpen(false)
-    } catch (error) {
-      console.error('Error deleting customer:', error)
+      setNotice({
+        type: "success",
+        message: `Pelanggan ${customerName} berhasil dihapus.`,
+      })
+    } catch (error: any) {
+      setNotice({
+        type: "error",
+        message: error.message || "Gagal menghapus pelanggan.",
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -268,6 +313,23 @@ export default function CustomersPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {notice && (
+        <div
+          className={
+            notice.type === "success"
+              ? `flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
+              : `flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
+          }
+        >
+          {notice.type === "success" ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+          )}
+          <span className="flex-1">{notice.message}</span>
+        </div>
+      )}
 
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">

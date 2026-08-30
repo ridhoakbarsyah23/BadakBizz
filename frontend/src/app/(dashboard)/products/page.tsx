@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Plus, Edit2, Trash2, Loader2, AlertTriangle, Search, Filter, Wand2, X } from "lucide-react"
+import { Plus, Edit2, Trash2, Loader2, AlertTriangle, Search, Filter, Wand2, X, CheckCircle2 } from "lucide-react"
 
 interface Category {
   id: number
@@ -96,6 +96,19 @@ const initialForm: ProductForm = {
   variants: []
 }
 
+const onlyDigits = (value: string | number | null | undefined) => {
+  return String(value ?? "").replace(/\D/g, "")
+}
+
+const parseIndonesianNumber = (value: string | number | null | undefined) => {
+  return Number(onlyDigits(value)) || 0
+}
+
+const formatIndonesianNumber = (value: string | number | null | undefined) => {
+  const digits = onlyDigits(value)
+  return digits ? Number(digits).toLocaleString("id-ID") : ""
+}
+
 export default function ProductsPage() {
   const { token } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
@@ -115,6 +128,29 @@ export default function ProductsPage() {
   const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, action: null as any, title: "", desc: "" })
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null)
   const [error, setError] = useState("")
+  const [notice, setNotice] = useState<{
+    type: "success" | "error"
+    message: string
+  } | null>(null)
+  const [isNoticeVisible, setIsNoticeVisible] = useState(false)
+
+  useEffect(() => {
+    if (!notice) return
+
+    setIsNoticeVisible(true)
+
+    const hideTimerId = window.setTimeout(() => {
+      setIsNoticeVisible(false)
+    }, 15000)
+    const removeTimerId = window.setTimeout(() => {
+      setNotice(null)
+    }, 15300)
+
+    return () => {
+      window.clearTimeout(hideTimerId)
+      window.clearTimeout(removeTimerId)
+    }
+  }, [notice])
 
   useEffect(() => {
     if (token) {
@@ -162,6 +198,7 @@ export default function ProductsPage() {
   const executeSubmit = async () => {
     setIsSubmitting(true)
     setError("")
+    const actionLabel = editingId ? "diperbarui" : "ditambahkan"
 
     try {
       const url = editingId 
@@ -171,14 +208,18 @@ export default function ProductsPage() {
       const payload = {
         ...formData,
         category_id: formData.category_id || null,
-        purchase_price: parseFloat(formData.purchase_price) || 0,
-        selling_price: parseFloat(formData.selling_price) || 0,
-        stock: parseInt(formData.stock) || 0,
-        minimum_stock: parseInt(formData.minimum_stock) || 0,
+        purchase_price: parseIndonesianNumber(formData.purchase_price),
+        selling_price: parseIndonesianNumber(formData.selling_price),
+        stock: parseIndonesianNumber(formData.stock),
+        minimum_stock: parseIndonesianNumber(formData.minimum_stock),
         barcode: formData.barcode,
         unit: formData.unit,
         has_variants: formData.has_variants,
-        variants: formData.variants,
+        variants: formData.variants.map(variant => ({
+          ...variant,
+          price_adjustment: parseIndonesianNumber(variant.price_adjustment),
+          stock: parseIndonesianNumber(variant.stock),
+        })),
       }
         
       const res = await fetch(url, {
@@ -199,6 +240,10 @@ export default function ProductsPage() {
 
       await fetchData()
       setIsFormOpen(false)
+      setNotice({
+        type: "success",
+        message: `Produk ${formData.name} berhasil ${actionLabel}.`,
+      })
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -209,17 +254,26 @@ export default function ProductsPage() {
   const handleDelete = async () => {
     if (!deleteProduct) return
     setIsSubmitting(true)
+    const productName = deleteProduct.name
     try {
       const res = await fetch(apiUrl(`/api/products/${deleteProduct.id}`), {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` }
       })
-      if (!res.ok) throw new Error("Gagal menghapus produk")
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.message || "Gagal menghapus produk")
       
       await fetchData()
       setIsDeleteOpen(false)
-    } catch (err) {
-      console.error(err)
+      setNotice({
+        type: "success",
+        message: `Produk ${productName} berhasil dihapus.`,
+      })
+    } catch (err: any) {
+      setNotice({
+        type: "error",
+        message: err.message || "Gagal menghapus produk.",
+      })
     } finally {
       setIsSubmitting(false)
       setDeleteProduct(null)
@@ -227,13 +281,14 @@ export default function ProductsPage() {
   }
 
   const openEdit = (product: Product) => {
+    setNotice(null)
     setEditingId(product.id)
     setFormData({
       sku: product.sku,
       name: product.name,
       category_id: product.category_id ? product.category_id.toString() : "",
-      purchase_price: product.purchase_price,
-      selling_price: product.selling_price,
+      purchase_price: onlyDigits(product.purchase_price),
+      selling_price: onlyDigits(product.selling_price),
       stock: product.stock.toString(),
       minimum_stock: product.minimum_stock.toString(),
       barcode: product.barcode || "",
@@ -245,6 +300,7 @@ export default function ProductsPage() {
   }
 
   const openCreate = () => {
+    setNotice(null)
     setEditingId(null)
     const randomSuffix = Math.floor(100000 + Math.random() * 900000);
     setFormData({
@@ -304,15 +360,15 @@ export default function ProductsPage() {
               Tambah Produk
             </Button>
           } />
-          <DialogContent className="sm:max-w-xl">
+          <DialogContent className="max-h-[92dvh] w-[96vw] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>{editingId ? "Edit Produk" : "Tambah Produk Baru"}</DialogTitle>
-              <DialogDescription>Lengkapi detail produk di bawah ini.</DialogDescription>
+              <DialogDescription>Isi data produk sesuai format yang biasa dipakai di Indonesia.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-md">{error}</div>}
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="sku">SKU <span className="text-destructive">*</span></Label>
                   <div className="flex gap-2">
@@ -340,21 +396,22 @@ export default function ProductsPage() {
                   <Input 
                     id="name"
                     required
-                    placeholder="e.g., Kopi Gula Aren"
+                    placeholder="cth. Kopi Gula Aren"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="barcode">Barcode (Opsional)</Label>
                   <Input 
                     id="barcode"
-                    placeholder="Scan atau ketik barcode"
+                    inputMode="numeric"
+                    placeholder="Scan atau ketik nomor barcode"
                     value={formData.barcode}
-                    onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, barcode: onlyDigits(e.target.value) })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -373,7 +430,7 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="unit">Satuan Produk <span className="text-destructive">*</span></Label>
                   <select 
@@ -383,11 +440,14 @@ export default function ProductsPage() {
                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                   >
                     <option value="pcs">Pcs / Buah</option>
-                    <option value="kg">Kilogram (Kg)</option>
-                    <option value="gr">Gram (Gr)</option>
-                    <option value="ltr">Liter (Ltr)</option>
-                    <option value="ml">Mililiter (Ml)</option>
-                    <option value="porsi">Porsi / Cup</option>
+                    <option value="porsi">Porsi</option>
+                    <option value="cup">Cup / Gelas</option>
+                    <option value="pack">Pack / Bungkus</option>
+                    <option value="botol">Botol</option>
+                    <option value="kg">Kilogram (kg)</option>
+                    <option value="gr">Gram (gr)</option>
+                    <option value="ltr">Liter (L)</option>
+                    <option value="ml">Mililiter (ml)</option>
                   </select>
                 </div>
                 <div className="flex items-center space-x-2 pt-6">
@@ -396,12 +456,12 @@ export default function ProductsPage() {
                     checked={formData.has_variants}
                     onCheckedChange={(checked) => setFormData({ ...formData, has_variants: checked })}
                   />
-                  <Label htmlFor="has_variants">Produk memiliki varian?</Label>
+                  <Label htmlFor="has_variants">Produk punya varian?</Label>
                 </div>
               </div>
 
               {formData.has_variants && (
-                <div className="p-4 border rounded-md bg-muted/20 space-y-4">
+                <div className="space-y-4 rounded-md border bg-muted/20 p-4">
                   <div className="flex justify-between items-center">
                     <Label>Varian Produk</Label>
                     <Button 
@@ -417,11 +477,11 @@ export default function ProductsPage() {
                     <div className="text-sm text-muted-foreground text-center py-2">Belum ada varian. Klik &quot;Tambah Varian&quot;.</div>
                   ) : (
                     formData.variants.map((variant, index) => (
-                      <div key={index} className="grid grid-cols-12 gap-2 items-center">
-                        <div className="col-span-4">
-                          <Input 
-                            placeholder="Nama varian (ex: Merah, L, Panas)" 
-                            value={variant.name} 
+                      <div key={index} className="grid grid-cols-1 gap-2 rounded-lg border bg-white p-3 sm:grid-cols-12 sm:items-center">
+                        <div className="sm:col-span-4">
+                          <Input
+                            placeholder="Varian, cth. Panas / Dingin"
+                            value={variant.name}
                             onChange={(e) => {
                               const newVariants = [...formData.variants!];
                               newVariants[index].name = e.target.value;
@@ -430,10 +490,10 @@ export default function ProductsPage() {
                             required
                           />
                         </div>
-                        <div className="col-span-3">
-                          <Input 
-                            placeholder="SKU Tambahan" 
-                            value={variant.sku} 
+                        <div className="sm:col-span-3">
+                          <Input
+                            placeholder="SKU varian"
+                            value={variant.sku}
                             onChange={(e) => {
                               const newVariants = [...formData.variants!];
                               newVariants[index].sku = e.target.value;
@@ -441,31 +501,36 @@ export default function ProductsPage() {
                             }} 
                           />
                         </div>
-                        <div className="col-span-2">
-                          <Input 
-                            type="number"
-                            placeholder="+Harga" 
-                            value={variant.price_adjustment} 
-                            onChange={(e) => {
-                              const newVariants = [...formData.variants!];
-                              newVariants[index].price_adjustment = parseFloat(e.target.value) || 0;
-                              setFormData({ ...formData, variants: newVariants });
-                            }} 
-                          />
+                        <div className="sm:col-span-2">
+                          <div className="relative">
+                            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
+                            <Input
+                              inputMode="numeric"
+                              placeholder="0"
+                              className="pl-9 text-right"
+                              value={formatIndonesianNumber(variant.price_adjustment)}
+                              onChange={(e) => {
+                                const newVariants = [...formData.variants!];
+                                newVariants[index].price_adjustment = parseIndonesianNumber(e.target.value);
+                                setFormData({ ...formData, variants: newVariants });
+                              }}
+                            />
+                          </div>
                         </div>
-                        <div className="col-span-2">
+                        <div className="sm:col-span-2">
                           <Input 
-                            type="number"
+                            inputMode="numeric"
                             placeholder="Stok" 
-                            value={variant.stock} 
+                            className="text-right"
+                            value={formatIndonesianNumber(variant.stock)}
                             onChange={(e) => {
                               const newVariants = [...formData.variants!];
-                              newVariants[index].stock = parseInt(e.target.value) || 0;
+                              newVariants[index].stock = parseIndonesianNumber(e.target.value);
                               setFormData({ ...formData, variants: newVariants });
                             }} 
                           />
                         </div>
-                        <div className="col-span-1 flex justify-end">
+                        <div className="flex justify-end sm:col-span-1">
                           <Button 
                             type="button" 
                             variant="ghost" 
@@ -485,41 +550,50 @@ export default function ProductsPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="purchase_price">Harga Beli (Rp) <span className="text-destructive">*</span></Label>
-                  <Input 
-                    id="purchase_price"
-                    required
-                    type="number"
-                    min="0"
-                    value={formData.purchase_price}
-                    onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })}
-                  />
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
+                    <Input
+                      id="purchase_price"
+                      required
+                      inputMode="numeric"
+                      placeholder="0"
+                      className="pl-9 text-right"
+                      value={formatIndonesianNumber(formData.purchase_price)}
+                      onChange={(e) => setFormData({ ...formData, purchase_price: onlyDigits(e.target.value) })}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="selling_price">Harga Jual (Rp) <span className="text-destructive">*</span></Label>
-                  <Input 
-                    id="selling_price"
-                    required
-                    type="number"
-                    min="0"
-                    value={formData.selling_price}
-                    onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                  />
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
+                    <Input
+                      id="selling_price"
+                      required
+                      inputMode="numeric"
+                      placeholder="0"
+                      className="pl-9 text-right"
+                      value={formatIndonesianNumber(formData.selling_price)}
+                      onChange={(e) => setFormData({ ...formData, selling_price: onlyDigits(e.target.value) })}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="stock">Stok Saat Ini <span className="text-destructive">*</span></Label>
                   <Input 
                     id="stock"
                     required
-                    type="number"
-                    min="0"
-                    value={formData.stock}
-                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                    inputMode="numeric"
+                    placeholder="0"
+                    className="text-right"
+                    value={formatIndonesianNumber(formData.stock)}
+                    onChange={(e) => setFormData({ ...formData, stock: onlyDigits(e.target.value) || "0" })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -527,10 +601,11 @@ export default function ProductsPage() {
                   <Input 
                     id="minimum_stock"
                     required
-                    type="number"
-                    min="0"
-                    value={formData.minimum_stock}
-                    onChange={(e) => setFormData({ ...formData, minimum_stock: e.target.value })}
+                    inputMode="numeric"
+                    placeholder="0"
+                    className="text-right"
+                    value={formatIndonesianNumber(formData.minimum_stock)}
+                    onChange={(e) => setFormData({ ...formData, minimum_stock: onlyDigits(e.target.value) || "0" })}
                   />
                 </div>
               </div>
@@ -548,6 +623,23 @@ export default function ProductsPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {notice && (
+        <div
+          className={
+            notice.type === "success"
+              ? `flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
+              : `flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
+          }
+        >
+          {notice.type === "success" ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+          )}
+          <span className="flex-1">{notice.message}</span>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row items-center gap-4">
         <div className="relative w-full sm:max-w-sm">

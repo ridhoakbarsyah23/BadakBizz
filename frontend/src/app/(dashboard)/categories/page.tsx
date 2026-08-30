@@ -35,7 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Plus, Edit2, Trash2, Loader2, AlertTriangle } from "lucide-react"
+import { Plus, Edit2, Trash2, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react"
 
 interface Category {
   id: number
@@ -62,6 +62,29 @@ export default function CategoriesPage() {
   const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, action: null as any, title: "", desc: "" })
   const [deleteCategory, setDeleteCategory] = useState<Category | null>(null)
   const [error, setError] = useState("")
+  const [notice, setNotice] = useState<{
+    type: "success" | "error"
+    message: string
+  } | null>(null)
+  const [isNoticeVisible, setIsNoticeVisible] = useState(false)
+
+  useEffect(() => {
+    if (!notice) return
+
+    setIsNoticeVisible(true)
+
+    const hideTimerId = window.setTimeout(() => {
+      setIsNoticeVisible(false)
+    }, 15000)
+    const removeTimerId = window.setTimeout(() => {
+      setNotice(null)
+    }, 15300)
+
+    return () => {
+      window.clearTimeout(hideTimerId)
+      window.clearTimeout(removeTimerId)
+    }
+  }, [notice])
 
   useEffect(() => {
     if (token) {
@@ -103,6 +126,7 @@ export default function CategoriesPage() {
   const executeSubmit = async () => {
     setIsSubmitting(true)
     setError("")
+    const actionLabel = editingId ? "diperbarui" : "ditambahkan"
 
     try {
       const url = editingId 
@@ -127,6 +151,10 @@ export default function CategoriesPage() {
 
       await fetchCategories()
       setIsFormOpen(false)
+      setNotice({
+        type: "success",
+        message: `Kategori ${formData.name} berhasil ${actionLabel}.`,
+      })
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -137,17 +165,26 @@ export default function CategoriesPage() {
   const handleDelete = async () => {
     if (!deleteCategory) return
     setIsSubmitting(true)
+    const categoryName = deleteCategory.name
     try {
       const res = await fetch(apiUrl(`/api/categories/${deleteCategory.id}`), {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` }
       })
-      if (!res.ok) throw new Error("Gagal menghapus kategori")
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.message || "Gagal menghapus kategori")
       
       await fetchCategories()
       setIsDeleteOpen(false)
-    } catch (err) {
-      console.error(err)
+      setNotice({
+        type: "success",
+        message: `Kategori ${categoryName} berhasil dihapus.`,
+      })
+    } catch (err: any) {
+      setNotice({
+        type: "error",
+        message: err.message || "Gagal menghapus kategori.",
+      })
     } finally {
       setIsSubmitting(false)
       setDeleteCategory(null)
@@ -155,12 +192,14 @@ export default function CategoriesPage() {
   }
 
   const openEdit = (category: Category) => {
+    setNotice(null)
     setEditingId(category.id)
     setFormData({ name: category.name })
     setIsFormOpen(true)
   }
 
   const openCreate = () => {
+    setNotice(null)
     setEditingId(null)
     setFormData({ name: "" })
     setError("")
@@ -223,6 +262,23 @@ export default function CategoriesPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {notice && (
+        <div
+          className={
+            notice.type === "success"
+              ? `flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
+              : `flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
+          }
+        >
+          {notice.type === "success" ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+          )}
+          <span className="flex-1">{notice.message}</span>
+        </div>
+      )}
 
       <div className="bg-background rounded-lg border shadow-sm overflow-x-auto w-full">
         {isLoading ? (
