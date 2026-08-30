@@ -133,23 +133,49 @@ class ReportController extends Controller
         $startDateStr = $request->query('start_date');
         $endDateStr = $request->query('end_date');
 
-        if ($startDateStr && $endDateStr) {
-            $startDate = Carbon::parse($startDateStr)->startOfDay();
-            $endDate = Carbon::parse($endDateStr)->endOfDay();
-        } else {
-            // Default to Year-to-Date if no dates provided
-            $startDate = Carbon::now()->startOfYear();
-            $endDate = Carbon::now()->endOfDay();
+        $query = Transaction::with('items.product', 'customer', 'cashier');
+
+        if ($startDateStr) {
+            $query->where('created_at', '>=', Carbon::parse($startDateStr)->startOfDay());
         }
 
-        $transactions = Transaction::with('items.product', 'customer', 'cashier')
-            ->whereBetween('created_at', [$startDate, $endDate])
+        if ($endDateStr) {
+            $query->where('created_at', '<=', Carbon::parse($endDateStr)->endOfDay());
+        }
+
+        if ($request->filled('status') && $request->status !== 'ALL') {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('payment_method') && $request->payment_method !== 'ALL') {
+            $query->where('payment_method', $request->payment_method);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('transaction_number', 'like', '%'.$search.'%')
+                    ->orWhereHas('customer', function ($customerQuery) use ($search) {
+                        $customerQuery->where('name', 'like', '%'.$search.'%');
+                    });
+            });
+        }
+
+        $transactions = $query
             ->orderBy('created_at', 'ASC')
             ->get();
 
+        $filenameDate = $startDateStr && $endDateStr
+            ? Carbon::parse($startDateStr)->format('Ymd').'_to_'.Carbon::parse($endDateStr)->format('Ymd')
+            : 'all';
+
+        if ($request->query('format') === 'excel') {
+            return $this->exportModernExcel($transactions, $filenameDate);
+        }
+
         $headers = [
             'Content-type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename=BadakBizzPOS_Report_'.$startDate->format('Ymd').'_to_'.$endDate->format('Ymd').'.csv',
+            'Content-Disposition' => 'attachment; filename=BadakBizzPOS_Report_'.$filenameDate.'.csv',
             'Pragma' => 'no-cache',
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
             'Expires' => '0',
@@ -184,5 +210,227 @@ class ReportController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    private function exportModernExcel($transactions, string $filenameDate)
+    {
+        $rows = [[
+            'Tanggal',
+            'Nomor Transaksi',
+            'Kasir',
+            'Pelanggan',
+            'Metode Pembayaran',
+            'Subtotal',
+            'Diskon',
+            'Pajak',
+            'Biaya Layanan',
+            'Total',
+            'Status',
+        ]];
+
+        foreach ($transactions as $tx) {
+            $rows[] = [
+                $tx->created_at->format('Y-m-d H:i:s'),
+                $tx->transaction_number,
+                $tx->cashier ? $tx->cashier->name : 'N/A',
+                $tx->customer ? $tx->customer->name : 'Walk-in',
+                $tx->payment_method,
+                (float) $tx->subtotal,
+                (float) $tx->discount,
+                (float) $tx->tax,
+                (float) $tx->service_charge,
+                (float) $tx->total_amount,
+                $tx->status,
+            ];
+        }
+
+        $files = [
+            '[Content_Types].xml' => $this->excelContentTypesXml(),
+            '_rels/.rels' => $this->excelRootRelationshipsXml(),
+            'docProps/app.xml' => $this->excelAppPropertiesXml(),
+            'docProps/core.xml' => $this->excelCorePropertiesXml(),
+            'xl/workbook.xml' => $this->excelWorkbookXml(),
+            'xl/_rels/workbook.xml.rels' => $this->excelWorkbookRelationshipsXml(),
+            'xl/styles.xml' => $this->excelStylesXml(),
+            'xl/worksheets/sheet1.xml' => $this->excelWorksheetXml($rows),
+        ];
+
+        $content = $this->createZipFromStrings($files);
+        $headers = [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename=BadakBizzPOS_Report_'.$filenameDate.'.xlsx',
+            'Content-Length' => (string) strlen($content),
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        return response($content, 200, $headers);
+    }
+
+    private function excelWorksheetXml(array $rows): string
+    {
+        $sheetData = '';
+
+        foreach ($rows as $rowIndex => $row) {
+            $rowNumber = $rowIndex + 1;
+            $sheetData .= '<row r="'.$rowNumber.'">';
+
+            foreach ($row as $columnIndex => $value) {
+                $cellReference = $this->excelColumnName($columnIndex + 1).$rowNumber;
+                $style = $rowIndex === 0 ? ' s="1"' : '';
+
+                if ($rowIndex > 0 && is_numeric($value)) {
+                    $sheetData .= '<c r="'.$cellReference.'"'.$style.'><v>'.$value.'</v></c>';
+                } else {
+                    $sheetData .= '<c r="'.$cellReference.'" t="inlineStr"'.$style.'><is><t>'.$this->xmlEscape($value).'</t></is></c>';
+                }
+            }
+
+            $sheetData .= '</row>';
+        }
+
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            .'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            .'<sheetViews><sheetView workbookViewId="0"/></sheetViews>'
+            .'<sheetFormatPr defaultRowHeight="18"/>'
+            .'<cols>'
+            .'<col min="1" max="1" width="20" customWidth="1"/>'
+            .'<col min="2" max="2" width="26" customWidth="1"/>'
+            .'<col min="3" max="5" width="18" customWidth="1"/>'
+            .'<col min="6" max="10" width="16" customWidth="1"/>'
+            .'<col min="11" max="11" width="14" customWidth="1"/>'
+            .'</cols>'
+            .'<sheetData>'.$sheetData.'</sheetData>'
+            .'</worksheet>';
+    }
+
+    private function excelColumnName(int $columnNumber): string
+    {
+        $columnName = '';
+
+        while ($columnNumber > 0) {
+            $columnNumber--;
+            $columnName = chr(65 + ($columnNumber % 26)).$columnName;
+            $columnNumber = intdiv($columnNumber, 26);
+        }
+
+        return $columnName;
+    }
+
+    private function createZipFromStrings(array $files): string
+    {
+        $localFiles = '';
+        $centralDirectory = '';
+        $offset = 0;
+        $dosTime = $this->dosTime();
+        $dosDate = $this->dosDate();
+
+        foreach ($files as $path => $content) {
+            $crc = crc32($content);
+            $size = strlen($content);
+            $localHeader = pack('VvvvvvVVVvv', 0x04034b50, 20, 0, 0, $dosTime, $dosDate, $crc, $size, $size, strlen($path), 0);
+            $centralHeader = pack('VvvvvvvVVVvvvvvVV', 0x02014b50, 20, 20, 0, 0, $dosTime, $dosDate, $crc, $size, $size, strlen($path), 0, 0, 0, 0, 0, $offset);
+
+            $localFiles .= $localHeader.$path.$content;
+            $centralDirectory .= $centralHeader.$path;
+            $offset += strlen($localHeader) + strlen($path) + $size;
+        }
+
+        $centralOffset = strlen($localFiles);
+        $centralSize = strlen($centralDirectory);
+        $fileCount = count($files);
+        $endDirectory = pack('VvvvvVVv', 0x06054b50, 0, 0, $fileCount, $fileCount, $centralSize, $centralOffset, 0);
+
+        return $localFiles.$centralDirectory.$endDirectory;
+    }
+
+    private function dosTime(): int
+    {
+        return ((int) date('H') << 11) | ((int) date('i') << 5) | ((int) date('s') >> 1);
+    }
+
+    private function dosDate(): int
+    {
+        return (((int) date('Y') - 1980) << 9) | ((int) date('m') << 5) | (int) date('d');
+    }
+
+    private function xmlEscape($value): string
+    {
+        return htmlspecialchars((string) $value, ENT_XML1 | ENT_COMPAT, 'UTF-8');
+    }
+
+    private function excelContentTypesXml(): string
+    {
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            .'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            .'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            .'<Default Extension="xml" ContentType="application/xml"/>'
+            .'<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>'
+            .'<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
+            .'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+            .'<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+            .'<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+            .'</Types>';
+    }
+
+    private function excelRootRelationshipsXml(): string
+    {
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            .'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            .'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+            .'<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>'
+            .'<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>'
+            .'</Relationships>';
+    }
+
+    private function excelWorkbookXml(): string
+    {
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            .'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            .'<sheets><sheet name="Riwayat Transaksi" sheetId="1" r:id="rId1"/></sheets>'
+            .'</workbook>';
+    }
+
+    private function excelWorkbookRelationshipsXml(): string
+    {
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            .'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            .'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+            .'<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+            .'</Relationships>';
+    }
+
+    private function excelStylesXml(): string
+    {
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            .'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            .'<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>'
+            .'<fills count="1"><fill><patternFill patternType="none"/></fill></fills>'
+            .'<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
+            .'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+            .'<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>'
+            .'</styleSheet>';
+    }
+
+    private function excelCorePropertiesXml(): string
+    {
+        $createdAt = Carbon::now()->toIso8601ZuluString();
+
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            .'<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+            .'<dc:creator>BadakBizz POS</dc:creator>'
+            .'<cp:lastModifiedBy>BadakBizz POS</cp:lastModifiedBy>'
+            .'<dcterms:created xsi:type="dcterms:W3CDTF">'.$createdAt.'</dcterms:created>'
+            .'<dcterms:modified xsi:type="dcterms:W3CDTF">'.$createdAt.'</dcterms:modified>'
+            .'</cp:coreProperties>';
+    }
+
+    private function excelAppPropertiesXml(): string
+    {
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            .'<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">'
+            .'<Application>BadakBizz POS</Application>'
+            .'</Properties>';
     }
 }

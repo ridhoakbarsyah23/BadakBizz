@@ -14,6 +14,7 @@ use App\Services\TransactionStatusService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class TransactionController extends Controller
 {
@@ -31,6 +32,14 @@ class TransactionController extends Controller
 
         if ($request->filled('payment_method') && $request->payment_method !== 'ALL') {
             $query->where('payment_method', $request->payment_method);
+        }
+
+        if ($request->filled('start_date')) {
+            $query->where('created_at', '>=', Carbon::parse($request->start_date)->startOfDay());
+        }
+
+        if ($request->filled('end_date')) {
+            $query->where('created_at', '<=', Carbon::parse($request->end_date)->endOfDay());
         }
 
         if ($request->filled('search')) {
