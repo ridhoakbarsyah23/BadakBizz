@@ -4,37 +4,21 @@ namespace App\Http\Controllers;
 
 use App\Models\CashierShift;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class ShiftController extends Controller
 {
     /**
      * Get all shifts for reporting
      */
-    public function index()
+    public function index(Request $request)
     {
-        $shifts = CashierShift::with('user')->orderBy('created_at', 'desc')->get();
+        $query = CashierShift::with('user')->orderBy('created_at', 'desc');
 
-        $shifts->each(function($shift) {
-            $cashTransactions = $shift->transactions()
-                ->where('payment_method', 'CASH')
-                ->where('status', 'COMPLETED')
-                ->sum('payment_amount'); // wait, the expected cash should be based on total_amount or payment_amount? It should be total_amount of the transaction if fully paid by cash, wait, payment_amount might include change. Usually it's total_amount for the sale if paid in cash.
-            
-            // Wait, let's just sum `total_amount` where payment_method is CASH
-            $cashSales = $shift->transactions()
-                ->where('payment_method', 'CASH')
-                ->where('status', 'COMPLETED')
-                ->sum('total_amount');
-            
-            $shift->expected_cash = $shift->starting_cash + $cashSales;
-            
-            if ($shift->status === 'closed') {
-                $shift->discrepancy = $shift->ending_cash - $shift->expected_cash;
-            } else {
-                $shift->discrepancy = null;
-            }
-        });
+        if ($request->user()->role?->slug !== 'admin') {
+            $query->where('user_id', $request->user()->id);
+        }
+
+        $shifts = $query->get()->map(fn (CashierShift $shift) => $this->withShiftSummary($shift));
 
         return response()->json($shifts);
     }
@@ -48,7 +32,9 @@ class ShiftController extends Controller
             ->where('status', 'open')
             ->first();
 
-        return response()->json(['shift' => $shift]);
+        return response()->json([
+            'shift' => $shift ? $this->withShiftSummary($shift->load('user')) : null,
+        ]);
     }
 
     /**
@@ -57,7 +43,7 @@ class ShiftController extends Controller
     public function open(Request $request)
     {
         $request->validate([
-            'starting_cash' => 'nullable|numeric|min:0'
+            'starting_cash' => 'nullable|numeric|min:0',
         ]);
 
         // Check if there is already an open shift
@@ -68,7 +54,7 @@ class ShiftController extends Controller
         if ($existingShift) {
             return response()->json([
                 'message' => 'You already have an open shift.',
-                'shift' => $existingShift
+                'shift' => $existingShift,
             ], 400);
         }
 
@@ -76,12 +62,12 @@ class ShiftController extends Controller
             'user_id' => $request->user()->id,
             'start_time' => now(),
             'starting_cash' => $request->starting_cash ?? 0,
-            'status' => 'open'
+            'status' => 'open',
         ]);
 
         return response()->json([
             'message' => 'Shift opened successfully',
-            'shift' => $shift
+            'shift' => $this->withShiftSummary($shift->load('user')),
         ], 201);
     }
 
@@ -91,28 +77,55 @@ class ShiftController extends Controller
     public function close(Request $request)
     {
         $request->validate([
-            'ending_cash' => 'required|numeric|min:0'
+            'ending_cash' => 'required|numeric|min:0',
         ]);
 
         $shift = CashierShift::where('user_id', $request->user()->id)
             ->where('status', 'open')
             ->first();
 
-        if (!$shift) {
+        if (! $shift) {
             return response()->json([
-                'message' => 'No open shift found.'
+                'message' => 'No open shift found.',
             ], 404);
         }
 
         $shift->update([
             'end_time' => now(),
             'ending_cash' => $request->ending_cash,
-            'status' => 'closed'
+            'status' => 'closed',
         ]);
 
         return response()->json([
             'message' => 'Shift closed successfully',
-            'shift' => $shift
+            'shift' => $this->withShiftSummary($shift->fresh('user')),
         ]);
+    }
+
+    private function withShiftSummary(CashierShift $shift): CashierShift
+    {
+        $completedTransactions = $shift->transactions()
+            ->where('status', 'COMPLETED');
+
+        $cashSales = (float) (clone $completedTransactions)
+            ->where('payment_method', 'CASH')
+            ->sum('total_amount');
+
+        $totalSales = (float) (clone $completedTransactions)->sum('total_amount');
+        $transactionCount = (clone $completedTransactions)->count();
+        $expectedCash = (float) $shift->starting_cash + $cashSales;
+
+        $shift->cash_sales = $cashSales;
+        $shift->total_sales = $totalSales;
+        $shift->transaction_count = $transactionCount;
+        $shift->expected_cash = $expectedCash;
+        $shift->duration_minutes = $shift->start_time
+            ? (int) $shift->start_time->diffInMinutes($shift->end_time ?? now())
+            : 0;
+        $shift->discrepancy = $shift->status === 'closed'
+            ? (float) $shift->ending_cash - $expectedCash
+            : null;
+
+        return $shift;
     }
 }

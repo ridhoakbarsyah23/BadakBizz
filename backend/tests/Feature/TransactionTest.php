@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\CashierShift;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -12,6 +13,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionStatusService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -58,12 +60,136 @@ class TransactionTest extends TestCase
             ->assertJsonPath('data.status', 'COMPLETED');
 
         $this->assertSame(8, $product->fresh()->stock);
+        $this->assertNotNull($response->json('data.cashier_shift_id'));
         $this->assertDatabaseHas('inventory_movements', [
             'product_id' => $product->id,
             'type' => 'OUT',
             'quantity' => 2,
             'user_id' => $cashier->id,
         ]);
+    }
+
+    public function test_transaction_number_uses_daily_sequence(): void
+    {
+        Carbon::setTestNow('2026-08-30 09:15:00');
+
+        $cashier = $this->cashier();
+        Sanctum::actingAs($cashier);
+
+        Store::create([
+            'name' => 'BadakBizz Test',
+            'tax_rate' => 0,
+            'service_charge_rate' => 0,
+        ]);
+
+        $product = Product::create([
+            'sku' => 'SKU-SEQUENCE',
+            'name' => 'Sequence Product',
+            'purchase_price' => 5_000,
+            'selling_price' => 10_000,
+            'stock' => 10,
+            'minimum_stock' => 2,
+            'is_active' => true,
+        ]);
+
+        $firstResponse = $this->postJson('/api/transactions', [
+            'items' => [
+                ['product_id' => $product->id, 'quantity' => 1],
+            ],
+            'payment_method' => 'CASH',
+            'payment_amount' => 10_000,
+            'order_type' => 'takeaway',
+        ]);
+
+        $secondResponse = $this->postJson('/api/transactions', [
+            'items' => [
+                ['product_id' => $product->id, 'quantity' => 1],
+            ],
+            'payment_method' => 'CASH',
+            'payment_amount' => 10_000,
+            'order_type' => 'takeaway',
+        ]);
+
+        $firstResponse->assertCreated()
+            ->assertJsonPath('data.transaction_number', 'TRX-20260830-0001');
+
+        $secondResponse->assertCreated()
+            ->assertJsonPath('data.transaction_number', 'TRX-20260830-0002');
+
+        Carbon::setTestNow();
+    }
+
+    public function test_transaction_is_rejected_without_active_shift(): void
+    {
+        Sanctum::actingAs($this->cashier(withOpenShift: false));
+
+        Store::create([
+            'name' => 'BadakBizz Test',
+            'enable_shift_management' => true,
+        ]);
+
+        $product = Product::create([
+            'sku' => 'SKU-NO-SHIFT',
+            'name' => 'No Shift Product',
+            'purchase_price' => 5_000,
+            'selling_price' => 10_000,
+            'stock' => 10,
+            'minimum_stock' => 2,
+            'is_active' => true,
+        ]);
+
+        $response = $this->postJson('/api/transactions', [
+            'items' => [
+                ['product_id' => $product->id, 'quantity' => 1],
+            ],
+            'payment_method' => 'CASH',
+            'payment_amount' => 10_000,
+            'order_type' => 'takeaway',
+        ]);
+
+        $response->assertStatus(400)
+            ->assertJsonPath('message', 'Failed to process transaction.')
+            ->assertJsonPath('error', 'Open an active cashier shift before checkout.');
+
+        $this->assertSame(10, $product->fresh()->stock);
+        $this->assertDatabaseCount('transactions', 0);
+    }
+
+    public function test_transaction_without_shift_is_allowed_when_shift_management_is_disabled(): void
+    {
+        Sanctum::actingAs($this->cashier(withOpenShift: false));
+
+        Store::create([
+            'name' => 'BadakBizz Test',
+            'tax_rate' => 0,
+            'service_charge_rate' => 0,
+            'enable_shift_management' => false,
+        ]);
+
+        $product = Product::create([
+            'sku' => 'SKU-SHIFT-DISABLED',
+            'name' => 'Shift Disabled Product',
+            'purchase_price' => 5_000,
+            'selling_price' => 10_000,
+            'stock' => 10,
+            'minimum_stock' => 2,
+            'is_active' => true,
+        ]);
+
+        $response = $this->postJson('/api/transactions', [
+            'items' => [
+                ['product_id' => $product->id, 'quantity' => 1],
+            ],
+            'payment_method' => 'CASH',
+            'payment_amount' => 10_000,
+            'order_type' => 'takeaway',
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.status', 'COMPLETED')
+            ->assertJsonPath('data.cashier_shift_id', null);
+
+        $this->assertSame(9, $product->fresh()->stock);
     }
 
     public function test_transaction_is_rejected_when_stock_is_insufficient(): void
@@ -553,26 +679,37 @@ class TransactionTest extends TestCase
             ->assertJsonPath('message', 'Only pending QRIS transactions can be cancelled from this action');
     }
 
-    private function cashier(): User
+    private function cashier(bool $withOpenShift = true): User
     {
-        return $this->userWithRole('cashier', 'Cashier');
+        return $this->userWithRole('cashier', 'Cashier', $withOpenShift);
     }
 
-    private function admin(): User
+    private function admin(bool $withOpenShift = true): User
     {
-        return $this->userWithRole('admin', 'Administrator');
+        return $this->userWithRole('admin', 'Administrator', $withOpenShift);
     }
 
-    private function userWithRole(string $slug, string $name): User
+    private function userWithRole(string $slug, string $name, bool $withOpenShift = true): User
     {
         $role = Role::create([
             'slug' => $slug,
             'name' => $name,
         ]);
 
-        return User::factory()->create([
+        $user = User::factory()->create([
             'role_id' => $role->id,
             'is_active' => true,
         ]);
+
+        if ($withOpenShift) {
+            CashierShift::create([
+                'user_id' => $user->id,
+                'start_time' => now(),
+                'starting_cash' => 0,
+                'status' => 'open',
+            ]);
+        }
+
+        return $user;
     }
 }

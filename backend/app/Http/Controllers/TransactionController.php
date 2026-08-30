@@ -14,7 +14,6 @@ use App\Services\TransactionStatusService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class TransactionController extends Controller
 {
@@ -162,6 +161,7 @@ class TransactionController extends Controller
             }
 
             $store = Store::first();
+            $shiftManagementEnabled = (bool) ($store?->enable_shift_management ?? false);
             $taxRatePercent = $store?->tax_rate ?? 11;
             $serviceChargeRatePercent = $store?->service_charge_rate ?? 0;
 
@@ -170,10 +170,8 @@ class TransactionController extends Controller
             $tax = ($netAfterDiscount + $serviceCharge) * ($taxRatePercent / 100);
             $totalAmount = $netAfterDiscount + $serviceCharge + $tax;
 
-            // Generate Transaction Number (e.g., TRX-20231024-ABC1)
-            $transactionNumber = 'TRX-'.date('Ymd').'-'.strtoupper(Str::random(4));
+            $transactionNumber = $this->generateTransactionNumber();
 
-            // Find active shift
             $activeShift = null;
             if ($request->user()) {
                 $activeShift = CashierShift::where('user_id', $request->user()->id)
@@ -181,12 +179,16 @@ class TransactionController extends Controller
                     ->first();
             }
 
+            if ($shiftManagementEnabled && ! $activeShift) {
+                throw new \Exception('Open an active cashier shift before checkout.');
+            }
+
             // 2. Create Transaction
             $transaction = Transaction::create([
                 'transaction_number' => $transactionNumber,
                 'customer_id' => $validated['customer_id'] ?? null,
                 'cashier_id' => $request->user() ? $request->user()->id : null,
-                'cashier_shift_id' => $activeShift ? $activeShift->id : null,
+                'cashier_shift_id' => $activeShift?->id,
                 'subtotal' => $subtotal,
                 'tax' => $tax,
                 'service_charge' => $serviceCharge,
@@ -318,5 +320,25 @@ class TransactionController extends Controller
                 'error' => $e->getMessage(),
             ], 400);
         }
+    }
+
+    private function generateTransactionNumber(): string
+    {
+        $prefix = 'TRX-'.now()->format('Ymd').'-';
+
+        $lastSequence = Transaction::where('transaction_number', 'like', $prefix.'%')
+            ->lockForUpdate()
+            ->pluck('transaction_number')
+            ->reduce(function (int $maxSequence, string $transactionNumber) use ($prefix) {
+                $suffix = substr($transactionNumber, strlen($prefix));
+
+                if (! ctype_digit($suffix)) {
+                    return $maxSequence;
+                }
+
+                return max($maxSequence, (int) $suffix);
+            }, 0);
+
+        return $prefix.str_pad((string) ($lastSequence + 1), 4, '0', STR_PAD_LEFT);
     }
 }

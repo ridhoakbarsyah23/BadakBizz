@@ -19,6 +19,7 @@ class SettingController extends Controller
                 'service_charge_rate' => 5.00,
                 'receipt_header' => 'BadakBizz Coffee & Eatery',
                 'receipt_footer' => 'Terima kasih atas kunjungan Anda!',
+                'enable_shift_management' => false,
             ]);
         }
 
@@ -37,6 +38,7 @@ class SettingController extends Controller
             'business_type' => 'required|string|in:retail,fnb,services,mixed',
             'enable_table_management' => 'boolean',
             'enable_kitchen_receipts' => 'boolean',
+            'enable_shift_management' => 'boolean',
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:255',
             'tax_rate' => 'numeric|min:0|max:100',
