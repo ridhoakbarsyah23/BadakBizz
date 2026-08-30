@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       fetchUser(storedToken)
     } else {
       setIsLoading(false)
-      if (pathname !== '/login') {
+      if (pathname !== '/login' && pathname !== '/register') {
         router.push('/login')
       }
     }

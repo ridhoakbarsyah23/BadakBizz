@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
+import { AppFooter } from "@/components/app-footer";
 import { Button } from "@heroui/react";
 import { Menu } from "lucide-react";
 
@@ -36,7 +37,12 @@ export default function DashboardLayout({
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
-          {children}
+          <div className="flex min-h-full flex-col">
+            <div className="flex-1">
+              {children}
+            </div>
+            <AppFooter />
+          </div>
         </div>
       </main>
 

@@ -7,7 +7,7 @@ export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname
 
   // Public paths that don't require authentication
-  const isPublicPath = path === '/login'
+  const isPublicPath = path === '/login' || path === '/register'
 
   // If user is logged in and tries to access login page, redirect to dashboard/pos
   if (isPublicPath && token) {
