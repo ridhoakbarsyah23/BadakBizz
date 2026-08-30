@@ -12,7 +12,7 @@ import {
   TableRow 
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Search, CalendarClock } from "lucide-react"
+import { Loader2, Search, CalendarClock, Users, Wallet, AlertTriangle, CheckCircle2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -24,8 +24,12 @@ interface Shift {
   starting_cash: string
   ending_cash: string | null
   status: string
+  cash_sales: number
+  total_sales: number
+  transaction_count: number
   expected_cash: number
   discrepancy: number | null
+  duration_minutes: number
   user: {
     name: string
   }
@@ -62,6 +66,10 @@ export default function ShiftsPage() {
   const filteredShifts = shifts.filter(shift => 
     shift.user?.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
+  const activeShifts = shifts.filter(shift => shift.status === 'open')
+  const closedShifts = shifts.filter(shift => shift.status === 'closed')
+  const activeCashTotal = activeShifts.reduce((sum, shift) => sum + Number(shift.expected_cash || 0), 0)
+  const totalDiscrepancy = closedShifts.reduce((sum, shift) => sum + Number(shift.discrepancy || 0), 0)
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "-"
@@ -77,6 +85,23 @@ export default function ShiftsPage() {
     return `Rp ${Number(amount).toLocaleString('id-ID')}`
   }
 
+  const formatDuration = (minutes: number) => {
+    const safeMinutes = Math.max(0, Number(minutes || 0))
+    const hours = Math.floor(safeMinutes / 60)
+    const restMinutes = safeMinutes % 60
+
+    if (hours === 0) return `${restMinutes} menit`
+    if (restMinutes === 0) return `${hours} jam`
+    return `${hours} jam ${restMinutes} menit`
+  }
+
+  const discrepancyLabel = (amount: number | null) => {
+    const value = Number(amount || 0)
+    if (value === 0) return "PAS"
+    if (value > 0) return `LEBIH ${formatCurrency(value)}`
+    return `KURANG ${formatCurrency(Math.abs(value))}`
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
@@ -85,6 +110,89 @@ export default function ShiftsPage() {
           Pantau riwayat buka/tutup kasir dan selisih uang harian.
         </p>
       </div>
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <Card className="border-slate-200 shadow-sm">
+          <CardContent className="flex items-center justify-between gap-3 p-4">
+            <div>
+              <p className="text-xs font-bold uppercase text-slate-500">Shift Aktif</p>
+              <p className="mt-1 text-2xl font-black text-slate-900">{activeShifts.length}</p>
+            </div>
+            <div className="rounded-xl bg-blue-50 p-2 text-blue-600">
+              <Users className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-slate-200 shadow-sm">
+          <CardContent className="flex items-center justify-between gap-3 p-4">
+            <div>
+              <p className="text-xs font-bold uppercase text-slate-500">Estimasi Kas Aktif</p>
+              <p className="mt-1 text-xl font-black text-slate-900">{formatCurrency(activeCashTotal)}</p>
+            </div>
+            <div className="rounded-xl bg-emerald-50 p-2 text-emerald-600">
+              <Wallet className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-slate-200 shadow-sm">
+          <CardContent className="flex items-center justify-between gap-3 p-4">
+            <div>
+              <p className="text-xs font-bold uppercase text-slate-500">Shift Selesai</p>
+              <p className="mt-1 text-2xl font-black text-slate-900">{closedShifts.length}</p>
+            </div>
+            <div className="rounded-xl bg-slate-100 p-2 text-slate-600">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-slate-200 shadow-sm">
+          <CardContent className="flex items-center justify-between gap-3 p-4">
+            <div>
+              <p className="text-xs font-bold uppercase text-slate-500">Total Selisih</p>
+              <p className={`mt-1 text-xl font-black ${totalDiscrepancy === 0 ? 'text-slate-900' : totalDiscrepancy > 0 ? 'text-amber-700' : 'text-red-700'}`}>
+                {formatCurrency(totalDiscrepancy)}
+              </p>
+            </div>
+            <div className="rounded-xl bg-amber-50 p-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {activeShifts.length > 0 && (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {activeShifts.map((shift) => (
+            <Card key={shift.id} className="border-blue-100 bg-blue-50 shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black text-blue-950">{shift.user?.name}</p>
+                    <p className="mt-1 text-xs font-semibold text-blue-700">
+                      Aktif {formatDuration(shift.duration_minutes)} sejak {formatDate(shift.start_time)}
+                    </p>
+                  </div>
+                  <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200">Aktif</Badge>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                  <div className="rounded-lg bg-white/75 p-2">
+                    <p className="font-semibold text-slate-500">Transaksi</p>
+                    <p className="mt-1 font-black text-slate-900">{shift.transaction_count}</p>
+                  </div>
+                  <div className="rounded-lg bg-white/75 p-2">
+                    <p className="font-semibold text-slate-500">Cash</p>
+                    <p className="mt-1 font-black text-slate-900">{formatCurrency(shift.cash_sales)}</p>
+                  </div>
+                  <div className="rounded-lg bg-white/75 p-2">
+                    <p className="font-semibold text-slate-500">Laci</p>
+                    <p className="mt-1 font-black text-slate-900">{formatCurrency(shift.expected_cash)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">
@@ -120,6 +228,10 @@ export default function ShiftsPage() {
                     <TableHead>WAKTU SHIFT</TableHead>
                     <TableHead>STATUS</TableHead>
                     <TableHead>MODAL AWAL</TableHead>
+                    <TableHead>PENJUALAN CASH</TableHead>
+                    <TableHead>TOTAL SALES</TableHead>
+                    <TableHead>TRANSAKSI</TableHead>
+                    <TableHead>DURASI</TableHead>
                     <TableHead>ESTIMASI UANG LACI</TableHead>
                     <TableHead>UANG AKTUAL</TableHead>
                     <TableHead className="text-right">SELISIH (DISCREPANCY)</TableHead>
@@ -128,7 +240,7 @@ export default function ShiftsPage() {
                 <TableBody>
                   {filteredShifts.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                         Belum ada riwayat shift.
                       </TableCell>
                     </TableRow>
@@ -152,6 +264,10 @@ export default function ShiftsPage() {
                           )}
                         </TableCell>
                         <TableCell>{formatCurrency(shift.starting_cash)}</TableCell>
+                        <TableCell className="font-medium">{formatCurrency(shift.cash_sales)}</TableCell>
+                        <TableCell className="font-medium">{formatCurrency(shift.total_sales)}</TableCell>
+                        <TableCell>{shift.transaction_count}</TableCell>
+                        <TableCell>{formatDuration(shift.duration_minutes)}</TableCell>
                         <TableCell className="font-medium">{formatCurrency(shift.expected_cash)}</TableCell>
                         <TableCell className="font-bold">{formatCurrency(shift.ending_cash)}</TableCell>
                         <TableCell className="text-right">
@@ -166,9 +282,7 @@ export default function ShiftsPage() {
                                 ${shift.discrepancy && shift.discrepancy > 0 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : ''}
                               `}
                             >
-                              {shift.discrepancy === 0 && "PAS"}
-                              {shift.discrepancy && shift.discrepancy > 0 && `LEBIH ${formatCurrency(shift.discrepancy)}`}
-                              {shift.discrepancy && shift.discrepancy < 0 && `KURANG ${formatCurrency(Math.abs(shift.discrepancy))}`}
+                              {discrepancyLabel(shift.discrepancy)}
                             </Badge>
                           )}
                         </TableCell>

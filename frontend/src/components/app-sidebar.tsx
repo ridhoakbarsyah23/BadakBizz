@@ -18,7 +18,8 @@ import {
   History,
   Loader2,
   Edit3,
-  Armchair
+  Armchair,
+  CalendarClock
 } from "lucide-react";
 import { Button } from "@heroui/react";
 import {
@@ -64,6 +65,7 @@ const navGroups = [
     label: "Laporan",
     items: [
       { title: "Riwayat Transaksi", url: "/transactions", icon: History, roles: ['admin', 'cashier'] },
+      { title: "Shift Kasir", url: "/shifts", icon: CalendarClock, roles: ['admin'] },
       { title: "Laporan Keuangan", url: "/reports", icon: BarChart3, roles: ['admin'] },
     ]
   }

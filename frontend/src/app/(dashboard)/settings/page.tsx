@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { AlertTriangle, Armchair, CheckCircle2, Coins, Loader2, Receipt, Settings2, Store, X } from "lucide-react"
+import { AlertTriangle, Armchair, CalendarClock, CheckCircle2, Coins, Loader2, Receipt, Settings2, Store, X } from "lucide-react"
 
 import Link from "next/link"
 
@@ -32,6 +32,7 @@ export default function SettingsPage() {
     business_type: "retail",
     enable_table_management: false,
     enable_kitchen_receipts: false,
+    enable_shift_management: false,
     phone: "",
     address: "",
     tax_rate: "11",
@@ -56,6 +57,7 @@ export default function SettingsPage() {
             business_type: data.business_type || "retail",
             enable_table_management: data.enable_table_management == 1 || data.enable_table_management === true,
             enable_kitchen_receipts: data.enable_kitchen_receipts == 1 || data.enable_kitchen_receipts === true,
+            enable_shift_management: data.enable_shift_management == 1 || data.enable_shift_management === true,
             phone: data.phone || "",
             address: data.address || "",
             tax_rate: data.tax_rate?.toString() || "11",
@@ -101,6 +103,7 @@ export default function SettingsPage() {
             business_type: data.store.business_type || "retail",
             enable_table_management: data.store.enable_table_management == 1 || data.store.enable_table_management === true,
             enable_kitchen_receipts: data.store.enable_kitchen_receipts == 1 || data.store.enable_kitchen_receipts === true,
+            enable_shift_management: data.store.enable_shift_management == 1 || data.store.enable_shift_management === true,
             phone: data.store.phone || "",
             address: data.store.address || "",
             tax_rate: data.store.tax_rate?.toString() || "11",
@@ -277,6 +280,24 @@ export default function SettingsPage() {
                 <Switch 
                   checked={settings.enable_kitchen_receipts}
                   onCheckedChange={(checked) => setSettings({...settings, enable_kitchen_receipts: checked})}
+                />
+              </div>
+
+              <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-lg bg-blue-50 p-2 text-blue-600">
+                    <CalendarClock className="h-4 w-4" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Sistem Shift Kasir</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Aktifkan jika kasir harus buka shift sebelum checkout dan tutup shift saat selesai bertugas.
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={settings.enable_shift_management}
+                  onCheckedChange={(checked) => setSettings({...settings, enable_shift_management: checked})}
                 />
               </div>
             </div>

@@ -326,6 +326,75 @@ export default function TransactionsPage() {
     return { start: "", end: "" }
   }
 
+  const handlePrintReceipt = () => {
+    const receiptWidth = Number(storeSettings.receipt_width || 80)
+    const receiptElement = document.getElementById("printable-receipt")
+
+    if (!receiptElement) {
+      window.print()
+      return
+    }
+
+    const previousPrintRoot = document.getElementById("receipt-print-root")
+    previousPrintRoot?.remove()
+
+    const printRoot = document.createElement("div")
+    printRoot.id = "receipt-print-root"
+    printRoot.style.setProperty("--receipt-width", `${receiptWidth}mm`)
+    printRoot.style.position = "fixed"
+    printRoot.style.left = "-10000px"
+    printRoot.style.top = "0"
+    printRoot.style.width = `${receiptWidth}mm`
+
+    const receiptCopy = receiptElement.cloneNode(true) as HTMLElement
+    receiptCopy.removeAttribute("id")
+    receiptCopy.setAttribute("data-receipt-print-copy", "true")
+    receiptCopy.style.width = `${receiptWidth}mm`
+    receiptCopy.style.minWidth = `${receiptWidth}mm`
+    receiptCopy.style.maxWidth = `${receiptWidth}mm`
+    receiptCopy.style.margin = "0"
+    receiptCopy.style.padding = "3mm"
+    receiptCopy.style.boxSizing = "border-box"
+    receiptCopy.style.border = "0"
+    receiptCopy.style.borderRadius = "0"
+    receiptCopy.style.boxShadow = "none"
+    printRoot.appendChild(receiptCopy)
+    document.body.appendChild(printRoot)
+
+    const receiptHeightPx = receiptCopy.scrollHeight || receiptCopy.getBoundingClientRect().height || 0
+    const receiptHeightMm = receiptHeightPx > 0 ? Math.ceil(receiptHeightPx * 25.4 / 96) + 8 : 120
+    const printStyleId = "receipt-print-page-size"
+    const previousStyle = document.getElementById(printStyleId)
+    previousStyle?.remove()
+
+    const printStyle = document.createElement("style")
+    printStyle.id = printStyleId
+    printStyle.textContent = `@page { size: ${receiptWidth}mm ${receiptHeightMm}mm; margin: 0; }`
+    document.head.appendChild(printStyle)
+    document.body.classList.add("receipt-printing")
+    document.body.style.setProperty("--receipt-width", `${receiptWidth}mm`)
+
+    const removePrintStyle = () => {
+      document.body.classList.remove("receipt-printing")
+      document.body.style.removeProperty("--receipt-width")
+      printStyle.remove()
+      printRoot.remove()
+      window.removeEventListener("afterprint", removePrintStyle)
+    }
+
+    window.addEventListener("afterprint", removePrintStyle)
+    window.setTimeout(removePrintStyle, 2000)
+    window.print()
+  }
+
+  const formatReceiptCurrency = (value: number | string | null | undefined) => {
+    return Math.round(Number(value || 0)).toLocaleString("id-ID")
+  }
+
+  const formatOrderType = (value?: string | null) => {
+    return value === "dine_in" ? "Dine-in" : "Takeaway"
+  }
+
   const buildTransactionParams = (includePagination = true) => {
     const params = new URLSearchParams()
 
@@ -891,81 +960,119 @@ export default function TransactionsPage() {
               <div
                 id="printable-receipt"
                 style={{ "--receipt-width": `${Number(storeSettings.receipt_width || 80)}mm` } as CSSProperties}
-                className="bg-white text-black text-sm print:text-[10px] font-mono flex flex-col gap-2 rounded-xl border shadow-sm mx-auto mb-2 p-5 print:m-0"
+                className="receipt-paper bg-white text-black text-sm print:text-[10px] font-mono flex flex-col gap-2 rounded-xl border shadow-sm mx-auto mb-2 p-5 print:m-0"
               >
-                <div className="receipt-text text-center font-bold text-lg print:text-[13px] leading-tight mb-1">
+                <div className="receipt-text text-center font-black text-lg print:text-[13px] leading-tight">
                   {storeSettings.receipt_header || storeSettings.name || 'BADAKBIZ'}
                 </div>
-                <div className="receipt-text text-center text-xs print:text-[9px] leading-snug font-normal text-gray-600 print:text-black mb-3 whitespace-pre-line">
+                <div className="receipt-text text-center text-xs print:text-[9px] leading-snug font-normal text-gray-600 print:text-black whitespace-pre-line">
                   {storeSettings.address || 'Alamat Toko'}{storeSettings.address ? '\n' : ''}
                   Telp: {storeSettings.phone || '-'}
                 </div>
 
-                <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2"></div>
-
-                <div className="receipt-row text-xs print:text-[9px] mb-2 font-medium text-gray-600 print:text-black">
-                  <span className="receipt-text">{formatDate(selectedTransaction.created_at)}</span>
-                  <span className="receipt-value receipt-text">{selectedTransaction.transaction_number}</span>
-                </div>
-                <div className="receipt-text text-left text-xs print:text-[9px] mb-2 font-medium text-gray-600 print:text-black">
-                  Pelanggan: {selectedTransaction.customer?.name || 'Walk-in'}
-                </div>
-                {selectedTransaction.table && (
-                  <div className="receipt-text text-left text-xs print:text-[9px] mb-2 font-medium text-gray-600 print:text-black">
-                    Meja: {selectedTransaction.table.name}
+                {selectedTransaction.status === "PENDING" && selectedTransaction.payment_method === "QRIS" && (
+                  <div className="receipt-status rounded-lg px-2 py-1 text-xs print:rounded-none print:text-[9px]">
+                    STATUS: MENUNGGU PEMBAYARAN
                   </div>
                 )}
 
-                <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 flex flex-col gap-2">
+                <div className="receipt-section space-y-1 text-xs font-medium text-gray-600 print:text-[9px] print:text-black">
+                  <div className="receipt-row">
+                    <span>No</span>
+                    <span className="receipt-value receipt-text">{selectedTransaction.transaction_number}</span>
+                  </div>
+                  <div className="receipt-row">
+                    <span>Tanggal</span>
+                    <span className="receipt-value receipt-text">{formatDate(selectedTransaction.created_at)}</span>
+                  </div>
+                  <div className="receipt-row">
+                    <span>Kasir</span>
+                    <span className="receipt-value receipt-text">{selectedTransaction.cashier?.name || '-'}</span>
+                  </div>
+                  <div className="receipt-row">
+                    <span>Pelanggan</span>
+                    <span className="receipt-value receipt-text">{selectedTransaction.customer?.name || 'Walk-in'}</span>
+                  </div>
+                  <div className="receipt-row">
+                    <span>Order</span>
+                    <span className="receipt-value receipt-text">{formatOrderType(selectedTransaction.order_type)}</span>
+                  </div>
+                  {selectedTransaction.table && (
+                    <div className="receipt-row">
+                      <span>Meja</span>
+                      <span className="receipt-value receipt-text">{selectedTransaction.table.name}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="receipt-section flex flex-col gap-2">
                   {selectedTransaction.items?.map((item: any, i: number) => (
-                    <div key={i} className="flex flex-col">
-                      <div className="receipt-row font-bold print:font-semibold print:text-black">
-                        <span className="receipt-text pr-1">{item.variant ? `${item.product?.name} - ${item.variant.name}` : item.product?.name}</span>
-                        <span className="receipt-value receipt-money">Rp {Number(item.subtotal).toLocaleString("id-ID")}</span>
+                    <div key={i} className="receipt-item flex flex-col gap-0.5">
+                      <div className="receipt-item-name print:text-black">
+                        {item.product?.name || "-"}
                       </div>
-                      <div className="text-xs print:text-[9px] text-gray-500 print:text-black">
-                        {item.quantity} x Rp {Number(item.price).toLocaleString("id-ID")}
+                      {item.variant?.name && (
+                        <div className="receipt-item-meta">Varian: {item.variant.name}</div>
+                      )}
+                      <div className="receipt-row text-xs text-gray-500 print:text-[9px] print:text-black">
+                        <span>{item.quantity} x Rp {formatReceiptCurrency(item.price)}</span>
+                        <span className="receipt-value receipt-money">Rp {formatReceiptCurrency(item.subtotal)}</span>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="receipt-row text-xs print:text-[9px] print:text-black">
-                  <span>Subtotal</span>
-                  <span className="receipt-value receipt-money">Rp {Number(selectedTransaction.subtotal).toLocaleString("id-ID")}</span>
-                </div>
-                {Number(selectedTransaction.discount) > 0 && (
+                <div className="receipt-section space-y-1">
                   <div className="receipt-row text-xs print:text-[9px] print:text-black">
-                    <span>Diskon</span>
-                    <span className="receipt-value receipt-money">- Rp {Number(selectedTransaction.discount).toLocaleString("id-ID")}</span>
+                    <span>Subtotal</span>
+                    <span className="receipt-value receipt-money">Rp {formatReceiptCurrency(selectedTransaction.subtotal)}</span>
                   </div>
-                )}
-                {Number(selectedTransaction.service_charge) > 0 && (
+                  {Number(selectedTransaction.discount) > 0 && (
+                    <div className="receipt-row text-xs print:text-[9px] print:text-black">
+                      <span>Diskon</span>
+                      <span className="receipt-value receipt-money">- Rp {formatReceiptCurrency(selectedTransaction.discount)}</span>
+                    </div>
+                  )}
+                  {Number(selectedTransaction.service_charge) > 0 && (
+                    <div className="receipt-row text-xs print:text-[9px] print:text-black">
+                      <span>Biaya Layanan</span>
+                      <span className="receipt-value receipt-money">Rp {formatReceiptCurrency(selectedTransaction.service_charge)}</span>
+                    </div>
+                  )}
                   <div className="receipt-row text-xs print:text-[9px] print:text-black">
-                    <span>Biaya Layanan</span>
-                    <span className="receipt-value receipt-money">Rp {Number(selectedTransaction.service_charge).toLocaleString("id-ID")}</span>
+                    <span>Pajak</span>
+                    <span className="receipt-value receipt-money">Rp {formatReceiptCurrency(selectedTransaction.tax)}</span>
                   </div>
-                )}
-                <div className="receipt-row text-xs print:text-[9px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
-                  <span>Pajak</span>
-                  <span className="receipt-value receipt-money">Rp {Number(selectedTransaction.tax).toLocaleString("id-ID")}</span>
                 </div>
 
-                <div className="receipt-row font-black text-lg print:text-[13px] mb-2 print:text-black">
+                <div className="receipt-section receipt-row font-black text-lg print:text-[12px] print:text-black">
                   <span>TOTAL</span>
-                  <span className="receipt-value receipt-money">Rp {Number(selectedTransaction.total_amount).toLocaleString("id-ID")}</span>
+                  <span className="receipt-value receipt-money">Rp {formatReceiptCurrency(selectedTransaction.total_amount)}</span>
                 </div>
 
-                <div className="receipt-row text-xs print:text-[9px] print:text-black">
-                  <span>Bayar ({selectedTransaction.payment_method})</span>
-                  <span className="receipt-value receipt-money">Rp {Number(selectedTransaction.payment_amount).toLocaleString("id-ID")}</span>
-                </div>
-                <div className="receipt-row text-xs print:text-[9px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
-                  <span>Kembali</span>
-                  <span className="receipt-value receipt-money font-bold">Rp {(Number(selectedTransaction.payment_amount) - Number(selectedTransaction.total_amount)).toLocaleString("id-ID")}</span>
+                <div className="space-y-1 text-xs print:text-[9px] print:text-black">
+                  <div className="receipt-row">
+                    <span>Metode</span>
+                    <span className="receipt-value receipt-text">{selectedTransaction.payment_method}</span>
+                  </div>
+                  <div className="receipt-row">
+                    <span>Bayar</span>
+                    <span className="receipt-value receipt-money">Rp {formatReceiptCurrency(selectedTransaction.payment_amount)}</span>
+                  </div>
+                  {selectedTransaction.status !== "PENDING" && (
+                    <div className="receipt-row">
+                      <span>Kembali</span>
+                      <span className="receipt-value receipt-money font-bold">Rp {formatReceiptCurrency(Number(selectedTransaction.payment_amount) - Number(selectedTransaction.total_amount))}</span>
+                    </div>
+                  )}
                 </div>
 
-                <div className="receipt-text text-center text-xs print:text-[9px] mt-2 print:mt-1 italic text-gray-500 print:text-black whitespace-pre-line">
+                <div className="receipt-section receipt-text text-center text-xs print:text-[9px] italic text-gray-500 print:text-black whitespace-pre-line">
+                  {selectedTransaction.status === "PENDING" && selectedTransaction.payment_method === "QRIS" && (
+                    <div className="mb-1 font-bold not-italic">
+                      Struk ini belum menjadi bukti pembayaran lunas.
+                    </div>
+                  )}
                   {storeSettings.receipt_footer || 'Terima kasih atas kunjungan Anda!\nSilakan datang kembali.'}
                 </div>
 
@@ -1067,7 +1174,7 @@ export default function TransactionsPage() {
             {isReceiptMode ? (
               <Button
                 variant="primary"
-                onPress={() => window.print()}
+                onPress={handlePrintReceipt}
               >
                 Cetak Sekarang
               </Button>

@@ -19,7 +19,10 @@ import {
   Loader2,
   CheckCircle2,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  CalendarClock,
+  LogIn,
+  LogOut
 } from "lucide-react"
 import {
   Dialog,
@@ -42,6 +45,7 @@ export default function POSPage() {
   const [cashAmount, setCashAmount] = useState("")
   const [customers, setCustomers] = useState<any[]>([])
   const [tables, setTables] = useState<any[]>([])
+  const [currentShift, setCurrentShift] = useState<any | null>(null)
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("")
   const [selectedTableId, setSelectedTableId] = useState<string>("")
   const [orderType, setOrderType] = useState<string>("dine_in")
@@ -59,6 +63,10 @@ export default function POSPage() {
   const [isCashOpen, setIsCashOpen] = useState(false)
   const [isQrisOpen, setIsQrisOpen] = useState(false)
   const [isReceiptOpen, setIsReceiptOpen] = useState(false)
+  const [isShiftDialogOpen, setIsShiftDialogOpen] = useState(false)
+  const [shiftAction, setShiftAction] = useState<"open" | "close">("open")
+  const [shiftCashAmount, setShiftCashAmount] = useState("")
+  const [isShiftProcessing, setIsShiftProcessing] = useState(false)
   const [receiptData, setReceiptData] = useState<any>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [variantProduct, setVariantProduct] = useState<any | null>(null)
@@ -76,21 +84,24 @@ export default function POSPage() {
     setIsLoading(true)
     try {
       const headers = { "Authorization": `Bearer ${token}` }
-      const [productsRes, customersRes, settingsRes, tablesRes] = await Promise.all([
+      const [productsRes, customersRes, settingsRes, tablesRes, currentShiftRes] = await Promise.all([
         fetch(apiUrl('/api/products'), { headers }),
         fetch(apiUrl('/api/customers'), { headers }),
         fetch(apiUrl('/api/settings'), { headers }),
-        fetch(apiUrl('/api/tables'), { headers })
+        fetch(apiUrl('/api/tables'), { headers }),
+        fetch(apiUrl('/api/shifts/current'), { headers })
       ])
       
       const productsData = await productsRes.json()
       const customersData = await customersRes.json()
       const settingsData = await settingsRes.json()
       const tablesData = await tablesRes.json()
+      const currentShiftData = currentShiftRes.ok ? await currentShiftRes.json() : null
       
       setProducts(Array.isArray(productsData) ? productsData : [])
       setCustomers(Array.isArray(customersData) ? customersData : [])
       setTables(Array.isArray(tablesData) ? tablesData : [])
+      setCurrentShift(currentShiftData?.shift ?? null)
       if (settingsData && settingsData.name) {
         setStoreSettings(settingsData)
       }
@@ -255,11 +266,14 @@ export default function POSPage() {
   const selectedCustomer = customers.find(c => c.id.toString() === selectedCustomerId)
   const selectedTable = tables.find(t => t.id.toString() === selectedTableId)
   const tableManagementEnabled = storeSettings.enable_table_management == 1 || storeSettings.enable_table_management === true
+  const shiftManagementEnabled = storeSettings.enable_shift_management == 1 || storeSettings.enable_shift_management === true
   const availableTables = tables.filter(table => table.status === "available" || table.id.toString() === selectedTableId)
   const requiresTable = tableManagementEnabled && orderType === "dine_in" && tables.length > 0
-  const canCheckout = cart.length > 0 && (!requiresTable || Boolean(selectedTableId))
+  const canCheckout = cart.length > 0 && (!shiftManagementEnabled || Boolean(currentShift)) && (!requiresTable || Boolean(selectedTableId))
   const checkoutHint = cart.length === 0
     ? "Tambahkan produk ke keranjang untuk mulai checkout."
+    : shiftManagementEnabled && !currentShift
+      ? "Buka shift kasir terlebih dahulu sebelum checkout."
     : requiresTable && !selectedTableId
       ? "Pilih meja terlebih dahulu untuk pesanan dine-in."
       : null
@@ -275,9 +289,21 @@ export default function POSPage() {
   const taxRate = storeSettings.tax_rate ? (Number(storeSettings.tax_rate) / 100) : 0
   const tax = Math.round((netAfterDiscount + serviceCharge) * taxRate)
   const total = netAfterDiscount + serviceCharge + tax
+  const currentShiftCashSales = Number(currentShift?.cash_sales || 0)
+  const currentShiftExpectedCash = Number(currentShift?.expected_cash || currentShift?.starting_cash || 0)
+  const closeShiftCashAmount = Number(shiftCashAmount || 0)
+  const closeShiftDiscrepancy = closeShiftCashAmount - currentShiftExpectedCash
 
   const formatCurrency = (value: number | string | null | undefined) => {
     return Math.round(Number(value || 0)).toLocaleString("id-ID")
+  }
+
+  const getReceiptItemParts = (item: any) => {
+    const nameParts = String(item.name || "").split(" - ")
+    return {
+      name: nameParts[0] || item.name || "-",
+      variantName: item.variant_name || (nameParts.length > 1 ? nameParts.slice(1).join(" - ") : ""),
+    }
   }
 
   const formatReceiptDate = () => {
@@ -288,6 +314,67 @@ export default function POSPage() {
       hour: "2-digit",
       minute: "2-digit",
     })
+  }
+
+  const formatShiftDate = (value?: string | null) => {
+    if (!value) return "-"
+    return new Date(value).toLocaleString("id-ID", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  const openShiftDialog = (action: "open" | "close") => {
+    setShiftAction(action)
+    setShiftCashAmount("")
+    setIsShiftDialogOpen(true)
+  }
+
+  const handleShiftSubmit = async () => {
+    setIsShiftProcessing(true)
+    setNotice(null)
+
+    try {
+      const endpoint = shiftAction === "open" ? "/api/shifts/open" : "/api/shifts/close"
+      const payload = shiftAction === "open"
+        ? { starting_cash: Number(shiftCashAmount || 0) }
+        : { ending_cash: Number(shiftCashAmount || 0) }
+
+      const res = await fetch(apiUrl(endpoint), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.message || "Gagal memperbarui shift kasir.")
+      }
+
+      setCurrentShift(shiftAction === "open" ? data.shift : null)
+      setIsShiftDialogOpen(false)
+      setShiftCashAmount("")
+      setNotice({
+        type: "success",
+        message: shiftAction === "open"
+          ? "Shift kasir sudah dibuka. Checkout sekarang bisa dilakukan."
+          : "Shift kasir sudah ditutup. Buka shift baru sebelum checkout berikutnya.",
+      })
+      fetchProductsAndCustomers()
+    } catch (error: any) {
+      setNotice({
+        type: "error",
+        message: error.message || "Gagal memperbarui shift kasir.",
+      })
+    } finally {
+      setIsShiftProcessing(false)
+    }
   }
 
   const handleCheckout = async (paymentMethod: string, paymentAmount: number) => {
@@ -359,6 +446,8 @@ export default function POSPage() {
               service_charge: Number(txn?.service_charge ?? serviceCharge),
               tax: Number(txn?.tax ?? tax),
               total: Number(txn?.total_amount ?? total),
+              status: txn?.status || "PENDING",
+              orderType,
               paymentMethod,
               paymentAmount,
               change: paymentAmount - Number(txn?.total_amount ?? total),
@@ -394,6 +483,8 @@ export default function POSPage() {
             service_charge: Number(txn?.service_charge ?? serviceCharge),
             tax: Number(txn?.tax ?? tax),
             total: Number(txn?.total_amount ?? total),
+            status: txn?.status || "COMPLETED",
+            orderType,
             paymentMethod,
             paymentAmount,
             change: paymentAmount - Number(txn?.total_amount ?? total),
@@ -437,19 +528,57 @@ export default function POSPage() {
 
   const handlePrint = () => {
     const receiptWidth = Number(storeSettings.receipt_width || 80)
-    const itemCount = Math.max(receiptData?.items?.length || 1, 1)
-    const receiptHeight = Math.min(260, Math.max(105, 82 + itemCount * 10))
+    const receiptElement = document.getElementById("printable-receipt")
+
+    if (!receiptElement) {
+      window.print()
+      return
+    }
+
+    const previousPrintRoot = document.getElementById("receipt-print-root")
+    previousPrintRoot?.remove()
+
+    const printRoot = document.createElement("div")
+    printRoot.id = "receipt-print-root"
+    printRoot.style.setProperty("--receipt-width", `${receiptWidth}mm`)
+    printRoot.style.position = "fixed"
+    printRoot.style.left = "-10000px"
+    printRoot.style.top = "0"
+    printRoot.style.width = `${receiptWidth}mm`
+
+    const receiptCopy = receiptElement.cloneNode(true) as HTMLElement
+    receiptCopy.removeAttribute("id")
+    receiptCopy.setAttribute("data-receipt-print-copy", "true")
+    receiptCopy.style.width = `${receiptWidth}mm`
+    receiptCopy.style.minWidth = `${receiptWidth}mm`
+    receiptCopy.style.maxWidth = `${receiptWidth}mm`
+    receiptCopy.style.margin = "0"
+    receiptCopy.style.padding = "3mm"
+    receiptCopy.style.boxSizing = "border-box"
+    receiptCopy.style.border = "0"
+    receiptCopy.style.borderRadius = "0"
+    receiptCopy.style.boxShadow = "none"
+    printRoot.appendChild(receiptCopy)
+    document.body.appendChild(printRoot)
+
+    const receiptHeightPx = receiptCopy.scrollHeight || receiptCopy.getBoundingClientRect().height || 0
+    const receiptHeightMm = receiptHeightPx > 0 ? Math.ceil(receiptHeightPx * 25.4 / 96) + 6 : 120
     const printStyleId = "receipt-print-page-size"
     const previousStyle = document.getElementById(printStyleId)
     previousStyle?.remove()
 
     const printStyle = document.createElement("style")
     printStyle.id = printStyleId
-    printStyle.textContent = `@page { size: ${receiptWidth}mm ${receiptHeight}mm; margin: 0; }`
+    printStyle.textContent = `@page { size: ${receiptWidth}mm ${receiptHeightMm}mm; margin: 0; }`
     document.head.appendChild(printStyle)
+    document.body.classList.add("receipt-printing")
+    document.body.style.setProperty("--receipt-width", `${receiptWidth}mm`)
 
     const removePrintStyle = () => {
+      document.body.classList.remove("receipt-printing")
+      document.body.style.removeProperty("--receipt-width")
       printStyle.remove()
+      printRoot.remove()
       window.removeEventListener("afterprint", removePrintStyle)
     }
 
@@ -463,6 +592,70 @@ export default function POSPage() {
     <div className="flex flex-row gap-6 relative h-[calc(100vh-8rem)] w-full overflow-hidden">
       {/* LEFT: Product Grid */}
       <div className="flex-1 flex flex-col min-w-0 gap-4 lg:gap-6 overflow-hidden h-full">
+        {shiftManagementEnabled && (
+          <div className={`shrink-0 rounded-2xl border px-4 py-3 shadow-sm ${
+            currentShift
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-amber-200 bg-amber-50 text-amber-900"
+          }`}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <div className={`rounded-xl p-2 ${
+                  currentShift ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                }`}>
+                  <CalendarClock className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-black">
+                    {currentShift ? "Shift kasir sedang aktif" : "Shift kasir belum dibuka"}
+                  </p>
+                  <p className="mt-0.5 text-xs font-semibold opacity-80">
+                    {currentShift
+                      ? `Dibuka ${formatShiftDate(currentShift.start_time)}. Tutup shift saat sesi kasir selesai dan keranjang sudah kosong.`
+                      : "Buka shift sebelum menerima transaksi pertama agar kas dan penjualan tercatat rapi."}
+                  </p>
+                  {currentShift && (
+                    <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-bold">
+                      <span className="rounded-full bg-white/70 px-2.5 py-1 text-emerald-800">
+                        Cash: Rp {formatCurrency(currentShiftCashSales)}
+                      </span>
+                      <span className="rounded-full bg-white/70 px-2.5 py-1 text-emerald-800">
+                        Estimasi laci: Rp {formatCurrency(currentShiftExpectedCash)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {currentShift ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 border-emerald-300 bg-white/80 text-emerald-800 hover:bg-white"
+                  disabled={cart.length > 0 || isProcessing}
+                  onClick={() => openShiftDialog("close")}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Tutup Shift
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  className="shrink-0 bg-amber-700 text-white hover:bg-amber-800"
+                  onClick={() => openShiftDialog("open")}
+                >
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Buka Shift
+                </Button>
+              )}
+            </div>
+            {currentShift && cart.length > 0 && (
+              <p className="mt-2 text-xs font-semibold text-emerald-700">
+                Selesaikan atau kosongkan keranjang sebelum menutup shift.
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-4 shrink-0">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" />
@@ -814,6 +1007,104 @@ export default function POSPage() {
                </div>
       </div>
     </div>
+        {/* Shift Dialog */}
+          <Dialog open={isShiftDialogOpen} onOpenChange={setIsShiftDialogOpen}>
+            <DialogContent className="!max-w-sm w-[95vw] sm:w-full rounded-2xl">
+              <DialogHeader>
+                <DialogTitle>
+                  {shiftAction === "open" ? "Buka Shift Kasir" : "Tutup Shift Kasir"}
+                </DialogTitle>
+                <DialogDescription>
+                  {shiftAction === "open"
+                    ? "Masukkan modal awal sebelum mulai menerima transaksi."
+                    : "Masukkan uang aktual di laci kas saat sesi kasir selesai."}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 py-2">
+                {shiftAction === "close" && currentShift && (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                    <div className="flex justify-between gap-3">
+                      <span className="font-medium text-slate-600">Shift dibuka</span>
+                      <span className="font-bold text-slate-900">{formatShiftDate(currentShift.start_time)}</span>
+                    </div>
+                    <div className="mt-1 flex justify-between gap-3">
+                      <span className="font-medium text-slate-600">Modal awal</span>
+                      <span className="font-bold text-slate-900">Rp {formatCurrency(currentShift.starting_cash)}</span>
+                    </div>
+                    <div className="mt-1 flex justify-between gap-3">
+                      <span className="font-medium text-slate-600">Penjualan cash</span>
+                      <span className="font-bold text-slate-900">Rp {formatCurrency(currentShiftCashSales)}</span>
+                    </div>
+                    <div className="mt-1 flex justify-between gap-3 border-t border-slate-200 pt-2">
+                      <span className="font-medium text-slate-600">Estimasi uang laci</span>
+                      <span className="font-black text-slate-900">Rp {formatCurrency(currentShiftExpectedCash)}</span>
+                    </div>
+                  </div>
+                )}
+                <label className="text-sm font-semibold">
+                  {shiftAction === "open" ? "Modal Awal" : "Uang Aktual"}
+                </label>
+                <Input
+                  type="text"
+                  placeholder={shiftAction === "open" ? "Misal: 200.000" : "Misal: 1.250.000"}
+                  value={shiftCashAmount ? Number(shiftCashAmount).toLocaleString("id-ID") : ""}
+                  onChange={(e) => {
+                    const rawValue = e.target.value.replace(/\D/g, "")
+                    setShiftCashAmount(rawValue)
+                  }}
+                  className="h-12 rounded-xl text-lg font-bold"
+                  autoFocus
+                />
+                <p className="text-xs font-medium text-muted-foreground">
+                  {shiftAction === "open"
+                    ? "Buka shift saat kasir mulai bertugas."
+                    : "Tutup shift setelah transaksi terakhir selesai."}
+                </p>
+                {shiftAction === "close" && shiftCashAmount && (
+                  <div className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
+                    closeShiftDiscrepancy === 0
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : closeShiftDiscrepancy > 0
+                        ? "border-amber-200 bg-amber-50 text-amber-700"
+                        : "border-red-200 bg-red-50 text-red-700"
+                  }`}>
+                    {closeShiftDiscrepancy === 0
+                      ? "Uang aktual pas dengan estimasi."
+                      : closeShiftDiscrepancy > 0
+                        ? `Lebih Rp ${formatCurrency(closeShiftDiscrepancy)} dari estimasi.`
+                        : `Kurang Rp ${formatCurrency(Math.abs(closeShiftDiscrepancy))} dari estimasi.`}
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  className="rounded-xl font-semibold"
+                  onClick={() => setIsShiftDialogOpen(false)}
+                  disabled={isShiftProcessing}
+                >
+                  Batal
+                </Button>
+                <Button
+                  className="rounded-xl font-bold"
+                  onClick={handleShiftSubmit}
+                  disabled={isShiftProcessing}
+                >
+                  {isShiftProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Menyimpan...
+                    </>
+                  ) : shiftAction === "open" ? (
+                    "Buka Shift"
+                  ) : (
+                    "Tutup Shift"
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
         {/* Variant Picker Dialog */}
           <Dialog open={Boolean(variantProduct)} onOpenChange={(open) => !open && setVariantProduct(null)}>
             <DialogContent className="!max-w-md w-[95vw] sm:w-full rounded-2xl">
@@ -969,8 +1260,12 @@ export default function POSPage() {
                 >
                   <CheckCircle2 className="h-7 w-7 sm:h-10 sm:w-10" />
                 </motion.div>
-                <h2 className="text-xl font-black text-default-900 sm:text-2xl">Pembayaran Berhasil!</h2>
-                <p className="mt-1 text-sm text-default-500 sm:text-base">Transaksi telah tersimpan.</p>
+                <h2 className="text-xl font-black text-default-900 sm:text-2xl">
+                  {receiptData?.status === "PENDING" ? "Menunggu Pembayaran" : "Pembayaran Berhasil!"}
+                </h2>
+                <p className="mt-1 text-sm text-default-500 sm:text-base">
+                  {receiptData?.status === "PENDING" ? "Simpan struk sampai QRIS terkonfirmasi." : "Transaksi telah tersimpan."}
+                </p>
               </div>
 
               {/* Printable Receipt Area */}
@@ -978,91 +1273,121 @@ export default function POSPage() {
                 <div
                   id="printable-receipt"
                   style={{ "--receipt-width": `${Number(storeSettings.receipt_width || 80)}mm` } as CSSProperties}
-                  className="bg-white text-black text-[13px] sm:text-sm print:text-[10px] font-mono flex max-w-full flex-col gap-2 rounded-xl border shadow-sm mx-auto mb-2 p-4 sm:p-5 print:m-0"
+                  className="receipt-paper bg-white text-black text-[13px] sm:text-sm print:text-[10px] font-mono flex max-w-full flex-col gap-2 rounded-xl border shadow-sm mx-auto mb-2 p-4 sm:p-5 print:m-0"
                 >
-                  <div className="receipt-text text-center font-bold text-lg print:text-[13px] leading-tight mb-1">
+                  <div className="receipt-text text-center font-black text-lg print:text-[13px] leading-tight">
                     {storeSettings.receipt_header || storeSettings.name || 'BadakBizz'}
                   </div>
-                  <div className="receipt-text text-center text-xs print:text-[9px] leading-snug font-normal text-gray-600 print:text-black mb-3">
+                  <div className="receipt-text text-center text-xs print:text-[9px] leading-snug font-normal text-gray-600 print:text-black">
                     {storeSettings.address || 'Alamat Toko'}<br />
                     Telp: {storeSettings.phone || '-'}
                   </div>
 
-                  <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2"></div>
-
-                  <div className="receipt-row text-xs print:text-[9px] font-medium text-gray-600 print:text-black">
-                    <span>Tanggal</span>
-                    <span className="receipt-value receipt-text">{receiptData?.date}</span>
-                  </div>
-                  <div className="receipt-row text-xs print:text-[9px] font-medium text-gray-600 print:text-black">
-                    <span>No</span>
-                    <span className="receipt-value receipt-text">{receiptData?.transaction_number}</span>
-                  </div>
-                  <div className="receipt-row text-xs print:text-[9px] font-medium text-gray-600 print:text-black">
-                    <span>Kasir</span>
-                    <span className="receipt-value receipt-text">{receiptData?.cashierName}</span>
-                  </div>
-                  <div className="receipt-row text-xs print:text-[9px] mb-2 font-medium text-gray-600 print:text-black">
-                    <span>Pelanggan</span>
-                    <span className="receipt-value receipt-text">{receiptData?.customerName}</span>
-                  </div>
-                  {receiptData?.tableName && (
-                    <div className="receipt-row text-xs print:text-[9px] mb-2 font-medium text-gray-600 print:text-black">
-                      <span>Meja</span>
-                      <span className="receipt-value receipt-text">{receiptData.tableName}</span>
+                  {receiptData?.status === "PENDING" && (
+                    <div className="receipt-status rounded-lg px-2 py-1 text-xs print:rounded-none print:text-[9px]">
+                      STATUS: MENUNGGU PEMBAYARAN
                     </div>
                   )}
 
-                  <div className="border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 flex flex-col gap-2">
-                    {receiptData?.items.map((item: any, i: number) => (
+                  <div className="receipt-section space-y-1 text-xs font-medium text-gray-600 print:text-[9px] print:text-black">
+                    <div className="receipt-row">
+                      <span>No</span>
+                      <span className="receipt-value receipt-text">{receiptData?.transaction_number}</span>
+                    </div>
+                    <div className="receipt-row">
+                      <span>Tanggal</span>
+                      <span className="receipt-value receipt-text">{receiptData?.date}</span>
+                    </div>
+                    <div className="receipt-row">
+                      <span>Kasir</span>
+                      <span className="receipt-value receipt-text">{receiptData?.cashierName}</span>
+                    </div>
+                    <div className="receipt-row">
+                      <span>Pelanggan</span>
+                      <span className="receipt-value receipt-text">{receiptData?.customerName}</span>
+                    </div>
+                    <div className="receipt-row">
+                      <span>Order</span>
+                      <span className="receipt-value receipt-text">{receiptData?.orderType === "dine_in" ? "Dine-in" : "Takeaway"}</span>
+                    </div>
+                    {receiptData?.tableName && (
+                      <div className="receipt-row">
+                      <span>Meja</span>
+                      <span className="receipt-value receipt-text">{receiptData.tableName}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="receipt-section flex flex-col gap-2">
+                    {receiptData?.items.map((item: any, i: number) => {
+                      const itemParts = getReceiptItemParts(item)
+                      return (
                       <div key={i} className="receipt-item flex flex-col gap-0.5">
-                        <div className="receipt-text font-bold leading-snug print:font-semibold print:text-black">
-                          {item.name}
+                        <div className="receipt-item-name print:text-black">
+                          {itemParts.name}
                         </div>
+                        {itemParts.variantName && (
+                          <div className="receipt-item-meta">Varian: {itemParts.variantName}</div>
+                        )}
                         <div className="receipt-row text-xs text-gray-500 print:text-[9px] print:text-black">
                           <span>{item.qty} x Rp {formatCurrency(item.selling_price)}</span>
                           <span className="receipt-value receipt-money">Rp {formatCurrency(item.selling_price * item.qty)}</span>
                         </div>
                       </div>
-                    ))}
+                    )})}
                   </div>
 
-                  <div className="receipt-row text-xs print:text-[9px] print:text-black">
-                    <span>Subtotal</span>
-                    <span className="receipt-value receipt-money">Rp {formatCurrency(receiptData?.subtotal)}</span>
-                  </div>
-                  {receiptData?.discount > 0 && (
+                  <div className="receipt-section space-y-1">
                     <div className="receipt-row text-xs print:text-[9px] print:text-black">
-                      <span>Diskon Member</span>
-                      <span className="receipt-value receipt-money">- Rp {formatCurrency(receiptData?.discount)}</span>
+                      <span>Subtotal</span>
+                      <span className="receipt-value receipt-money">Rp {formatCurrency(receiptData?.subtotal)}</span>
                     </div>
-                  )}
-                  {receiptData?.service_charge > 0 && (
+                    {receiptData?.discount > 0 && (
+                      <div className="receipt-row text-xs print:text-[9px] print:text-black">
+                        <span>Diskon</span>
+                        <span className="receipt-value receipt-money">- Rp {formatCurrency(receiptData?.discount)}</span>
+                      </div>
+                    )}
+                    {receiptData?.service_charge > 0 && (
+                      <div className="receipt-row text-xs print:text-[9px] print:text-black">
+                        <span className="receipt-text">Service Charge ({storeSettings.service_charge_rate}%)</span>
+                        <span className="receipt-value receipt-money">Rp {formatCurrency(receiptData?.service_charge)}</span>
+                      </div>
+                    )}
                     <div className="receipt-row text-xs print:text-[9px] print:text-black">
-                      <span className="receipt-text">Service Charge ({storeSettings.service_charge_rate}%)</span>
-                      <span className="receipt-value receipt-money">Rp {formatCurrency(receiptData?.service_charge)}</span>
+                      <span>Tax ({storeSettings.tax_rate}%)</span>
+                      <span className="receipt-value receipt-money">Rp {formatCurrency(receiptData?.tax)}</span>
                     </div>
-                  )}
-                  <div className="receipt-row text-xs print:text-[9px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
-                    <span>Tax ({storeSettings.tax_rate}%)</span>
-                    <span className="receipt-value receipt-money">Rp {formatCurrency(receiptData?.tax)}</span>
                   </div>
 
-                  <div className="receipt-row font-black text-lg print:text-[13px] mb-2 print:text-black">
+                  <div className="receipt-section receipt-row font-black text-lg print:text-[12px] print:text-black">
                     <span>TOTAL</span>
                     <span className="receipt-value receipt-money">Rp {formatCurrency(receiptData?.total)}</span>
                   </div>
 
-                  <div className="receipt-row text-xs print:text-[9px] print:text-black">
-                    <span>Bayar ({receiptData?.paymentMethod})</span>
-                    <span className="receipt-value receipt-money">Rp {formatCurrency(receiptData?.paymentAmount)}</span>
-                  </div>
-                  <div className="receipt-row text-xs print:text-[9px] border-b-2 border-dashed border-gray-300 print:border-black pb-2 mb-2 print:text-black">
-                    <span>Kembali</span>
-                    <span className="receipt-value receipt-money font-bold">Rp {formatCurrency(receiptData?.change)}</span>
+                  <div className="space-y-1 text-xs print:text-[9px] print:text-black">
+                    <div className="receipt-row">
+                      <span>Metode</span>
+                      <span className="receipt-value receipt-text">{receiptData?.paymentMethod}</span>
+                    </div>
+                    <div className="receipt-row">
+                      <span>Bayar</span>
+                      <span className="receipt-value receipt-money">Rp {formatCurrency(receiptData?.paymentAmount)}</span>
+                    </div>
+                    {receiptData?.status !== "PENDING" && (
+                      <div className="receipt-row">
+                        <span>Kembali</span>
+                        <span className="receipt-value receipt-money font-bold">Rp {formatCurrency(receiptData?.change)}</span>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="receipt-text text-center text-xs print:text-[9px] mt-2 print:mt-1 italic text-gray-500 print:text-black">
+                  <div className="receipt-section receipt-text text-center text-xs print:text-[9px] italic text-gray-500 print:text-black">
+                    {receiptData?.status === "PENDING" && (
+                      <div className="mb-1 font-bold not-italic">
+                        Struk ini belum menjadi bukti pembayaran lunas.
+                      </div>
+                    )}
                     {storeSettings.receipt_footer || 'Terima kasih atas kunjungan Anda!'}
                   </div>
 
