@@ -140,7 +140,7 @@ class ReportController extends Controller
         $startDateStr = $request->query('start_date');
         $endDateStr = $request->query('end_date');
 
-        $query = Transaction::with('items.product', 'customer', 'cashier');
+        $query = Transaction::with('items.product', 'items.variant', 'customer', 'cashier');
 
         if ($startDateStr) {
             $query->where('created_at', '>=', Carbon::parse($startDateStr)->startOfDay());
@@ -191,6 +191,7 @@ class ReportController extends Controller
         $columns = [
             'Date', 'Transaction Number', 'Cashier', 'Customer', 'Payment Method',
             'Subtotal', 'Discount', 'Tax', 'Service Charge', 'Total Amount', 'Status',
+            'Order Notes', 'Items', 'Item Notes',
         ];
 
         $callback = function () use ($transactions, $columns) {
@@ -210,6 +211,9 @@ class ReportController extends Controller
                     $tx->service_charge,
                     $tx->total_amount,
                     $tx->status,
+                    $tx->notes,
+                    $this->transactionItemsSummary($tx),
+                    $this->transactionItemNotesSummary($tx),
                 ];
                 fputcsv($file, $row);
             }
@@ -233,6 +237,9 @@ class ReportController extends Controller
             'Biaya Layanan',
             'Total',
             'Status',
+            'Catatan Order',
+            'Item',
+            'Catatan Item',
         ]];
 
         foreach ($transactions as $tx) {
@@ -248,6 +255,9 @@ class ReportController extends Controller
                 (float) $tx->service_charge,
                 (float) $tx->total_amount,
                 $tx->status,
+                $tx->notes,
+                $this->transactionItemsSummary($tx),
+                $this->transactionItemNotesSummary($tx),
             ];
         }
 
@@ -307,9 +317,35 @@ class ReportController extends Controller
             .'<col min="3" max="5" width="18" customWidth="1"/>'
             .'<col min="6" max="10" width="16" customWidth="1"/>'
             .'<col min="11" max="11" width="14" customWidth="1"/>'
+            .'<col min="12" max="14" width="34" customWidth="1"/>'
             .'</cols>'
             .'<sheetData>'.$sheetData.'</sheetData>'
             .'</worksheet>';
+    }
+
+    private function transactionItemsSummary(Transaction $transaction): string
+    {
+        return $transaction->items
+            ->map(function ($item) {
+                $productName = $item->product?->name ?? 'Produk terhapus';
+                $variantName = $item->variant ? ' - '.$item->variant->name : '';
+
+                return $productName.$variantName.' x'.$item->quantity;
+            })
+            ->implode('; ');
+    }
+
+    private function transactionItemNotesSummary(Transaction $transaction): string
+    {
+        return $transaction->items
+            ->filter(fn ($item) => filled($item->notes))
+            ->map(function ($item) {
+                $productName = $item->product?->name ?? 'Produk terhapus';
+                $variantName = $item->variant ? ' - '.$item->variant->name : '';
+
+                return $productName.$variantName.': '.$item->notes;
+            })
+            ->implode('; ');
     }
 
     private function excelColumnName(int $columnNumber): string

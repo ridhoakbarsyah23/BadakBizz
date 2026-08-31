@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Role;
 use App\Models\Transaction;
 use App\Models\User;
@@ -51,6 +52,46 @@ class TransactionFilterExportTest extends TestCase
         $this->assertStringContainsString('TRX-CASH', $content);
         $this->assertStringNotContainsString('TRX-QRIS', $content);
         $this->assertStringNotContainsString('TRX-OLD', $content);
+    }
+
+    public function test_report_export_includes_order_notes_items_and_item_notes(): void
+    {
+        Sanctum::actingAs($this->admin());
+
+        $product = $this->createProduct('SKU-NOTE-EXPORT', 'Noodle Special');
+        $product->update(['has_variants' => true]);
+
+        $variant = ProductVariant::create([
+            'product_id' => $product->id,
+            'name' => 'Pedas',
+            'sku' => 'SKU-NOTE-EXPORT-PEDAS',
+            'price_adjustment' => 2_000,
+            'stock' => 5,
+        ]);
+
+        $transaction = $this->createTransaction('TRX-NOTE-EXPORT', '2026-08-29 12:00:00');
+        $transaction->update(['notes' => 'Antar ke meja luar']);
+        $transaction->items()->create([
+            'product_id' => $product->id,
+            'variant_id' => $variant->id,
+            'quantity' => 2,
+            'price' => 12_000,
+            'subtotal' => 24_000,
+            'notes' => 'Tanpa daun bawang',
+        ]);
+
+        $response = $this->get('/api/reports/export?start_date=2026-08-29&end_date=2026-08-29');
+
+        $response->assertOk();
+
+        $content = $response->streamedContent();
+
+        $this->assertStringContainsString('Order Notes', $content);
+        $this->assertStringContainsString('Items', $content);
+        $this->assertStringContainsString('Item Notes', $content);
+        $this->assertStringContainsString('Antar ke meja luar', $content);
+        $this->assertStringContainsString('Noodle Special - Pedas x2', $content);
+        $this->assertStringContainsString('Noodle Special - Pedas: Tanpa daun bawang', $content);
     }
 
     public function test_report_export_can_return_excel_file(): void

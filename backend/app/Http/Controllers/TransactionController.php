@@ -68,6 +68,7 @@ class TransactionController extends Controller
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.variant_id' => 'nullable|exists:product_variants,id',
             'items.*.quantity' => 'required|integer|min:1',
+            'items.*.notes' => 'nullable|string|max:255',
             'payment_method' => 'required|string|in:CASH,QRIS,TRANSFER,CARD',
             'payment_amount' => 'required|numeric|min:0',
             // customer_id and cashier_id are optional for now
@@ -76,6 +77,7 @@ class TransactionController extends Controller
             'discount' => 'nullable|numeric|min:0',
             'order_type' => 'nullable|string|in:dine_in,takeaway',
             'table_id' => 'nullable|exists:tables,id',
+            'notes' => 'nullable|string|max:255',
         ]);
 
         try {
@@ -145,6 +147,7 @@ class TransactionController extends Controller
                     'quantity' => $itemData['quantity'],
                     'price' => $price,
                     'subtotal' => $itemSubtotal,
+                    'notes' => isset($itemData['notes']) ? trim((string) $itemData['notes']) : null,
                 ];
             }
 
@@ -163,6 +166,7 @@ class TransactionController extends Controller
             $store = Store::first();
             $taxRatePercent = $store?->tax_rate ?? 11;
             $serviceChargeRatePercent = $store?->service_charge_rate ?? 0;
+            $shiftManagementEnabled = $store?->enable_shift_management ?? true;
 
             $netAfterDiscount = $subtotal - $discount;
             $serviceCharge = $netAfterDiscount * ($serviceChargeRatePercent / 100);
@@ -178,7 +182,7 @@ class TransactionController extends Controller
                     ->first();
             }
 
-            if (! $activeShift) {
+            if ($shiftManagementEnabled && ! $activeShift) {
                 throw new \Exception('Open an active cashier shift before checkout.');
             }
 
@@ -198,6 +202,7 @@ class TransactionController extends Controller
                 'status' => $validated['payment_method'] === 'QRIS' ? 'PENDING' : 'COMPLETED',
                 'order_type' => $validated['order_type'] ?? 'dine_in',
                 'table_id' => $validated['table_id'] ?? null,
+                'notes' => isset($validated['notes']) ? trim((string) $validated['notes']) ?: null : null,
             ]);
 
             // 3. Create Items, Update Stock, Create Inventory Movements
@@ -211,6 +216,7 @@ class TransactionController extends Controller
                     'quantity' => $item['quantity'],
                     'price' => $item['price'],
                     'subtotal' => $item['subtotal'],
+                    'notes' => $item['notes'] ?: null,
                 ]);
 
                 if ($item['variant']) {

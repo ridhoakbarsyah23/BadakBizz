@@ -1,6 +1,7 @@
 "use client"
 
 import { apiUrl } from "@/lib/api"
+import { AutoDismissNotice } from "@/components/auto-dismiss-notice"
 import React, { useState, useEffect, type CSSProperties } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { useAuth } from "@/context/AuthContext"
@@ -32,6 +33,7 @@ interface TransactionItem {
   quantity: number
   price: string
   subtotal: string
+  notes?: string | null
   product: {
     id: number
     name: string
@@ -60,6 +62,7 @@ interface Transaction {
   midtrans_transaction_id?: string | null
   status: string
   order_type?: string
+  notes?: string | null
   created_at: string
   customer?: {
     id: number
@@ -261,7 +264,6 @@ export default function TransactionsPage() {
     type: "error" | "success" | "info"
     message: string
   } | null>(null)
-  const [isNoticeVisible, setIsNoticeVisible] = useState(false)
   const [storeSettings, setStoreSettings] = useState<any>({
     name: "BadakBizz",
     address: "",
@@ -269,25 +271,6 @@ export default function TransactionsPage() {
     receipt_header: "BadakBizz",
     receipt_footer: "Thank you!"
   })
-
-  useEffect(() => {
-    if (!notice) return
-
-    setIsNoticeVisible(true)
-
-    const hideTimerId = window.setTimeout(() => {
-      setIsNoticeVisible(false)
-    }, 15000)
-
-    const removeTimerId = window.setTimeout(() => {
-      setNotice(null)
-    }, 15300)
-
-    return () => {
-      window.clearTimeout(hideTimerId)
-      window.clearTimeout(removeTimerId)
-    }
-  }, [notice])
 
   const getEffectiveDateRange = () => {
     const today = new Date()
@@ -687,22 +670,7 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {notice && (
-        <div className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm font-medium ${
-          notice.type === "error"
-            ? "border-red-200 bg-red-50 text-red-700"
-            : notice.type === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-              : "border-blue-200 bg-blue-50 text-blue-700"
-        } transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`}>
-          {notice.type === "error" ? (
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          ) : (
-            <Receipt className="mt-0.5 h-4 w-4 shrink-0" />
-          )}
-          <span>{notice.message}</span>
-        </div>
-      )}
+      <AutoDismissNotice notice={notice} onDismiss={() => setNotice(null)} />
 
       {pendingTransactions.length > 0 && (
         <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1003,6 +971,12 @@ export default function TransactionsPage() {
                       <span className="receipt-value receipt-text">{selectedTransaction.table.name}</span>
                     </div>
                   )}
+                  {selectedTransaction.notes && (
+                    <div className="receipt-row">
+                      <span>Catatan</span>
+                      <span className="receipt-value receipt-text">{selectedTransaction.notes}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="receipt-section flex flex-col gap-2">
@@ -1013,6 +987,9 @@ export default function TransactionsPage() {
                       </div>
                       {item.variant?.name && (
                         <div className="receipt-item-meta">Varian: {item.variant.name}</div>
+                      )}
+                      {item.notes && (
+                        <div className="receipt-item-meta">Catatan: {item.notes}</div>
                       )}
                       <div className="receipt-row text-xs text-gray-500 print:text-[9px] print:text-black">
                         <span>{item.quantity} x Rp {formatReceiptCurrency(item.price)}</span>
@@ -1128,6 +1105,12 @@ export default function TransactionsPage() {
                       </Chip>
                     </div>
                   </div>
+                  {selectedTransaction.notes && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
+                      <p className="mb-1 font-bold text-amber-800">Catatan Order</p>
+                      <p className="font-medium text-amber-700">{selectedTransaction.notes}</p>
+                    </div>
+                  )}
 
                   <div>
                     <h4 className="font-semibold mb-3">Item Pesanan</h4>
@@ -1137,6 +1120,9 @@ export default function TransactionsPage() {
                           <div>
                             <p className="font-medium">{item.variant ? `${item.product?.name} - ${item.variant.name}` : item.product?.name}</p>
                             <p className="text-muted-foreground text-xs">{item.quantity} x Rp {Number(item.price).toLocaleString('id-ID')}</p>
+                            {item.notes && (
+                              <p className="mt-1 text-xs font-medium text-amber-700">Catatan: {item.notes}</p>
+                            )}
                           </div>
                           <p className="font-bold">Rp {Number(item.subtotal).toLocaleString('id-ID')}</p>
                         </div>

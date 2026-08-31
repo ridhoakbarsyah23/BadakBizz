@@ -1,6 +1,7 @@
 "use client"
 
 import { apiUrl } from "@/lib/api"
+import { AutoDismissNotice } from "@/components/auto-dismiss-notice"
 import { useState, useEffect, type CSSProperties } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
@@ -11,11 +12,10 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { AlertTriangle, Armchair, CalendarClock, CheckCircle2, Coins, Loader2, Receipt, Settings2, Store, X } from "lucide-react"
+import { Armchair, CalendarClock, Coins, Loader2, Receipt, Settings2, Store } from "lucide-react"
 
 import Link from "next/link"
 
@@ -41,6 +41,7 @@ export default function SettingsPage() {
     receipt_footer: "",
     receipt_width: "80",
   })
+  const [savedSettings, setSavedSettings] = useState<typeof settings | null>(null)
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -52,12 +53,12 @@ export default function SettingsPage() {
         })
         const data = await res.json()
         if (res.ok) {
-          setSettings({
+          const nextSettings = {
             name: data.name || "",
             business_type: data.business_type || "retail",
             enable_table_management: data.enable_table_management == 1 || data.enable_table_management === true,
             enable_kitchen_receipts: data.enable_kitchen_receipts == 1 || data.enable_kitchen_receipts === true,
-            enable_shift_management: true,
+            enable_shift_management: data.enable_shift_management == 1 || data.enable_shift_management === true,
             phone: data.phone || "",
             address: data.address || "",
             tax_rate: data.tax_rate?.toString() || "11",
@@ -65,7 +66,10 @@ export default function SettingsPage() {
             receipt_header: data.receipt_header || "",
             receipt_footer: data.receipt_footer || "",
             receipt_width: data.receipt_width?.toString() || "80",
-          })
+          }
+
+          setSettings(nextSettings)
+          setSavedSettings(nextSettings)
         }
       } catch (error) {
         console.error("Failed to fetch settings:", error)
@@ -94,19 +98,19 @@ export default function SettingsPage() {
         },
         body: JSON.stringify({
           ...settings,
-          enable_shift_management: true,
+          enable_shift_management: settings.enable_shift_management,
         })
       })
       const data = await res.json().catch(() => null)
 
       if (res.ok) {
         if (data?.store) {
-          setSettings({
+          const nextSettings = {
             name: data.store.name || "",
             business_type: data.store.business_type || "retail",
             enable_table_management: data.store.enable_table_management == 1 || data.store.enable_table_management === true,
             enable_kitchen_receipts: data.store.enable_kitchen_receipts == 1 || data.store.enable_kitchen_receipts === true,
-            enable_shift_management: true,
+            enable_shift_management: data.store.enable_shift_management == 1 || data.store.enable_shift_management === true,
             phone: data.store.phone || "",
             address: data.store.address || "",
             tax_rate: data.store.tax_rate?.toString() || "11",
@@ -114,7 +118,12 @@ export default function SettingsPage() {
             receipt_header: data.store.receipt_header || "",
             receipt_footer: data.store.receipt_footer || "",
             receipt_width: data.store.receipt_width?.toString() || "80",
-          })
+          }
+
+          setSettings(nextSettings)
+          setSavedSettings(nextSettings)
+        } else {
+          setSavedSettings(settings)
         }
         setNotice({
           type: "success",
@@ -137,6 +146,10 @@ export default function SettingsPage() {
     }
   }
 
+  const hasChanges = savedSettings
+    ? JSON.stringify(settings) !== JSON.stringify(savedSettings)
+    : false
+
   if (isLoading) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
@@ -147,42 +160,21 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Pengaturan Toko</h1>
-        <p className="text-muted-foreground">
-          Kelola preferensi toko, format struk, dan akses karyawan.
-        </p>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold tracking-tight">Pengaturan Toko</h1>
+          <p className="max-w-2xl text-muted-foreground">
+            Kelola identitas toko, fitur operasional, pajak, dan format struk dari satu halaman.
+          </p>
+        </div>
       </div>
 
-      {notice && (
-        <div className={`flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-medium ${
-          notice.type === "success"
-            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-            : "border-red-200 bg-red-50 text-red-700"
-        }`}>
-          <div className="flex items-start gap-2">
-            {notice.type === "success" ? (
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-            ) : (
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            )}
-            <span>{notice.message}</span>
-          </div>
-          <button
-            type="button"
-            className="rounded-md p-1 opacity-70 transition hover:bg-black/5 hover:opacity-100"
-            aria-label="Tutup notifikasi"
-            onClick={() => setNotice(null)}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+      <AutoDismissNotice notice={notice} onDismiss={() => setNotice(null)} />
 
       <div className="grid gap-6 md:grid-cols-2">
         
         {/* Staff Management */}
-        <Card className="border-primary/20 shadow-md shadow-primary/5 bg-primary/5">
+        <Card className="border-primary/20 bg-primary/5 shadow-md shadow-primary/5">
           <CardHeader>
             <div className="flex items-center gap-2">
               <div className="p-2 bg-primary/20 rounded-lg">
@@ -198,12 +190,10 @@ export default function SettingsPage() {
             <p className="text-sm text-slate-600">
               Kontrol siapa yang dapat mengakses sistem POS Anda. Setiap nama kasir akan tercetak di struk untuk akuntabilitas.
             </p>
-          </CardContent>
-          <CardFooter>
-            <Link href="/staff" className="w-full sm:w-auto">
-              <Button className="w-full sm:w-auto">Kelola Akun Karyawan</Button>
+            <Link href="/staff" className="mt-4 inline-flex text-sm font-semibold text-primary hover:underline">
+              Kelola akun karyawan
             </Link>
-          </CardFooter>
+          </CardContent>
         </Card>
 
         <Card className="border-emerald-200 bg-emerald-50/60 shadow-md shadow-emerald-900/5">
@@ -222,12 +212,10 @@ export default function SettingsPage() {
             <p className="text-sm text-slate-600">
               Daftar meja ini akan muncul di POS saat fitur Manajemen Meja diaktifkan.
             </p>
-          </CardContent>
-          <CardFooter>
-            <Link href="/tables" className="w-full sm:w-auto">
-              <Button className="w-full sm:w-auto">Kelola Meja</Button>
+            <Link href="/tables" className="mt-4 inline-flex text-sm font-semibold text-emerald-700 hover:underline">
+              Kelola meja dine-in
             </Link>
-          </CardFooter>
+          </CardContent>
         </Card>
         
         {/* Business Type & Features */}
@@ -294,20 +282,17 @@ export default function SettingsPage() {
                   <div className="space-y-0.5">
                     <Label className="text-base">Sistem Shift Kasir</Label>
                     <p className="text-sm text-muted-foreground">
-                      Aktifkan jika kasir harus buka shift sebelum checkout dan tutup shift saat selesai bertugas.
+                      Jika aktif, kasir wajib buka shift sebelum checkout dan tutup shift saat selesai bertugas.
                     </p>
                   </div>
                 </div>
-                <Switch checked={settings.enable_shift_management} disabled />
+                <Switch
+                  checked={settings.enable_shift_management}
+                  onCheckedChange={(checked) => setSettings({...settings, enable_shift_management: checked})}
+                />
               </div>
             </div>
           </CardContent>
-          <CardFooter>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Simpan Konfigurasi
-            </Button>
-          </CardFooter>
         </Card>
 
         {/* General Information */}
@@ -347,12 +332,6 @@ export default function SettingsPage() {
               />
             </div>
           </CardContent>
-          <CardFooter>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Simpan Perubahan
-            </Button>
-          </CardFooter>
         </Card>
 
         {/* Financial Settings */}
@@ -392,12 +371,6 @@ export default function SettingsPage() {
               />
             </div>
           </CardContent>
-          <CardFooter>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Simpan Perubahan
-            </Button>
-          </CardFooter>
         </Card>
 
         {/* Receipt Customization */}
@@ -505,14 +478,17 @@ export default function SettingsPage() {
               </div>
             </div>
           </CardContent>
-          <CardFooter>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Simpan Perubahan
-            </Button>
-          </CardFooter>
         </Card>
+      </div>
 
+      <div className="sticky bottom-4 z-20 flex flex-col gap-3 rounded-2xl border bg-white/95 p-3 shadow-lg shadow-slate-900/10 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-sm font-medium text-muted-foreground">
+          {hasChanges ? "Ada perubahan yang belum disimpan." : "Semua pengaturan sudah tersimpan."}
+        </div>
+        <Button onClick={handleSave} disabled={isSaving || !hasChanges} className="w-full sm:w-auto">
+          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Simpan Pengaturan
+        </Button>
       </div>
     </div>
   )

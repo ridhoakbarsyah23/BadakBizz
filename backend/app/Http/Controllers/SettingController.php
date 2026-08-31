@@ -19,6 +19,8 @@ class SettingController extends Controller
                 'service_charge_rate' => 5.00,
                 'receipt_header' => 'BadakBizz Coffee & Eatery',
                 'receipt_footer' => 'Terima kasih atas kunjungan Anda!',
+                'enable_table_management' => false,
+                'enable_kitchen_receipts' => false,
                 'enable_shift_management' => true,
             ]);
         }
@@ -48,10 +50,7 @@ class SettingController extends Controller
             'receipt_width' => 'nullable|integer|in:58,80',
         ]);
 
-        $store->update([
-            ...$validated,
-            'enable_shift_management' => true,
-        ]);
+        $store->update($validated);
 
         return response()->json([
             'message' => 'Settings updated successfully',

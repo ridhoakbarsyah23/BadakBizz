@@ -1,6 +1,7 @@
 "use client"
 
 import { apiUrl } from "@/lib/api"
+import { AutoDismissNotice } from "@/components/auto-dismiss-notice"
 import { useState, useEffect, type CSSProperties } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { Button } from "@/components/ui/button"
@@ -18,7 +19,6 @@ import {
   QrCode,
   Loader2,
   CheckCircle2,
-  AlertTriangle,
   RefreshCw,
   CalendarClock,
   LogIn,
@@ -49,6 +49,7 @@ export default function POSPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("")
   const [selectedTableId, setSelectedTableId] = useState<string>("")
   const [orderType, setOrderType] = useState<string>("dine_in")
+  const [orderNotes, setOrderNotes] = useState("")
   const [customDiscountPercent, setCustomDiscountPercent] = useState("")
   const [storeSettings, setStoreSettings] = useState<any>({
     name: "BadakBizz",
@@ -186,6 +187,12 @@ export default function POSPage() {
     ? (product.variants || []).reduce((sum: number, variant: any) => sum + Number(variant.stock || 0), 0)
     : Number(product.stock || 0)
 
+  const availableVariantCount = (product: any) =>
+    (product.variants || []).filter((variant: any) => Number(variant.stock || 0) > 0).length
+
+  const variantPrice = (product: any, variant: any) =>
+    Number(product?.selling_price || 0) + Number(variant?.price_adjustment || 0)
+
   const productPrice = (product: any) => {
     if (!product.has_variants) {
       return Number(product.selling_price)
@@ -264,17 +271,27 @@ export default function POSPage() {
     setCart(prev => prev.filter(item => item.cart_key !== cartKey))
   }
 
+  const updateItemNote = (cartKey: string, notes: string) => {
+    setCart(prev => prev.map(item =>
+      item.cart_key === cartKey
+        ? { ...item, notes }
+        : item
+    ))
+  }
+
   const subtotal = cart.reduce((sum, item) => sum + (item.selling_price * item.qty), 0)
   const selectedCustomer = customers.find(c => c.id.toString() === selectedCustomerId)
   const selectedTable = tables.find(t => t.id.toString() === selectedTableId)
   const tableManagementEnabled = storeSettings.enable_table_management == 1 || storeSettings.enable_table_management === true
   const kitchenReceiptsEnabled = storeSettings.enable_kitchen_receipts == 1 || storeSettings.enable_kitchen_receipts === true
+  const shiftManagementEnabled = storeSettings.enable_shift_management == 1 || storeSettings.enable_shift_management === true
   const availableTables = tables.filter(table => table.status === "available" || table.id.toString() === selectedTableId)
   const requiresTable = tableManagementEnabled && orderType === "dine_in" && tables.length > 0
-  const canCheckout = cart.length > 0 && Boolean(currentShift) && (!requiresTable || Boolean(selectedTableId))
+  const requiresShift = shiftManagementEnabled && !currentShift
+  const canCheckout = cart.length > 0 && !requiresShift && (!requiresTable || Boolean(selectedTableId))
   const checkoutHint = cart.length === 0
     ? "Tambahkan produk ke keranjang untuk mulai checkout."
-    : !currentShift
+    : requiresShift
       ? "Buka shift kasir terlebih dahulu sebelum checkout."
     : requiresTable && !selectedTableId
       ? "Pilih meja terlebih dahulu untuk pesanan dine-in."
@@ -402,14 +419,16 @@ export default function POSPage() {
           items: cart.map(item => ({
             product_id: item.product_id,
             variant_id: item.variant_id || undefined,
-            quantity: item.qty
+            quantity: item.qty,
+            notes: item.notes?.trim() || undefined
           })),
           customer_id: selectedCustomerId || null,
           table_id: tableManagementEnabled && orderType === "dine_in" && selectedTableId ? selectedTableId : null,
           payment_method: paymentMethod,
           payment_amount: paymentAmount,
           discount: discount,
-          order_type: orderType
+          order_type: orderType,
+          notes: orderNotes.trim() || undefined
         })
       })
 
@@ -450,6 +469,7 @@ export default function POSPage() {
               total: Number(txn?.total_amount ?? total),
               status: txn?.status || "PENDING",
               orderType,
+              notes: txn?.notes || orderNotes.trim() || null,
               paymentMethod,
               paymentAmount,
               change: paymentAmount - Number(txn?.total_amount ?? total),
@@ -462,6 +482,7 @@ export default function POSPage() {
             setCart([])
             setSelectedCustomerId("")
             setSelectedTableId("")
+            setOrderNotes("")
             setCashAmount("")
             setIsCheckoutOpen(false)
             setIsQrisOpen(true)
@@ -487,6 +508,7 @@ export default function POSPage() {
             total: Number(txn?.total_amount ?? total),
             status: txn?.status || "COMPLETED",
             orderType,
+            notes: txn?.notes || orderNotes.trim() || null,
             paymentMethod,
             paymentAmount,
             change: paymentAmount - Number(txn?.total_amount ?? total),
@@ -498,6 +520,7 @@ export default function POSPage() {
           setCart([])
           setSelectedCustomerId("")
           setSelectedTableId("")
+          setOrderNotes("")
           setIsCashOpen(false)
           setIsCheckoutOpen(false)
           setIsReceiptOpen(true)
@@ -698,7 +721,8 @@ export default function POSPage() {
     <div className="flex flex-row gap-6 relative h-[calc(100vh-8rem)] w-full overflow-hidden">
       {/* LEFT: Product Grid */}
       <div className="flex-1 flex flex-col min-w-0 gap-4 lg:gap-6 overflow-hidden h-full">
-        <div className={`shrink-0 rounded-2xl border px-4 py-3 shadow-sm ${
+        {shiftManagementEnabled && (
+          <div className={`shrink-0 rounded-2xl border px-4 py-3 shadow-sm ${
             currentShift
               ? "border-emerald-200 bg-emerald-50 text-emerald-900"
               : "border-amber-200 bg-amber-50 text-amber-900"
@@ -759,6 +783,7 @@ export default function POSPage() {
               </p>
             )}
           </div>
+        )}
 
         <div className="flex items-center justify-between gap-4 shrink-0">
           <div className="relative flex-1">
@@ -827,9 +852,20 @@ export default function POSPage() {
                         {product.name.charAt(0)}
                       </div>
                       <div className="font-bold text-sm line-clamp-2 leading-tight text-slate-800 group-hover:text-primary transition-colors">{product.name}</div>
-                      <div className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 rounded-full text-slate-500 uppercase tracking-wider">
-                        {product.has_variants ? `${product.variants?.length || 0} Varian` : `Stok: ${product.stock}`}
-                      </div>
+                      {product.has_variants ? (
+                        <div className="flex flex-wrap justify-center gap-1.5">
+                          <div className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 rounded-full text-slate-500 uppercase tracking-wider">
+                            {availableVariantCount(product)}/{product.variants?.length || 0} Varian
+                          </div>
+                          <div className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 rounded-full text-emerald-700 uppercase tracking-wider">
+                            Stok: {productStock(product)}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 rounded-full text-slate-500 uppercase tracking-wider">
+                          Stok: {product.stock}
+                        </div>
+                      )}
                       <div className="text-primary font-black text-base mt-auto pt-1">
                         {product.has_variants ? "Mulai " : ""}Rp {productPrice(product).toLocaleString("id-ID")}
                       </div>
@@ -908,31 +944,40 @@ export default function POSPage() {
                           initial={{ opacity: 0, scale: 0.95 }}
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.95 }}
-                          className="flex gap-3 items-center bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow group"
+                          className="flex flex-col gap-3 bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow group"
                         >
-                          <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 font-bold border border-slate-100">
-                            {item.name.charAt(0)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-bold text-slate-900 truncate">{item.name}</div>
-                            <div className="text-sm text-primary font-bold">
-                              Rp {(item.selling_price * item.qty).toLocaleString("id-ID")}
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 font-bold border border-slate-100">
+                              {item.name.charAt(0)}
                             </div>
-                          </div>
-                          
-                          <div className="flex items-center gap-1 bg-slate-50 rounded-lg p-1 border border-slate-200">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md hover:bg-white hover:shadow-sm transition-all" onClick={() => updateQty(item.cart_key, -1)}>
-                              <Minus className="h-3 w-3" />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-bold text-slate-900 truncate">{item.name}</div>
+                              <div className="text-sm text-primary font-bold">
+                                Rp {(item.selling_price * item.qty).toLocaleString("id-ID")}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 bg-slate-50 rounded-lg p-1 border border-slate-200">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md hover:bg-white hover:shadow-sm transition-all" onClick={() => updateQty(item.cart_key, -1)}>
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <span className="w-6 text-center font-bold text-sm">{item.qty}</span>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md hover:bg-white hover:shadow-sm transition-all" onClick={() => updateQty(item.cart_key, 1)}>
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+
+                            <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-400 hover:text-destructive hover:bg-destructive/10 rounded-xl transition-colors" onClick={() => removeFromCart(item.cart_key)}>
+                              <Trash2 className="h-4 w-4" />
                             </Button>
-                            <span className="w-6 text-center font-bold text-sm">{item.qty}</span>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md hover:bg-white hover:shadow-sm transition-all" onClick={() => updateQty(item.cart_key, 1)}>
-                              <Plus className="h-3 w-3" />
-                            </Button>
                           </div>
-                          
-                          <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-400 hover:text-destructive hover:bg-destructive/10 rounded-xl transition-colors" onClick={() => removeFromCart(item.cart_key)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <Input
+                            value={item.notes || ""}
+                            onChange={(event) => updateItemNote(item.cart_key, event.target.value)}
+                            maxLength={255}
+                            placeholder="Catatan item, cth. tanpa gula"
+                            className="h-9 rounded-xl border-slate-200 bg-slate-50 text-xs"
+                          />
                         </motion.div>
                       ))
                     )}
@@ -1013,6 +1058,18 @@ export default function POSPage() {
                 className="h-10 text-sm rounded-xl"
               />
             </div>
+
+            <div className="flex flex-col gap-1.5 mb-2">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Catatan Order</label>
+              <textarea
+                value={orderNotes}
+                onChange={(event) => setOrderNotes(event.target.value)}
+                maxLength={255}
+                rows={2}
+                placeholder="cth. antar ke meja luar, ambil jam 7"
+                className="min-h-16 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
             
                  <div className="pt-4 border-t border-slate-100 space-y-2">
                     <div className="flex justify-between text-sm font-medium text-slate-600">
@@ -1040,22 +1097,7 @@ export default function POSPage() {
         </div>
 
                <div className="p-5 bg-slate-50 border-t border-slate-100 shadow-[0_-15px_40px_-15px_rgba(0,0,0,0.05)] z-20 shrink-0">
-                  {notice && (
-                    <div className={`mb-3 flex items-start gap-2 rounded-xl border px-3 py-2 text-sm font-medium ${
-                      notice.type === "error"
-                        ? "border-red-200 bg-red-50 text-red-700"
-                        : notice.type === "success"
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                          : "border-blue-200 bg-blue-50 text-blue-700"
-                    }`}>
-                      {notice.type === "error" ? (
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                      ) : (
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-                      )}
-                      <span>{notice.message}</span>
-                    </div>
-                  )}
+                  <AutoDismissNotice notice={notice} onDismiss={() => setNotice(null)} className="mb-3 px-3 py-2" />
                   <div className="flex justify-between font-black text-2xl text-slate-900 mb-4">
                     <span>Total</span>
                     <span className="text-primary">Rp {total.toLocaleString("id-ID")}</span>
@@ -1219,13 +1261,16 @@ export default function POSPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-3 py-2">
-                {(variantProduct?.variants || [])
-                  .filter((variant: any) => Number(variant.stock || 0) > 0)
-                  .map((variant: any) => (
+                {(variantProduct?.variants || []).map((variant: any) => {
+                  const stock = Number(variant.stock || 0)
+                  const isAvailable = stock > 0
+
+                  return (
                     <button
                       key={variant.id}
                       type="button"
-                      className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-primary/40 hover:bg-primary/5"
+                      disabled={!isAvailable}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-primary/40 hover:bg-primary/5 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-70"
                       onClick={() => {
                         addToCart(buildCartItem(variantProduct, variant))
                         setVariantProduct(null)
@@ -1233,13 +1278,21 @@ export default function POSPage() {
                     >
                       <div className="min-w-0">
                         <div className="font-bold text-slate-900 truncate">{variant.name}</div>
-                        <div className="text-xs font-medium text-slate-500">Stok: {variant.stock}</div>
+                        <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-semibold">
+                          {variant.sku && (
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{variant.sku}</span>
+                          )}
+                          <span className={`rounded-full px-2 py-0.5 ${isAvailable ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>
+                            {isAvailable ? `Stok ${stock}` : "Habis"}
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-right font-black text-primary">
-                        Rp {(Number(variantProduct?.selling_price || 0) + Number(variant.price_adjustment || 0)).toLocaleString("id-ID")}
+                      <div className={`shrink-0 text-right font-black ${isAvailable ? "text-primary" : "text-slate-400"}`}>
+                        Rp {variantPrice(variantProduct, variant).toLocaleString("id-ID")}
                       </div>
                     </button>
-                  ))}
+                  )
+                })}
                 {(variantProduct?.variants || []).filter((variant: any) => Number(variant.stock || 0) > 0).length === 0 && (
                   <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm font-medium text-slate-500">
                     Semua varian sedang habis.
@@ -1464,6 +1517,12 @@ export default function POSPage() {
                       <span className="receipt-value receipt-text">{receiptData.tableName}</span>
                       </div>
                     )}
+                    {receiptData?.notes && (
+                      <div className="receipt-row">
+                        <span>Catatan</span>
+                        <span className="receipt-value receipt-text">{receiptData.notes}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="receipt-section flex flex-col gap-2">
@@ -1476,6 +1535,9 @@ export default function POSPage() {
                         </div>
                         {itemParts.variantName && (
                           <div className="receipt-item-meta">Varian: {itemParts.variantName}</div>
+                        )}
+                        {item.notes && (
+                          <div className="receipt-item-meta">Catatan: {item.notes}</div>
                         )}
                         <div className="receipt-row text-xs text-gray-500 print:text-[9px] print:text-black">
                           <span>{item.qty} x Rp {formatCurrency(item.selling_price)}</span>
@@ -1548,47 +1610,59 @@ export default function POSPage() {
                   <div
                     id="printable-kitchen-receipt"
                     style={{ "--receipt-width": `${Number(storeSettings.receipt_width || 80)}mm` } as CSSProperties}
-                    className="receipt-paper mt-3 bg-white text-black text-[13px] sm:text-sm print:text-[10px] font-mono flex max-w-full flex-col gap-2 rounded-xl border shadow-sm mx-auto mb-2 p-4 sm:p-5 print:m-0"
+                    className="receipt-paper mt-3 bg-white text-black text-[13px] sm:text-sm print:text-[10px] font-mono flex max-w-full flex-col gap-3 rounded-xl border shadow-sm mx-auto mb-2 p-4 sm:p-5 print:m-0"
                   >
-                    <div className="receipt-text text-center font-black text-lg print:text-[13px] leading-tight">
-                      TIKET DAPUR
-                    </div>
-                    <div className="receipt-text text-center text-xs print:text-[9px] leading-snug font-normal text-gray-600 print:text-black">
-                      {storeSettings.name || "BadakBizz"}
+                    <div className="receipt-section text-center">
+                      <div className="receipt-text font-black text-xl leading-tight print:text-[15px]">
+                        TIKET DAPUR
+                      </div>
+                      <div className="receipt-text mt-1 text-xs font-bold uppercase print:text-[9px]">
+                        {receiptData?.orderType === "dine_in" ? "DINE-IN" : "TAKEAWAY"}
+                        {receiptData?.tableName ? ` / ${receiptData.tableName}` : ""}
+                      </div>
+                      <div className="receipt-text mt-1 text-xs text-gray-600 print:text-[9px] print:text-black">
+                        {storeSettings.name || "BadakBizz"}
+                      </div>
                     </div>
 
-                    <div className="receipt-section space-y-1 text-xs font-medium text-gray-600 print:text-[9px] print:text-black">
+                    <div className="receipt-section space-y-1 text-xs font-medium text-gray-700 print:text-[9px] print:text-black">
                       <div className="receipt-row">
                         <span>No</span>
-                        <span className="receipt-value receipt-text">{receiptData?.transaction_number}</span>
+                        <span className="receipt-value receipt-text font-black">{receiptData?.transaction_number}</span>
                       </div>
                       <div className="receipt-row">
                         <span>Waktu</span>
                         <span className="receipt-value receipt-text">{receiptData?.date}</span>
                       </div>
-                      <div className="receipt-row">
-                        <span>Order</span>
-                        <span className="receipt-value receipt-text">{receiptData?.orderType === "dine_in" ? "Dine-in" : "Takeaway"}</span>
-                      </div>
-                      {receiptData?.tableName && (
-                        <div className="receipt-row">
-                          <span>Meja</span>
-                          <span className="receipt-value receipt-text">{receiptData.tableName}</span>
-                        </div>
-                      )}
                     </div>
 
-                    <div className="receipt-section flex flex-col gap-2">
+                    {receiptData?.notes && (
+                      <div className="receipt-section rounded-md border border-dashed border-black/50 p-2 print:rounded-none">
+                        <div className="receipt-text text-[10px] font-black uppercase print:text-[8px]">Catatan Order</div>
+                        <div className="receipt-text mt-1 text-sm font-bold leading-snug print:text-[10px]">
+                          {receiptData.notes}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="receipt-section flex flex-col gap-3">
                       {receiptData?.items.map((item: any, i: number) => {
                         const itemParts = getReceiptItemParts(item)
                         return (
-                          <div key={i} className="receipt-item flex flex-col gap-0.5">
-                            <div className="receipt-row font-black text-sm print:text-[11px] print:text-black">
-                              <span className="receipt-item-name">{itemParts.name}</span>
-                              <span className="receipt-value">{item.qty}x</span>
+                          <div key={i} className="receipt-item flex flex-col gap-1">
+                            <div className="receipt-row items-start font-black text-base print:text-[12px] print:text-black">
+                              <span className="receipt-item-name">{i + 1}. {itemParts.name}</span>
+                              <span className="receipt-value ml-2 rounded border border-black px-2 py-0.5 text-base print:text-[12px]">
+                                {item.qty}x
+                              </span>
                             </div>
                             {itemParts.variantName && (
-                              <div className="receipt-item-meta">Varian: {itemParts.variantName}</div>
+                              <div className="receipt-item-meta font-bold">Varian: {itemParts.variantName}</div>
+                            )}
+                            {item.notes && (
+                              <div className="receipt-item-meta rounded bg-gray-100 px-2 py-1 font-bold print:bg-white print:px-0">
+                                Catatan: {item.notes}
+                              </div>
                             )}
                           </div>
                         )

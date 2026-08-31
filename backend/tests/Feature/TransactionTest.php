@@ -155,7 +155,7 @@ class TransactionTest extends TestCase
         $this->assertDatabaseCount('transactions', 0);
     }
 
-    public function test_transaction_without_shift_is_rejected_even_when_shift_management_setting_is_disabled(): void
+    public function test_transaction_without_shift_is_allowed_when_shift_management_setting_is_disabled(): void
     {
         Sanctum::actingAs($this->cashier(withOpenShift: false));
 
@@ -168,7 +168,7 @@ class TransactionTest extends TestCase
 
         $product = Product::create([
             'sku' => 'SKU-SHIFT-DISABLED',
-            'name' => 'Shift Required Product',
+            'name' => 'Shift Optional Product',
             'purchase_price' => 5_000,
             'selling_price' => 10_000,
             'stock' => 10,
@@ -185,12 +185,12 @@ class TransactionTest extends TestCase
             'order_type' => 'takeaway',
         ]);
 
-        $response->assertStatus(400)
-            ->assertJsonPath('message', 'Failed to process transaction.')
-            ->assertJsonPath('error', 'Open an active cashier shift before checkout.');
+        $response->assertCreated()
+            ->assertJsonPath('data.status', 'COMPLETED')
+            ->assertJsonPath('data.cashier_shift_id', null);
 
-        $this->assertSame(10, $product->fresh()->stock);
-        $this->assertDatabaseCount('transactions', 0);
+        $this->assertSame(9, $product->fresh()->stock);
+        $this->assertDatabaseCount('transactions', 1);
     }
 
     public function test_transaction_is_rejected_when_stock_is_insufficient(): void
@@ -521,6 +521,100 @@ class TransactionTest extends TestCase
             'variant_id' => $variant->id,
             'type' => 'IN',
             'quantity' => 2,
+        ]);
+    }
+
+    public function test_transaction_items_can_store_notes(): void
+    {
+        Sanctum::actingAs($this->cashier());
+
+        Store::create([
+            'name' => 'BadakBizz Test',
+            'tax_rate' => 0,
+            'service_charge_rate' => 0,
+        ]);
+
+        $product = Product::create([
+            'sku' => 'SKU-NOTE',
+            'name' => 'Noodle Special',
+            'purchase_price' => 8_000,
+            'selling_price' => 18_000,
+            'stock' => 5,
+            'minimum_stock' => 1,
+            'is_active' => true,
+        ]);
+
+        $response = $this->postJson('/api/transactions', [
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => 1,
+                    'notes' => 'Tidak pedas, tanpa daun bawang',
+                ],
+            ],
+            'payment_method' => 'CASH',
+            'payment_amount' => 18_000,
+            'order_type' => 'takeaway',
+        ]);
+
+        $transactionId = $response->assertCreated()
+            ->assertJsonPath('data.items.0.notes', 'Tidak pedas, tanpa daun bawang')
+            ->json('data.id');
+
+        $this->getJson("/api/transactions?search={$response->json('data.transaction_number')}")
+            ->assertOk()
+            ->assertJsonPath('0.id', $transactionId)
+            ->assertJsonPath('0.items.0.notes', 'Tidak pedas, tanpa daun bawang');
+
+        $this->assertDatabaseHas('transaction_items', [
+            'transaction_id' => $transactionId,
+            'product_id' => $product->id,
+            'notes' => 'Tidak pedas, tanpa daun bawang',
+        ]);
+    }
+
+    public function test_transaction_can_store_order_notes(): void
+    {
+        Sanctum::actingAs($this->cashier());
+
+        Store::create([
+            'name' => 'BadakBizz Test',
+            'tax_rate' => 0,
+            'service_charge_rate' => 0,
+        ]);
+
+        $product = Product::create([
+            'sku' => 'SKU-ORDER-NOTE',
+            'name' => 'Nasi Goreng',
+            'purchase_price' => 10_000,
+            'selling_price' => 20_000,
+            'stock' => 5,
+            'minimum_stock' => 1,
+            'is_active' => true,
+        ]);
+
+        $response = $this->postJson('/api/transactions', [
+            'items' => [
+                ['product_id' => $product->id, 'quantity' => 1],
+            ],
+            'payment_method' => 'CASH',
+            'payment_amount' => 20_000,
+            'order_type' => 'takeaway',
+            'notes' => 'Ambil jam 7 malam',
+        ]);
+
+        $transactionId = $response->assertCreated()
+            ->assertJsonPath('data.notes', 'Ambil jam 7 malam')
+            ->json('data.id');
+
+        $this->getJson("/api/transactions?search={$response->json('data.transaction_number')}")
+            ->assertOk()
+            ->assertJsonPath('0.id', $transactionId)
+            ->assertJsonPath('0.notes', 'Ambil jam 7 malam');
+
+        $this->assertDatabaseHas('transactions', [
+            'id' => $transactionId,
+            'notes' => 'Ambil jam 7 malam',
         ]);
     }
 

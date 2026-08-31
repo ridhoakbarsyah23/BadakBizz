@@ -25,6 +25,7 @@ class Transaction extends Model
         'status',
         'order_type',
         'table_id',
+        'notes',
     ];
 
     public function customer(): BelongsTo

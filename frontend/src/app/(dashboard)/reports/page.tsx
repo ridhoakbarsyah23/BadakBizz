@@ -1,6 +1,7 @@
 "use client"
 
 import { apiUrl } from "@/lib/api"
+import { AutoDismissNotice } from "@/components/auto-dismiss-notice"
 import { useState, useEffect } from "react"
 import {
   Card,
@@ -12,7 +13,7 @@ import {
 import { Bar, BarChart, CartesianGrid, XAxis, LineChart, Line } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { useAuth } from "@/context/AuthContext"
-import { AlertTriangle, CalendarDays, CheckCircle2, Download, Loader2, RotateCcw } from "lucide-react"
+import { CalendarDays, Download, Loader2, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -64,27 +65,7 @@ export default function ReportsPage() {
     type: "success" | "error"
     message: string
   } | null>(null)
-  const [isNoticeVisible, setIsNoticeVisible] = useState(false)
   const { token } = useAuth()
-
-  useEffect(() => {
-    if (!notice) return
-
-    setIsNoticeVisible(true)
-
-    const hideTimerId = window.setTimeout(() => {
-      setIsNoticeVisible(false)
-    }, 15000)
-
-    const removeTimerId = window.setTimeout(() => {
-      setNotice(null)
-    }, 15300)
-
-    return () => {
-      window.clearTimeout(hideTimerId)
-      window.clearTimeout(removeTimerId)
-    }
-  }, [notice])
 
   const getDateRange = () => {
     const now = new Date()
@@ -323,20 +304,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {notice && (
-        <div className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm font-medium transition-all duration-300 ease-out ${
-          notice.type === "success"
-            ? "border-green-200 bg-green-50 text-green-700"
-            : "border-red-200 bg-red-50 text-red-700"
-        } ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`}>
-          {notice.type === "success" ? (
-            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-          ) : (
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          )}
-          <span className="flex-1">{notice.message}</span>
-        </div>
-      )}
+      <AutoDismissNotice notice={notice} onDismiss={() => setNotice(null)} />
 
       {isLoading ? (
         <div className="flex h-[40vh] items-center justify-center">
