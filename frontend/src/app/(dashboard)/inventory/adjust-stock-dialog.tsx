@@ -27,6 +27,12 @@ const formatIndonesianNumber = (value: string) => {
   const digits = onlyDigits(value)
   return digits ? Number(digits).toLocaleString("id-ID") : ""
 }
+const variantLabel = (product: any, variant: any) => {
+  const price = Number(product?.selling_price || 0) + Number(variant?.price_adjustment || 0)
+  const sku = variant?.sku ? ` - ${variant.sku}` : ""
+
+  return `${variant.name}${sku} - stok ${variant.stock} - Rp ${price.toLocaleString("id-ID")}`
+}
 
 export function AdjustStockDialog({ product, onAdjusted }: AdjustStockDialogProps) {
   const { token } = useAuth()
@@ -151,10 +157,16 @@ export function AdjustStockDialog({ product, onAdjusted }: AdjustStockDialogProp
                   <option value="">Pilih varian</option>
                   {variants.map((variant: any) => (
                     <option key={variant.id} value={variant.id.toString()}>
-                      {variant.name} - stok {variant.stock}
+                      {variantLabel(product, variant)}
                     </option>
                   ))}
                 </select>
+                {selectedVariant && (
+                  <div className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    Target stok: <span className="font-bold text-slate-900">{selectedVariant.name}</span>
+                    {selectedVariant.sku ? ` (${selectedVariant.sku})` : ""}, stok saat ini {selectedVariant.stock}.
+                  </div>
+                )}
               </div>
             )}
             <div className="rounded-lg border bg-slate-50 px-3 py-2 text-sm">

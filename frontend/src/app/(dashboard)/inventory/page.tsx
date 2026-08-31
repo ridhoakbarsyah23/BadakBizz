@@ -1,6 +1,7 @@
 "use client"
 
 import { apiUrl } from "@/lib/api"
+import { AutoDismissNotice } from "@/components/auto-dismiss-notice"
 import React, { useState, useEffect } from "react"
 import { Package, ArrowRightLeft, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
@@ -25,25 +26,6 @@ export default function InventoryPage() {
     type: "success" | "error" | "info"
     message: string
   } | null>(null)
-  const [isNoticeVisible, setIsNoticeVisible] = useState(false)
-
-  useEffect(() => {
-    if (!notice) return
-
-    setIsNoticeVisible(true)
-
-    const hideTimerId = window.setTimeout(() => {
-      setIsNoticeVisible(false)
-    }, 15000)
-    const removeTimerId = window.setTimeout(() => {
-      setNotice(null)
-    }, 15300)
-
-    return () => {
-      window.clearTimeout(hideTimerId)
-      window.clearTimeout(removeTimerId)
-    }
-  }, [notice])
 
   const fetchData = async () => {
     setIsLoading(true)
@@ -122,18 +104,7 @@ export default function InventoryPage() {
         <p className="text-muted-foreground">Kelola ketersediaan barang dan riwayat mutasi.</p>
       </div>
 
-      {notice && (
-        <div
-          className={
-            notice.type === "success"
-              ? `flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
-              : `flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
-          }
-        >
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          <span className="flex-1">{notice.message}</span>
-        </div>
-      )}
+      <AutoDismissNotice notice={notice} onDismiss={() => setNotice(null)} />
 
       {lowStockCount > 0 && (
         <Card className="bg-red-50 border-red-200 shadow-none">

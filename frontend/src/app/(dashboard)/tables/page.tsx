@@ -1,6 +1,7 @@
 "use client"
 
 import { apiUrl } from "@/lib/api"
+import { AutoDismissNotice } from "@/components/auto-dismiss-notice"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { Badge } from "@/components/ui/badge"
@@ -31,7 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { AlertTriangle, Armchair, CheckCircle2, Edit2, Loader2, Plus, Trash2 } from "lucide-react"
+import { AlertTriangle, Armchair, Edit2, Loader2, Plus, Trash2 } from "lucide-react"
 
 type DiningTable = {
   id: number
@@ -68,25 +69,6 @@ export default function TablesPage() {
     type: "success" | "error"
     message: string
   } | null>(null)
-  const [isNoticeVisible, setIsNoticeVisible] = useState(false)
-
-  useEffect(() => {
-    if (!notice) return
-
-    setIsNoticeVisible(true)
-
-    const hideTimerId = window.setTimeout(() => {
-      setIsNoticeVisible(false)
-    }, 15000)
-    const removeTimerId = window.setTimeout(() => {
-      setNotice(null)
-    }, 15300)
-
-    return () => {
-      window.clearTimeout(hideTimerId)
-      window.clearTimeout(removeTimerId)
-    }
-  }, [notice])
 
   const fetchTables = async () => {
     setIsLoading(true)
@@ -271,22 +253,7 @@ export default function TablesPage() {
         </Dialog>
       </div>
 
-      {notice && (
-        <div
-          className={
-            notice.type === "success"
-              ? `flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
-              : `flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
-          }
-        >
-          {notice.type === "success" ? (
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-          ) : (
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-          )}
-          <span className="flex-1">{notice.message}</span>
-        </div>
-      )}
+      <AutoDismissNotice notice={notice} onDismiss={() => setNotice(null)} />
 
       <div className="grid gap-3 sm:grid-cols-3">
         {(["available", "occupied", "reserved"] as DiningTable["status"][]).map((status) => (

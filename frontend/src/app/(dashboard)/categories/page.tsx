@@ -1,6 +1,7 @@
 "use client"
 
 import { apiUrl } from "@/lib/api"
+import { AutoDismissNotice } from "@/components/auto-dismiss-notice"
 import React, { useState, useEffect } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { 
@@ -35,7 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Plus, Edit2, Trash2, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react"
+import { Plus, Edit2, Trash2, Loader2, AlertTriangle } from "lucide-react"
 
 interface Category {
   id: number
@@ -66,25 +67,6 @@ export default function CategoriesPage() {
     type: "success" | "error"
     message: string
   } | null>(null)
-  const [isNoticeVisible, setIsNoticeVisible] = useState(false)
-
-  useEffect(() => {
-    if (!notice) return
-
-    setIsNoticeVisible(true)
-
-    const hideTimerId = window.setTimeout(() => {
-      setIsNoticeVisible(false)
-    }, 15000)
-    const removeTimerId = window.setTimeout(() => {
-      setNotice(null)
-    }, 15300)
-
-    return () => {
-      window.clearTimeout(hideTimerId)
-      window.clearTimeout(removeTimerId)
-    }
-  }, [notice])
 
   useEffect(() => {
     if (token) {
@@ -263,22 +245,7 @@ export default function CategoriesPage() {
         </Dialog>
       </div>
 
-      {notice && (
-        <div
-          className={
-            notice.type === "success"
-              ? `flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
-              : `flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
-          }
-        >
-          {notice.type === "success" ? (
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-          ) : (
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-          )}
-          <span className="flex-1">{notice.message}</span>
-        </div>
-      )}
+      <AutoDismissNotice notice={notice} onDismiss={() => setNotice(null)} />
 
       <div className="bg-background rounded-lg border shadow-sm overflow-x-auto w-full">
         {isLoading ? (

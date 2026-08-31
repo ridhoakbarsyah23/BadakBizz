@@ -1,6 +1,7 @@
 "use client"
 
 import { apiUrl } from "@/lib/api"
+import { AutoDismissNotice } from "@/components/auto-dismiss-notice"
 import React, { useState, useEffect } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { 
@@ -37,7 +38,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Plus, Edit2, Trash2, Loader2, AlertTriangle, Search, Filter, Wand2, X, CheckCircle2 } from "lucide-react"
+import { Plus, Edit2, Trash2, Loader2, AlertTriangle, Search, Filter, Wand2, X } from "lucide-react"
 
 interface Category {
   id: number
@@ -110,6 +111,13 @@ const formatIndonesianNumber = (value: string | number | null | undefined) => {
   return digits ? Number(digits).toLocaleString("id-ID") : ""
 }
 
+const productStock = (product: Product) => product.has_variants
+  ? (product.variants || []).reduce((sum, variant) => sum + Number(variant.stock || 0), 0)
+  : Number(product.stock || 0)
+
+const variantPrice = (basePrice: string | number, variant: VariantForm) =>
+  parseIndonesianNumber(basePrice) + Number(variant.price_adjustment || 0)
+
 export default function ProductsPage() {
   const { token } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
@@ -133,25 +141,6 @@ export default function ProductsPage() {
     type: "success" | "error"
     message: string
   } | null>(null)
-  const [isNoticeVisible, setIsNoticeVisible] = useState(false)
-
-  useEffect(() => {
-    if (!notice) return
-
-    setIsNoticeVisible(true)
-
-    const hideTimerId = window.setTimeout(() => {
-      setIsNoticeVisible(false)
-    }, 15000)
-    const removeTimerId = window.setTimeout(() => {
-      setNotice(null)
-    }, 15300)
-
-    return () => {
-      window.clearTimeout(hideTimerId)
-      window.clearTimeout(removeTimerId)
-    }
-  }, [notice])
 
   useEffect(() => {
     if (token) {
@@ -477,7 +466,10 @@ export default function ProductsPage() {
                   {(!formData.variants || formData.variants.length === 0) ? (
                     <div className="text-sm text-muted-foreground text-center py-2">Belum ada varian. Klik &quot;Tambah Varian&quot;.</div>
                   ) : (
-                    formData.variants.map((variant, index) => (
+                    formData.variants.map((variant, index) => {
+                      const finalPrice = variantPrice(formData.selling_price, variant)
+
+                      return (
                       <div key={index} className="grid grid-cols-1 gap-2 rounded-lg border bg-white p-3 sm:grid-cols-12 sm:items-center">
                         <div className="sm:col-span-4">
                           <Input
@@ -517,6 +509,9 @@ export default function ProductsPage() {
                               }}
                             />
                           </div>
+                          <div className="mt-1 text-[11px] font-medium text-muted-foreground">
+                            Jual: Rp {finalPrice.toLocaleString("id-ID")}
+                          </div>
                         </div>
                         <div className="sm:col-span-2">
                           <Input 
@@ -546,7 +541,8 @@ export default function ProductsPage() {
                           </Button>
                         </div>
                       </div>
-                    ))
+                      )
+                    })
                   )}
                 </div>
               )}
@@ -625,22 +621,7 @@ export default function ProductsPage() {
         </Dialog>
       </div>
 
-      {notice && (
-        <div
-          className={
-            notice.type === "success"
-              ? `flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
-              : `flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
-          }
-        >
-          {notice.type === "success" ? (
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-          ) : (
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-          )}
-          <span className="flex-1">{notice.message}</span>
-        </div>
-      )}
+      <AutoDismissNotice notice={notice} onDismiss={() => setNotice(null)} />
 
       <div className="flex flex-col sm:flex-row items-center gap-4">
         <div className="relative w-full sm:max-w-sm">
@@ -678,18 +659,37 @@ export default function ProductsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                products.map((product) => (
+                products.map((product) => {
+                  const stock = productStock(product)
+                  const isLowStock = stock <= product.minimum_stock
+                  const availableVariants = product.has_variants
+                    ? (product.variants || []).filter((variant) => Number(variant.stock || 0) > 0).length
+                    : 0
+
+                  return (
                   <TableRow key={product.id}>
                     <TableCell className="py-3 px-4 font-medium">{product.sku}</TableCell>
-                    <TableCell className="py-3 px-4">{product.name}</TableCell>
+                    <TableCell className="py-3 px-4">
+                      <div className="font-medium">{product.name}</div>
+                      {product.has_variants && (
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-semibold">
+                            {availableVariants}/{product.variants?.length || 0} varian aktif
+                          </Badge>
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="py-3 px-4 text-muted-foreground">{product.category?.name || '-'}</TableCell>
                     <TableCell className="py-3 px-4">Rp {Number(product.selling_price).toLocaleString('id-ID')}</TableCell>
                     <TableCell className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <span className={product.stock <= product.minimum_stock ? "text-destructive font-bold" : ""}>
-                          {product.stock}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={isLowStock ? "text-destructive font-bold" : ""}>
+                          {stock}
                         </span>
-                        {product.stock <= product.minimum_stock && (
+                        {product.has_variants && (
+                          <span className="text-xs text-muted-foreground">total varian</span>
+                        )}
+                        {isLowStock && (
                           <Badge variant="destructive" className="h-5 px-1 text-[10px]">Menipis</Badge>
                         )}
                       </div>
@@ -710,7 +710,8 @@ export default function ProductsPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
+                  )
+                })
               )}
             </TableBody>
           </Table>

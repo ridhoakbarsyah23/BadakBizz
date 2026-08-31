@@ -1,6 +1,7 @@
 "use client"
 
 import { apiUrl } from "@/lib/api"
+import { AutoDismissNotice } from "@/components/auto-dismiss-notice"
 import React, { useState, useEffect } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { 
@@ -13,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from "@/components/ui/dialog"
-import { AlertTriangle, CheckCircle2, Loader2, Plus, Edit2, ShieldAlert, ShieldCheck, Search } from "lucide-react"
+import { Loader2, Plus, Edit2, ShieldAlert, ShieldCheck, Search } from "lucide-react"
 
 interface Role {
   id: number
@@ -55,25 +56,6 @@ export default function StaffPage() {
     type: "success" | "error"
     message: string
   } | null>(null)
-  const [isNoticeVisible, setIsNoticeVisible] = useState(false)
-
-  useEffect(() => {
-    if (!notice) return
-
-    setIsNoticeVisible(true)
-
-    const hideTimerId = window.setTimeout(() => {
-      setIsNoticeVisible(false)
-    }, 15000)
-    const removeTimerId = window.setTimeout(() => {
-      setNotice(null)
-    }, 15300)
-
-    return () => {
-      window.clearTimeout(hideTimerId)
-      window.clearTimeout(removeTimerId)
-    }
-  }, [notice])
 
   const fetchData = async () => {
     setIsLoading(true)
@@ -207,22 +189,7 @@ export default function StaffPage() {
         </Button>
       </div>
 
-      {notice && (
-        <div
-          className={
-            notice.type === "success"
-              ? `flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
-              : `flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 transition-all duration-300 ease-out ${isNoticeVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`
-          }
-        >
-          {notice.type === "success" ? (
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-          ) : (
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-          )}
-          <span className="flex-1">{notice.message}</span>
-        </div>
-      )}
+      <AutoDismissNotice notice={notice} onDismiss={() => setNotice(null)} />
 
       <Card>
         <CardHeader className="py-4 px-6 border-b bg-slate-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
