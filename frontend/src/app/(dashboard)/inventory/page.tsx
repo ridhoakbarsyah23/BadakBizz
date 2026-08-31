@@ -6,6 +6,7 @@ import { Package, ArrowRightLeft, AlertTriangle, CheckCircle2, Loader2 } from "l
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AdjustStockDialog } from "./adjust-stock-dialog"
 import { RestockDialog } from "./restock-dialog"
 import { useAuth } from "@/context/AuthContext"
 
@@ -84,13 +85,25 @@ export default function InventoryPage() {
     }
   }, [token, stockPage, movementPage])
 
-  const lowStockCount = products.filter((p: any) => p.stock <= p.minimum_stock).length
+  const productStock = (product: any) => product.has_variants
+    ? (product.variants || []).reduce((sum: number, variant: any) => sum + Number(variant.stock || 0), 0)
+    : Number(product.stock || 0)
+
+  const lowStockCount = products.filter((product: any) => productStock(product) <= product.minimum_stock).length
 
   const handleRestocked = async (product: any, quantity: number) => {
     await fetchData()
     setNotice({
       type: "success",
       message: `Stok ${product.name} berhasil ditambahkan sebanyak ${quantity.toLocaleString("id-ID")}.`,
+    })
+  }
+
+  const handleAdjusted = async (product: any, difference: number) => {
+    await fetchData()
+    setNotice({
+      type: "success",
+      message: `Stok ${product.name} berhasil disesuaikan (${difference > 0 ? "+" : ""}${difference.toLocaleString("id-ID")}).`,
     })
   }
 
@@ -169,7 +182,8 @@ export default function InventoryPage() {
                       </tr>
                     ) : (
                       products.map((product: any) => {
-                        const isLowStock = product.stock <= product.minimum_stock
+                        const stock = productStock(product)
+                        const isLowStock = stock <= product.minimum_stock
                         return (
                           <tr key={product.id} className="border-b last:border-0 hover:bg-slate-50/50">
                             <td className="px-4 py-3">
@@ -177,7 +191,10 @@ export default function InventoryPage() {
                               <div className="text-slate-500 text-xs">{product.sku}</div>
                             </td>
                             <td className="px-4 py-3">
-                              <span className="font-bold text-slate-700">{product.stock}</span>
+                              <span className="font-bold text-slate-700">{stock}</span>
+                              {product.has_variants && (
+                                <div className="text-xs text-slate-500">Total dari {product.variants?.length || 0} varian</div>
+                              )}
                             </td>
                             <td className="px-4 py-3 text-slate-500">
                               {product.minimum_stock}
@@ -194,7 +211,10 @@ export default function InventoryPage() {
                               )}
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <RestockDialog product={product} onRestocked={(quantity) => handleRestocked(product, quantity)} />
+                              <div className="flex justify-end gap-2">
+                                <RestockDialog product={product} onRestocked={(quantity) => handleRestocked(product, quantity)} />
+                                <AdjustStockDialog product={product} onAdjusted={handleAdjusted} />
+                              </div>
                             </td>
                           </tr>
                         )
@@ -273,7 +293,13 @@ export default function InventoryPage() {
                           </td>
                           <td className="px-4 py-3">
                             <span className="font-bold text-slate-700">
-                              {movement.type === 'IN' ? '+' : '-'}{movement.quantity}
+                              {movement.type === 'IN'
+                                ? `+${movement.quantity}`
+                                : movement.type === 'OUT'
+                                  ? `-${movement.quantity}`
+                                  : Number(movement.quantity) > 0
+                                    ? `+${movement.quantity}`
+                                    : movement.quantity}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-slate-500">

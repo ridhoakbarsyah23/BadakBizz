@@ -60,6 +60,11 @@ class AuthorizationTest extends TestCase
                 'product_id' => $product->id,
                 'quantity' => 1,
             ]],
+            ['POST', '/api/inventory/adjust', [
+                'product_id' => $product->id,
+                'actual_stock' => 9,
+                'reason' => 'Blocked adjustment',
+            ]],
         ];
 
         foreach ($adminRequests as $adminRequest) {

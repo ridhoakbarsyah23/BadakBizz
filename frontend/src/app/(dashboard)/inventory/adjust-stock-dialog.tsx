@@ -2,7 +2,7 @@
 
 import { apiUrl } from "@/lib/api"
 import { useState } from "react"
-import { Plus, Loader2 } from "lucide-react"
+import { ArrowRightLeft, Loader2 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,9 +17,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
-interface RestockDialogProps {
+interface AdjustStockDialogProps {
   product: any
-  onRestocked?: (quantity: number) => Promise<void> | void
+  onAdjusted?: (product: any, difference: number) => Promise<void> | void
 }
 
 const onlyDigits = (value: string) => value.replace(/\D/g, "")
@@ -28,27 +28,50 @@ const formatIndonesianNumber = (value: string) => {
   return digits ? Number(digits).toLocaleString("id-ID") : ""
 }
 
-export function RestockDialog({ product, onRestocked }: RestockDialogProps) {
+export function AdjustStockDialog({ product, onAdjusted }: AdjustStockDialogProps) {
   const { token } = useAuth()
   const [open, setOpen] = useState(false)
   const [variantId, setVariantId] = useState("")
-  const [quantity, setQuantity] = useState("")
-  const [notes, setNotes] = useState("")
+  const [actualStock, setActualStock] = useState("")
+  const [reason, setReason] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
-  const variants = Array.isArray(product.variants) ? product.variants : []
 
-  const handleRestock = async (e: React.FormEvent) => {
+  const variants = Array.isArray(product.variants) ? product.variants : []
+  const selectedVariant = variants.find((variant: any) => variant.id.toString() === variantId)
+  const currentStock = product.has_variants
+    ? Number(selectedVariant?.stock || 0)
+    : Number(product.stock || 0)
+  const parsedActualStock = actualStock === "" ? null : Number(onlyDigits(actualStock))
+  const difference = parsedActualStock === null ? 0 : parsedActualStock - currentStock
+
+  const resetForm = () => {
+    setVariantId("")
+    setActualStock("")
+    setReason("")
+    setError("")
+  }
+
+  const handleAdjust = async (e: React.FormEvent) => {
     e.preventDefault()
-    const parsedQuantity = Number(onlyDigits(quantity))
 
     if (product.has_variants && !variantId) {
-      setError("Pilih varian yang akan ditambah stoknya.")
+      setError("Pilih varian yang ingin disesuaikan.")
       return
     }
 
-    if (!parsedQuantity || parsedQuantity < 1) {
-      setError("Jumlah stok minimal 1.")
+    if (parsedActualStock === null || parsedActualStock < 0) {
+      setError("Stok aktual wajib diisi minimal 0.")
+      return
+    }
+
+    if (difference === 0) {
+      setError("Stok aktual sama dengan stok sistem.")
+      return
+    }
+
+    if (!reason.trim()) {
+      setError("Alasan penyesuaian wajib diisi.")
       return
     }
 
@@ -56,7 +79,7 @@ export function RestockDialog({ product, onRestocked }: RestockDialogProps) {
     setError("")
 
     try {
-      const res = await fetch(apiUrl('/api/inventory/restock'), {
+      const res = await fetch(apiUrl("/api/inventory/adjust"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -66,24 +89,21 @@ export function RestockDialog({ product, onRestocked }: RestockDialogProps) {
         body: JSON.stringify({
           product_id: product.id,
           variant_id: product.has_variants ? Number(variantId) : null,
-          quantity: parsedQuantity,
-          notes: notes.trim() || null
+          actual_stock: parsedActualStock,
+          reason: reason.trim()
         })
       })
-
       const data = await res.json().catch(() => null)
 
       if (!res.ok) {
-        throw new Error(data?.message || "Gagal menambah stok")
+        throw new Error(data?.message || "Gagal menyesuaikan stok")
       }
 
       setOpen(false)
-      setVariantId("")
-      setQuantity("")
-      setNotes("")
-      await onRestocked?.(parsedQuantity)
+      resetForm()
+      await onAdjusted?.(data.product, difference)
     } catch (err: any) {
-      setError(err.message || "Terjadi kesalahan saat menambah stok.")
+      setError(err.message || "Terjadi kesalahan saat menyesuaikan stok.")
     } finally {
       setIsLoading(false)
     }
@@ -94,26 +114,21 @@ export function RestockDialog({ product, onRestocked }: RestockDialogProps) {
       open={open}
       onOpenChange={(nextOpen) => {
         setOpen(nextOpen)
-        if (!nextOpen) {
-          setVariantId("")
-          setQuantity("")
-          setNotes("")
-          setError("")
-        }
+        if (!nextOpen) resetForm()
       }}
     >
       <DialogTrigger render={
-        <Button size="sm" variant="outline" className="h-8">
-          <Plus className="w-4 h-4 mr-1" />
-          Tambah Stok
+        <Button size="sm" variant="ghost" className="h-8">
+          <ArrowRightLeft className="w-4 h-4 mr-1" />
+          Sesuaikan
         </Button>
       } />
-      <DialogContent className="sm:max-w-[425px]">
-        <form onSubmit={handleRestock}>
+      <DialogContent className="sm:max-w-[460px]">
+        <form onSubmit={handleAdjust}>
           <DialogHeader>
-            <DialogTitle>Tambah Stok Produk</DialogTitle>
+            <DialogTitle>Penyesuaian Stok</DialogTitle>
             <DialogDescription>
-              Tambahkan stok baru untuk produk <strong>{product.name}</strong>.
+              Set stok aktual untuk <strong>{product.name}</strong> berdasarkan hitung fisik.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -124,9 +139,9 @@ export function RestockDialog({ product, onRestocked }: RestockDialogProps) {
             )}
             {product.has_variants && (
               <div className="space-y-2">
-                <Label htmlFor={`restock-variant-${product.id}`}>Varian</Label>
+                <Label htmlFor={`variant-${product.id}`}>Varian</Label>
                 <select
-                  id={`restock-variant-${product.id}`}
+                  id={`variant-${product.id}`}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={variantId}
                   onChange={(e) => setVariantId(e.target.value)}
@@ -142,27 +157,39 @@ export function RestockDialog({ product, onRestocked }: RestockDialogProps) {
                 </select>
               </div>
             )}
+            <div className="rounded-lg border bg-slate-50 px-3 py-2 text-sm">
+              <div className="flex justify-between text-slate-600">
+                <span>Stok sistem</span>
+                <span className="font-bold text-slate-900">{product.has_variants && !selectedVariant ? "-" : currentStock}</span>
+              </div>
+              {parsedActualStock !== null && (!product.has_variants || selectedVariant) && (
+                <div className={`mt-1 flex justify-between font-semibold ${difference < 0 ? "text-red-600" : "text-emerald-600"}`}>
+                  <span>Selisih</span>
+                  <span>{difference > 0 ? "+" : ""}{difference}</span>
+                </div>
+              )}
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="quantity">Jumlah</Label>
+              <Label htmlFor={`actual-stock-${product.id}`}>Stok Aktual</Label>
               <Input
-                id="quantity"
+                id={`actual-stock-${product.id}`}
                 inputMode="numeric"
-                placeholder="Misal: 50"
-                value={formatIndonesianNumber(quantity)}
-                onChange={(e) => setQuantity(onlyDigits(e.target.value))}
-                required
-                min="1"
+                placeholder="Misal: 48"
+                value={formatIndonesianNumber(actualStock)}
+                onChange={(e) => setActualStock(onlyDigits(e.target.value))}
                 disabled={isLoading}
+                required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="notes">Keterangan (Opsional)</Label>
+              <Label htmlFor={`reason-${product.id}`}>Alasan</Label>
               <Input
-                id="notes"
-                placeholder="Catatan tambahan"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                id={`reason-${product.id}`}
+                placeholder="Misal: Stock opname / rusak / hilang"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
                 disabled={isLoading}
+                required
               />
             </div>
           </div>
@@ -177,7 +204,7 @@ export function RestockDialog({ product, onRestocked }: RestockDialogProps) {
                   Menyimpan...
                 </>
               ) : (
-                "Simpan Stok"
+                "Simpan Penyesuaian"
               )}
             </Button>
           </DialogFooter>

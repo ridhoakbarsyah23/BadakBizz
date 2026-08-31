@@ -76,6 +76,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Inventory
         Route::get('/inventory/movements', [InventoryController::class, 'movements']);
         Route::post('/inventory/restock', [InventoryController::class, 'restock']);
+        Route::post('/inventory/adjust', [InventoryController::class, 'adjust']);
 
         // Transaction Void
         Route::post('/transactions/{id}/void', [TransactionController::class, 'voidTransaction']);

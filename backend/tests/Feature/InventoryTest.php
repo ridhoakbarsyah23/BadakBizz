@@ -118,6 +118,112 @@ class InventoryTest extends TestCase
             ->assertJsonPath('0.variant_sku', 'SKU-BREAD-WHEAT');
     }
 
+    public function test_admin_can_adjust_product_stock_and_record_signed_movement(): void
+    {
+        $admin = $this->userWithRole('admin', 'Administrator');
+        Sanctum::actingAs($admin);
+
+        $product = Product::create([
+            'sku' => 'SKU-ADJUST',
+            'name' => 'Adjusted Product',
+            'purchase_price' => 4_000,
+            'selling_price' => 7_000,
+            'stock' => 10,
+            'minimum_stock' => 0,
+            'is_active' => true,
+        ]);
+
+        $this->postJson('/api/inventory/adjust', [
+            'product_id' => $product->id,
+            'actual_stock' => 6,
+            'reason' => 'Stock opname',
+        ])->assertOk()
+            ->assertJsonPath('product.stock', 6);
+
+        $this->assertSame(6, $product->fresh()->stock);
+        $this->assertDatabaseHas('inventory_movements', [
+            'product_id' => $product->id,
+            'variant_id' => null,
+            'type' => 'ADJUSTMENT',
+            'quantity' => -4,
+            'notes' => 'Stock adjustment: Stock opname (10 -> 6)',
+            'user_id' => $admin->id,
+        ]);
+    }
+
+    public function test_admin_can_adjust_variant_stock(): void
+    {
+        $admin = $this->userWithRole('admin', 'Administrator');
+        Sanctum::actingAs($admin);
+
+        $product = Product::create([
+            'sku' => 'SKU-VARIANT-ADJUST',
+            'name' => 'Variant Adjusted Product',
+            'purchase_price' => 4_000,
+            'selling_price' => 7_000,
+            'has_variants' => true,
+            'stock' => 0,
+            'minimum_stock' => 0,
+            'is_active' => true,
+        ]);
+
+        $variant = ProductVariant::create([
+            'product_id' => $product->id,
+            'name' => 'Large',
+            'sku' => 'SKU-VARIANT-ADJUST-L',
+            'price_adjustment' => 1_000,
+            'stock' => 2,
+        ]);
+
+        $this->postJson('/api/inventory/adjust', [
+            'product_id' => $product->id,
+            'variant_id' => $variant->id,
+            'actual_stock' => 5,
+            'reason' => 'Found extra stock',
+        ])->assertOk()
+            ->assertJsonPath('product.variants.0.stock', 5);
+
+        $this->assertSame(5, $variant->fresh()->stock);
+        $this->assertDatabaseHas('inventory_movements', [
+            'product_id' => $product->id,
+            'variant_id' => $variant->id,
+            'type' => 'ADJUSTMENT',
+            'quantity' => 3,
+            'notes' => 'Stock adjustment: Found extra stock (2 -> 5)',
+            'user_id' => $admin->id,
+        ]);
+    }
+
+    public function test_adjustment_requires_reason_and_actual_stock_difference(): void
+    {
+        Sanctum::actingAs($this->userWithRole('admin', 'Administrator'));
+
+        $product = Product::create([
+            'sku' => 'SKU-NO-DIFF',
+            'name' => 'No Difference Product',
+            'purchase_price' => 4_000,
+            'selling_price' => 7_000,
+            'stock' => 10,
+            'minimum_stock' => 0,
+            'is_active' => true,
+        ]);
+
+        $this->postJson('/api/inventory/adjust', [
+            'product_id' => $product->id,
+            'actual_stock' => 10,
+            'reason' => 'Stock opname',
+        ])->assertStatus(400)
+            ->assertJsonPath('message', 'Gagal menyesuaikan stok: Stock is already equal to the actual count.');
+
+        $this->postJson('/api/inventory/adjust', [
+            'product_id' => $product->id,
+            'actual_stock' => 9,
+        ])->assertStatus(422);
+
+        $this->assertSame(10, $product->fresh()->stock);
+        $this->assertDatabaseCount('inventory_movements', 0);
+    }
+
     private function userWithRole(string $slug, string $name): User
     {
         $role = Role::create([
