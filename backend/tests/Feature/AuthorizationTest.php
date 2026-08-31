@@ -86,6 +86,13 @@ class AuthorizationTest extends TestCase
         $this->getJson('/api/transactions')->assertOk();
     }
 
+    public function test_unauthenticated_api_requests_return_json_unauthorized_response(): void
+    {
+        $this->get('/api/settings')
+            ->assertUnauthorized()
+            ->assertJsonPath('message', 'Unauthenticated.');
+    }
+
     private function userWithRole(string $slug, string $name): User
     {
         $role = Role::firstOrCreate(
