@@ -78,6 +78,8 @@ export default function POSPage() {
   // QRIS dynamic state
   const [qrisString, setQrisString] = useState<string | null>(null)
   const [qrisDialogTransaction, setQrisDialogTransaction] = useState<any | null>(null)
+  const [isQrisChecking, setIsQrisChecking] = useState(false)
+  const [isQrisCancelling, setIsQrisCancelling] = useState(false)
   const [isCartModalOpen, setIsCartModalOpen] = useState(false)
 
   const fetchProductsAndCustomers = async () => {
@@ -266,13 +268,13 @@ export default function POSPage() {
   const selectedCustomer = customers.find(c => c.id.toString() === selectedCustomerId)
   const selectedTable = tables.find(t => t.id.toString() === selectedTableId)
   const tableManagementEnabled = storeSettings.enable_table_management == 1 || storeSettings.enable_table_management === true
-  const shiftManagementEnabled = storeSettings.enable_shift_management == 1 || storeSettings.enable_shift_management === true
+  const kitchenReceiptsEnabled = storeSettings.enable_kitchen_receipts == 1 || storeSettings.enable_kitchen_receipts === true
   const availableTables = tables.filter(table => table.status === "available" || table.id.toString() === selectedTableId)
   const requiresTable = tableManagementEnabled && orderType === "dine_in" && tables.length > 0
-  const canCheckout = cart.length > 0 && (!shiftManagementEnabled || Boolean(currentShift)) && (!requiresTable || Boolean(selectedTableId))
+  const canCheckout = cart.length > 0 && Boolean(currentShift) && (!requiresTable || Boolean(selectedTableId))
   const checkoutHint = cart.length === 0
     ? "Tambahkan produk ke keranjang untuk mulai checkout."
-    : shiftManagementEnabled && !currentShift
+    : !currentShift
       ? "Buka shift kasir terlebih dahulu sebelum checkout."
     : requiresTable && !selectedTableId
       ? "Pilih meja terlebih dahulu untuk pesanan dine-in."
@@ -526,9 +528,105 @@ export default function POSPage() {
     }
   }
 
-  const handlePrint = () => {
+  const handleQrisStatusCheck = async () => {
+    const transactionNumber = qrisDialogTransaction?.transaction_number || receiptData?.transaction_number
+    if (!transactionNumber) return
+
+    setIsQrisChecking(true)
+    setNotice(null)
+
+    try {
+      const res = await fetch(apiUrl(`/api/qris/status/${transactionNumber}`), {
+        headers: {
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`
+        }
+      })
+      const data = await res.json()
+
+      if (!res.ok || data.status !== "success") {
+        throw new Error(data.message || "Gagal mengecek status QRIS.")
+      }
+
+      const transactionStatus = data.transaction_status
+      setQrisDialogTransaction((current: any) => current ? { ...current, status: transactionStatus } : current)
+      setReceiptData((current: any) => current ? { ...current, status: transactionStatus } : current)
+
+      if (transactionStatus === "COMPLETED") {
+        setIsQrisOpen(false)
+        setIsReceiptOpen(true)
+        setNotice({
+          type: "success",
+          message: "Pembayaran QRIS sudah terkonfirmasi.",
+        })
+      } else if (transactionStatus === "CANCELLED") {
+        setIsQrisOpen(false)
+        setQrisDialogTransaction(null)
+        setQrisString(null)
+        setNotice({
+          type: "info",
+          message: "Transaksi QRIS sudah dibatalkan. Stok dan meja sudah dikembalikan.",
+        })
+      } else {
+        setNotice({
+          type: "info",
+          message: "QRIS masih menunggu pembayaran.",
+        })
+      }
+
+      fetchProductsAndCustomers()
+    } catch (error: any) {
+      setNotice({
+        type: "error",
+        message: error.message || "Gagal mengecek status QRIS.",
+      })
+    } finally {
+      setIsQrisChecking(false)
+    }
+  }
+
+  const handleCancelPendingQris = async () => {
+    if (!qrisDialogTransaction?.id) return
+
+    setIsQrisCancelling(true)
+    setNotice(null)
+
+    try {
+      const res = await fetch(apiUrl(`/api/transactions/${qrisDialogTransaction.id}/cancel-pending-qris`), {
+        method: "POST",
+        headers: {
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`
+        }
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.message || data.error || "Gagal membatalkan transaksi QRIS.")
+      }
+
+      setQrisDialogTransaction(data.data)
+      setReceiptData((current: any) => current ? { ...current, status: "CANCELLED" } : current)
+      setQrisString(null)
+      setIsQrisOpen(false)
+      setNotice({
+        type: "success",
+        message: "Transaksi QRIS pending dibatalkan. Stok dan meja sudah dikembalikan.",
+      })
+      fetchProductsAndCustomers()
+    } catch (error: any) {
+      setNotice({
+        type: "error",
+        message: error.message || "Gagal membatalkan transaksi QRIS.",
+      })
+    } finally {
+      setIsQrisCancelling(false)
+    }
+  }
+
+  const printReceiptElement = (elementId: string) => {
     const receiptWidth = Number(storeSettings.receipt_width || 80)
-    const receiptElement = document.getElementById("printable-receipt")
+    const receiptElement = document.getElementById(elementId)
 
     if (!receiptElement) {
       window.print()
@@ -587,13 +685,20 @@ export default function POSPage() {
     window.print()
   }
 
+  const handlePrint = () => {
+    printReceiptElement("printable-receipt")
+  }
+
+  const handleKitchenPrint = () => {
+    printReceiptElement("printable-kitchen-receipt")
+  }
+
   return (
     <>
     <div className="flex flex-row gap-6 relative h-[calc(100vh-8rem)] w-full overflow-hidden">
       {/* LEFT: Product Grid */}
       <div className="flex-1 flex flex-col min-w-0 gap-4 lg:gap-6 overflow-hidden h-full">
-        {shiftManagementEnabled && (
-          <div className={`shrink-0 rounded-2xl border px-4 py-3 shadow-sm ${
+        <div className={`shrink-0 rounded-2xl border px-4 py-3 shadow-sm ${
             currentShift
               ? "border-emerald-200 bg-emerald-50 text-emerald-900"
               : "border-amber-200 bg-amber-50 text-amber-900"
@@ -654,7 +759,6 @@ export default function POSPage() {
               </p>
             )}
           </div>
-        )}
 
         <div className="flex items-center justify-between gap-4 shrink-0">
           <div className="relative flex-1">
@@ -1229,13 +1333,57 @@ export default function POSPage() {
                   <div className="text-3xl font-black text-primary">
                     Rp {Number(qrisDialogTransaction?.total_amount ?? total).toLocaleString("id-ID")}
                   </div>
-                  <p className="text-xs font-medium text-blue-600">Status transaksi: menunggu pembayaran</p>
+                  <p className={`text-xs font-medium ${
+                    qrisDialogTransaction?.status === "COMPLETED"
+                      ? "text-emerald-600"
+                      : qrisDialogTransaction?.status === "CANCELLED"
+                        ? "text-red-600"
+                        : "text-blue-600"
+                  }`}>
+                    Status transaksi: {qrisDialogTransaction?.status === "COMPLETED"
+                      ? "terkonfirmasi"
+                      : qrisDialogTransaction?.status === "CANCELLED"
+                        ? "dibatalkan"
+                        : "menunggu pembayaran"}
+                  </p>
                 </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="grid gap-2 sm:grid-cols-2">
+                <Button
+                  className="h-12 text-sm font-bold rounded-xl"
+                  onClick={handleQrisStatusCheck}
+                  disabled={isQrisChecking || isQrisCancelling}
+                >
+                  {isQrisChecking ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                  )}
+                  Cek Status
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-12 text-sm font-bold rounded-xl"
+                  onClick={() => {
+                    setIsQrisOpen(false)
+                    setIsReceiptOpen(true)
+                  }}
+                  disabled={!receiptData || isQrisChecking || isQrisCancelling}
+                >
+                  Cetak Struk Pending
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="h-12 text-sm font-bold rounded-xl"
+                  onClick={handleCancelPendingQris}
+                  disabled={!qrisDialogTransaction?.id || qrisDialogTransaction?.status !== "PENDING" || isQrisChecking || isQrisCancelling}
+                >
+                  {isQrisCancelling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Batalkan QRIS
+                </Button>
                 <Button 
                   variant="outline"
-                  className="w-full h-12 text-sm font-bold rounded-xl transition-transform hover:scale-[1.02] active:scale-[0.98]" 
+                  className="h-12 text-sm font-bold rounded-xl transition-transform hover:scale-[1.02] active:scale-[0.98]"
                   onClick={() => {
                     setIsQrisOpen(false)
                     fetchProductsAndCustomers()
@@ -1395,15 +1543,79 @@ export default function POSPage() {
                     Ini adalah pratinjau struk yang akan dicetak.
                   </div>
                 </div>
+
+                {kitchenReceiptsEnabled && receiptData?.status !== "PENDING" && (
+                  <div
+                    id="printable-kitchen-receipt"
+                    style={{ "--receipt-width": `${Number(storeSettings.receipt_width || 80)}mm` } as CSSProperties}
+                    className="receipt-paper mt-3 bg-white text-black text-[13px] sm:text-sm print:text-[10px] font-mono flex max-w-full flex-col gap-2 rounded-xl border shadow-sm mx-auto mb-2 p-4 sm:p-5 print:m-0"
+                  >
+                    <div className="receipt-text text-center font-black text-lg print:text-[13px] leading-tight">
+                      TIKET DAPUR
+                    </div>
+                    <div className="receipt-text text-center text-xs print:text-[9px] leading-snug font-normal text-gray-600 print:text-black">
+                      {storeSettings.name || "BadakBizz"}
+                    </div>
+
+                    <div className="receipt-section space-y-1 text-xs font-medium text-gray-600 print:text-[9px] print:text-black">
+                      <div className="receipt-row">
+                        <span>No</span>
+                        <span className="receipt-value receipt-text">{receiptData?.transaction_number}</span>
+                      </div>
+                      <div className="receipt-row">
+                        <span>Waktu</span>
+                        <span className="receipt-value receipt-text">{receiptData?.date}</span>
+                      </div>
+                      <div className="receipt-row">
+                        <span>Order</span>
+                        <span className="receipt-value receipt-text">{receiptData?.orderType === "dine_in" ? "Dine-in" : "Takeaway"}</span>
+                      </div>
+                      {receiptData?.tableName && (
+                        <div className="receipt-row">
+                          <span>Meja</span>
+                          <span className="receipt-value receipt-text">{receiptData.tableName}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="receipt-section flex flex-col gap-2">
+                      {receiptData?.items.map((item: any, i: number) => {
+                        const itemParts = getReceiptItemParts(item)
+                        return (
+                          <div key={i} className="receipt-item flex flex-col gap-0.5">
+                            <div className="receipt-row font-black text-sm print:text-[11px] print:text-black">
+                              <span className="receipt-item-name">{itemParts.name}</span>
+                              <span className="receipt-value">{item.qty}x</span>
+                            </div>
+                            {itemParts.variantName && (
+                              <div className="receipt-item-meta">Varian: {itemParts.variantName}</div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    <div className="print:hidden border-t border-dashed mt-4 pt-4 text-center text-xs text-muted-foreground">
+                      Tiket dapur tidak menyertakan harga.
+                    </div>
+                  </div>
+                )}
               </div>
 
               <DialogFooter className="!mx-0 !mb-0 shrink-0 border-t px-5 py-3 sm:justify-between sm:py-4">
                 <Button variant="outline" className="rounded-xl font-semibold" onClick={() => setIsReceiptOpen(false)}>
                   Tutup
                 </Button>
-                <Button onClick={handlePrint} className="rounded-xl font-bold bg-slate-900 text-white hover:bg-slate-800">
-                  Cetak Struk
-                </Button>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  {kitchenReceiptsEnabled && receiptData?.status !== "PENDING" && (
+                    <Button variant="outline" onClick={handleKitchenPrint} className="rounded-xl font-bold">
+                      Cetak Tiket Dapur
+                    </Button>
+                  )}
+                  <Button onClick={handlePrint} className="rounded-xl font-bold bg-slate-900 text-white hover:bg-slate-800">
+                    Cetak Struk
+                  </Button>
+                </div>
               </DialogFooter>
             </DialogContent>
           </Dialog>

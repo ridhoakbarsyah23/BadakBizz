@@ -32,7 +32,7 @@ export default function SettingsPage() {
     business_type: "retail",
     enable_table_management: false,
     enable_kitchen_receipts: false,
-    enable_shift_management: false,
+    enable_shift_management: true,
     phone: "",
     address: "",
     tax_rate: "11",
@@ -57,7 +57,7 @@ export default function SettingsPage() {
             business_type: data.business_type || "retail",
             enable_table_management: data.enable_table_management == 1 || data.enable_table_management === true,
             enable_kitchen_receipts: data.enable_kitchen_receipts == 1 || data.enable_kitchen_receipts === true,
-            enable_shift_management: data.enable_shift_management == 1 || data.enable_shift_management === true,
+            enable_shift_management: true,
             phone: data.phone || "",
             address: data.address || "",
             tax_rate: data.tax_rate?.toString() || "11",
@@ -92,7 +92,10 @@ export default function SettingsPage() {
           "Accept": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify(settings)
+        body: JSON.stringify({
+          ...settings,
+          enable_shift_management: true,
+        })
       })
       const data = await res.json().catch(() => null)
 
@@ -103,7 +106,7 @@ export default function SettingsPage() {
             business_type: data.store.business_type || "retail",
             enable_table_management: data.store.enable_table_management == 1 || data.store.enable_table_management === true,
             enable_kitchen_receipts: data.store.enable_kitchen_receipts == 1 || data.store.enable_kitchen_receipts === true,
-            enable_shift_management: data.store.enable_shift_management == 1 || data.store.enable_shift_management === true,
+            enable_shift_management: true,
             phone: data.store.phone || "",
             address: data.store.address || "",
             tax_rate: data.store.tax_rate?.toString() || "11",
@@ -295,10 +298,7 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 </div>
-                <Switch
-                  checked={settings.enable_shift_management}
-                  onCheckedChange={(checked) => setSettings({...settings, enable_shift_management: checked})}
-                />
+                <Switch checked={settings.enable_shift_management} disabled />
               </div>
             </div>
           </CardContent>
