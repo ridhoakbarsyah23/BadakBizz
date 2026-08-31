@@ -3,22 +3,25 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\ProductVariant;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
     public function index(Request $request)
     {
         $query = Product::with(['category', 'variants']);
-        
+
         if ($request->has('category_id')) {
             $query->where('category_id', $request->category_id);
         }
-        
+
         if ($request->has('per_page')) {
             return response()->json($query->paginate($request->per_page));
         }
-        
+
         return response()->json($query->get());
     }
 
@@ -42,7 +45,7 @@ class ProductController extends Controller
             'variants.*.stock' => 'integer|min:0',
         ]);
 
-        $product = Product::create(\Illuminate\Support\Arr::except($validated, ['variants']));
+        $product = Product::create(Arr::except($validated, ['variants']));
 
         if ($request->has('variants') && $request->has_variants) {
             foreach ($request->variants as $variant) {
@@ -63,7 +66,7 @@ class ProductController extends Controller
     public function update(Request $request, Product $product)
     {
         $validated = $request->validate([
-            'sku' => 'string|unique:products,sku,' . $product->id,
+            'sku' => 'string|unique:products,sku,'.$product->id,
             'barcode' => 'nullable|string',
             'name' => 'string|max:255',
             'category_id' => 'nullable|exists:categories,id',
@@ -75,26 +78,59 @@ class ProductController extends Controller
             'minimum_stock' => 'integer|min:0',
             'is_active' => 'boolean',
             'variants' => 'nullable|array',
+            'variants.*.id' => 'nullable|integer',
+            'variants.*.name' => 'required_with:variants|string',
+            'variants.*.sku' => 'nullable|string',
+            'variants.*.price_adjustment' => 'numeric',
+            'variants.*.stock' => 'integer|min:0',
         ]);
 
-        $product->update(\Illuminate\Support\Arr::except($validated, ['variants']));
+        $product->update(Arr::except($validated, ['variants']));
 
         if ($request->has('variants') && $request->has_variants) {
-            // Very simple approach: delete old variants and create new ones
-            $product->variants()->delete();
-            foreach ($request->variants as $variant) {
-                $product->variants()->create($variant);
+            $keptVariantIds = [];
+
+            foreach ($validated['variants'] ?? [] as $variantData) {
+                $variantPayload = Arr::only($variantData, ['name', 'sku', 'price_adjustment', 'stock']);
+                $variantId = $variantData['id'] ?? null;
+
+                if ($variantId) {
+                    $variant = ProductVariant::withTrashed()
+                        ->where('product_id', $product->id)
+                        ->find($variantId);
+
+                    if (! $variant) {
+                        throw ValidationException::withMessages([
+                            'variants' => 'Variant not found for this product.',
+                        ]);
+                    }
+
+                    $variant->fill($variantPayload);
+                    $variant->restore();
+                    $variant->save();
+                } else {
+                    $variant = $product->variants()->create($variantPayload);
+                }
+
+                $keptVariantIds[] = $variant->id;
             }
-        } else if (isset($validated['has_variants']) && !$validated['has_variants']) {
+
+            if (count($keptVariantIds) > 0) {
+                $product->variants()->whereNotIn('id', $keptVariantIds)->delete();
+            } else {
+                $product->variants()->delete();
+            }
+        } elseif (isset($validated['has_variants']) && ! $validated['has_variants']) {
             $product->variants()->delete();
         }
-        
+
         return response()->json($product->load(['category', 'variants']));
     }
 
     public function destroy(Product $product)
     {
         $product->delete();
+
         return response()->json(null, 204);
     }
 }

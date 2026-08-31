@@ -62,6 +62,7 @@ interface Product {
 }
 
 interface VariantForm {
+  id?: number;
   name: string;
   sku: string;
   price_adjustment: number;
