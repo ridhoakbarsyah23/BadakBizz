@@ -25,15 +25,20 @@ class ReportController extends Controller
         }
 
         // 1. Total Revenue
-        $totalRevenue = Transaction::whereBetween('created_at', [$startDate, $endDate])->sum('total_amount');
+        $totalRevenue = Transaction::where('status', 'COMPLETED')
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->sum('total_amount');
 
         // 2. Average Transaction
-        $averageTransaction = Transaction::whereBetween('created_at', [$startDate, $endDate])->avg('total_amount') ?? 0;
+        $averageTransaction = Transaction::where('status', 'COMPLETED')
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->avg('total_amount') ?? 0;
 
         // 3. Top Selling Item
         $topSellingItem = DB::table('transaction_items')
             ->join('products', 'transaction_items.product_id', '=', 'products.id')
             ->join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
+            ->where('transactions.status', 'COMPLETED')
             ->whereBetween('transactions.created_at', [$startDate, $endDate])
             ->select('products.name', DB::raw('SUM(transaction_items.quantity) as total_sold'))
             ->groupBy('products.id', 'products.name')
@@ -42,6 +47,7 @@ class ReportController extends Controller
 
         // 4. Busiest Hour
         $transactionsTime = Transaction::select('created_at')
+            ->where('status', 'COMPLETED')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->get();
 
@@ -57,6 +63,7 @@ class ReportController extends Controller
         $diffInDays = $startDate->diffInDays($endDate);
 
         $chartTransactions = Transaction::with('items.product')
+            ->where('status', 'COMPLETED')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->get();
 
@@ -329,8 +336,8 @@ class ReportController extends Controller
         foreach ($files as $path => $content) {
             $crc = crc32($content);
             $size = strlen($content);
-            $localHeader = pack('VvvvvvVVVvv', 0x04034b50, 20, 0, 0, $dosTime, $dosDate, $crc, $size, $size, strlen($path), 0);
-            $centralHeader = pack('VvvvvvvVVVvvvvvVV', 0x02014b50, 20, 20, 0, 0, $dosTime, $dosDate, $crc, $size, $size, strlen($path), 0, 0, 0, 0, 0, $offset);
+            $localHeader = pack('VvvvvvVVVvv', 0x04034B50, 20, 0, 0, $dosTime, $dosDate, $crc, $size, $size, strlen($path), 0);
+            $centralHeader = pack('VvvvvvvVVVvvvvvVV', 0x02014B50, 20, 20, 0, 0, $dosTime, $dosDate, $crc, $size, $size, strlen($path), 0, 0, 0, 0, 0, $offset);
 
             $localFiles .= $localHeader.$path.$content;
             $centralDirectory .= $centralHeader.$path;
@@ -340,7 +347,7 @@ class ReportController extends Controller
         $centralOffset = strlen($localFiles);
         $centralSize = strlen($centralDirectory);
         $fileCount = count($files);
-        $endDirectory = pack('VvvvvVVv', 0x06054b50, 0, 0, $fileCount, $fileCount, $centralSize, $centralOffset, 0);
+        $endDirectory = pack('VvvvvVVv', 0x06054B50, 0, 0, $fileCount, $fileCount, $centralSize, $centralOffset, 0);
 
         return $localFiles.$centralDirectory.$endDirectory;
     }

@@ -13,7 +13,7 @@ class SettingTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_can_activate_shift_management(): void
+    public function test_admin_cannot_disable_required_shift_management(): void
     {
         Sanctum::actingAs($this->userWithRole('admin', 'Administrator'));
 
@@ -28,7 +28,7 @@ class SettingTest extends TestCase
             'business_type' => 'fnb',
             'enable_table_management' => true,
             'enable_kitchen_receipts' => false,
-            'enable_shift_management' => true,
+            'enable_shift_management' => false,
             'phone' => '08123456789',
             'address' => 'Jl. Test',
             'tax_rate' => 11,

@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('stores', function (Blueprint $table) {
-            $table->boolean('enable_shift_management')->default(false)->after('enable_kitchen_receipts');
+            $table->boolean('enable_shift_management')->default(true)->after('enable_kitchen_receipts');
         });
     }
 

@@ -155,7 +155,7 @@ class TransactionTest extends TestCase
         $this->assertDatabaseCount('transactions', 0);
     }
 
-    public function test_transaction_without_shift_is_allowed_when_shift_management_is_disabled(): void
+    public function test_transaction_without_shift_is_rejected_even_when_shift_management_setting_is_disabled(): void
     {
         Sanctum::actingAs($this->cashier(withOpenShift: false));
 
@@ -168,7 +168,7 @@ class TransactionTest extends TestCase
 
         $product = Product::create([
             'sku' => 'SKU-SHIFT-DISABLED',
-            'name' => 'Shift Disabled Product',
+            'name' => 'Shift Required Product',
             'purchase_price' => 5_000,
             'selling_price' => 10_000,
             'stock' => 10,
@@ -185,11 +185,12 @@ class TransactionTest extends TestCase
             'order_type' => 'takeaway',
         ]);
 
-        $response->assertCreated()
-            ->assertJsonPath('data.status', 'COMPLETED')
-            ->assertJsonPath('data.cashier_shift_id', null);
+        $response->assertStatus(400)
+            ->assertJsonPath('message', 'Failed to process transaction.')
+            ->assertJsonPath('error', 'Open an active cashier shift before checkout.');
 
-        $this->assertSame(9, $product->fresh()->stock);
+        $this->assertSame(10, $product->fresh()->stock);
+        $this->assertDatabaseCount('transactions', 0);
     }
 
     public function test_transaction_is_rejected_when_stock_is_insufficient(): void

@@ -161,7 +161,6 @@ class TransactionController extends Controller
             }
 
             $store = Store::first();
-            $shiftManagementEnabled = (bool) ($store?->enable_shift_management ?? false);
             $taxRatePercent = $store?->tax_rate ?? 11;
             $serviceChargeRatePercent = $store?->service_charge_rate ?? 0;
 
@@ -179,7 +178,7 @@ class TransactionController extends Controller
                     ->first();
             }
 
-            if ($shiftManagementEnabled && ! $activeShift) {
+            if (! $activeShift) {
                 throw new \Exception('Open an active cashier shift before checkout.');
             }
 
