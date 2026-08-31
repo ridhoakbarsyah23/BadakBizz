@@ -27,6 +27,21 @@ class TableTest extends TestCase
             ->assertJsonPath('1.status', 'reserved');
     }
 
+    public function test_tables_are_listed_in_natural_name_order(): void
+    {
+        Sanctum::actingAs($this->userWithRole('cashier', 'Cashier'));
+
+        Table::create(['name' => 'Meja 1']);
+        Table::create(['name' => 'Meja 10']);
+        Table::create(['name' => 'Meja 2']);
+
+        $this->getJson('/api/tables')
+            ->assertOk()
+            ->assertJsonPath('0.name', 'Meja 1')
+            ->assertJsonPath('1.name', 'Meja 2')
+            ->assertJsonPath('2.name', 'Meja 10');
+    }
+
     public function test_admin_can_create_table(): void
     {
         Sanctum::actingAs($this->userWithRole('admin', 'Administrator'));

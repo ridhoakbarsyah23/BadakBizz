@@ -9,7 +9,11 @@ class TableController extends Controller
 {
     public function index()
     {
-        return response()->json(Table::orderBy('name')->get());
+        $tables = Table::all()
+            ->sort(fn (Table $first, Table $second) => strnatcasecmp($first->name, $second->name))
+            ->values();
+
+        return response()->json($tables);
     }
 
     public function store(Request $request)
