@@ -22,7 +22,8 @@ import {
   RefreshCw,
   CalendarClock,
   LogIn,
-  LogOut
+  LogOut,
+  ImageIcon
 } from "lucide-react"
 import {
   Dialog,
@@ -848,8 +849,18 @@ export default function POSPage() {
                       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
                         <div className="bg-primary text-primary-foreground rounded-full p-1 shadow-md"><Plus className="w-3 h-3"/></div>
                       </div>
-                      <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center text-primary font-black text-2xl mb-1 group-hover:scale-110 transition-transform duration-300 border border-slate-100">
-                        {product.name.charAt(0)}
+                      <div className="h-20 w-full overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
+                        {product.image_url ? (
+                          <img
+                            src={product.image_url}
+                            alt={`Foto ${product.name}`}
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50 text-primary">
+                            <ImageIcon className="h-7 w-7" />
+                          </div>
+                        )}
                       </div>
                       <div className="font-bold text-sm line-clamp-2 leading-tight text-slate-800 group-hover:text-primary transition-colors">{product.name}</div>
                       {product.has_variants ? (

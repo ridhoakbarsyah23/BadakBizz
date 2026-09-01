@@ -144,6 +144,267 @@ class ProductVariantArchiveTest extends TestCase
         $this->assertSoftDeleted('product_variants', ['id' => $variant->id]);
     }
 
+    public function test_archived_variant_can_be_restored_by_sku_when_updating_same_product(): void
+    {
+        Sanctum::actingAs($this->admin());
+
+        $product = Product::create([
+            'sku' => 'SKU-RESTORE-VARIANT',
+            'name' => 'Restore Variant Product',
+            'purchase_price' => 5_000,
+            'selling_price' => 10_000,
+            'has_variants' => true,
+            'stock' => 0,
+            'minimum_stock' => 0,
+            'is_active' => true,
+        ]);
+
+        $variant = ProductVariant::create([
+            'product_id' => $product->id,
+            'name' => 'Archived Size',
+            'sku' => 'SKU-RESTORE-VARIANT-S',
+            'price_adjustment' => 0,
+            'stock' => 2,
+        ]);
+        $variant->delete();
+
+        $this->putJson("/api/products/{$product->id}", [
+            'sku' => 'SKU-RESTORE-VARIANT',
+            'name' => 'Restore Variant Product',
+            'purchase_price' => 5_000,
+            'selling_price' => 10_000,
+            'has_variants' => true,
+            'stock' => 0,
+            'minimum_stock' => 0,
+            'variants' => [
+                [
+                    'name' => 'Restored Size',
+                    'sku' => 'SKU-RESTORE-VARIANT-S',
+                    'price_adjustment' => 1_000,
+                    'stock' => 5,
+                ],
+            ],
+        ])->assertOk()
+            ->assertJsonCount(1, 'variants')
+            ->assertJsonFragment(['name' => 'Restored Size']);
+
+        $restoredVariant = $variant->fresh();
+        $this->assertNull($restoredVariant->deleted_at);
+        $this->assertSame('Restored Size', $restoredVariant->name);
+        $this->assertSame(5, $restoredVariant->stock);
+        $this->assertSame(1, ProductVariant::withTrashed()->where('product_id', $product->id)->count());
+    }
+
+    public function test_variant_sku_conflict_returns_validation_error_instead_of_database_error(): void
+    {
+        Sanctum::actingAs($this->admin());
+
+        $firstProduct = Product::create([
+            'sku' => 'SKU-CONFLICT-OWNER',
+            'name' => 'Conflict Owner',
+            'purchase_price' => 5_000,
+            'selling_price' => 10_000,
+            'has_variants' => true,
+            'stock' => 0,
+            'minimum_stock' => 0,
+            'is_active' => true,
+        ]);
+
+        ProductVariant::create([
+            'product_id' => $firstProduct->id,
+            'name' => 'Owner Variant',
+            'sku' => 'SKU-VARIANT-CONFLICT',
+            'price_adjustment' => 0,
+            'stock' => 2,
+        ]);
+
+        $this->postJson('/api/products', [
+            'sku' => 'SKU-CONFLICT-NEW',
+            'name' => 'Conflict New',
+            'purchase_price' => 5_000,
+            'selling_price' => 10_000,
+            'has_variants' => true,
+            'stock' => 0,
+            'minimum_stock' => 0,
+            'variants' => [
+                [
+                    'name' => 'New Variant',
+                    'sku' => 'SKU-VARIANT-CONFLICT',
+                    'price_adjustment' => 0,
+                    'stock' => 1,
+                ],
+            ],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('variants.0.sku');
+    }
+
+    public function test_multiple_variants_can_have_blank_sku_without_unique_database_conflict(): void
+    {
+        Sanctum::actingAs($this->admin());
+
+        $response = $this->postJson('/api/products', [
+            'sku' => 'SKU-BLANK-VARIANTS',
+            'name' => 'Blank Variant SKU Product',
+            'purchase_price' => 5_000,
+            'selling_price' => 10_000,
+            'has_variants' => true,
+            'stock' => 0,
+            'minimum_stock' => 0,
+            'variants' => [
+                [
+                    'name' => 'Small',
+                    'sku' => '',
+                    'price_adjustment' => 0,
+                    'stock' => 2,
+                ],
+                [
+                    'name' => 'Large',
+                    'sku' => '',
+                    'price_adjustment' => 2_000,
+                    'stock' => 3,
+                ],
+            ],
+        ])->assertCreated()
+            ->assertJsonCount(2, 'variants')
+            ->assertJsonPath('variants.0.sku', null)
+            ->assertJsonPath('variants.1.sku', null);
+
+        $this->assertDatabaseHas('product_variants', [
+            'product_id' => $response->json('id'),
+            'name' => 'Small',
+            'sku' => null,
+        ]);
+        $this->assertDatabaseHas('product_variants', [
+            'product_id' => $response->json('id'),
+            'name' => 'Large',
+            'sku' => null,
+        ]);
+    }
+
+    public function test_product_and_variant_skus_are_normalized_before_storage(): void
+    {
+        Sanctum::actingAs($this->admin());
+
+        $response = $this->postJson('/api/products', [
+            'sku' => ' kopi gula 01 ',
+            'name' => 'Normalized SKU Product',
+            'purchase_price' => 5_000,
+            'selling_price' => 10_000,
+            'has_variants' => true,
+            'stock' => 0,
+            'minimum_stock' => 0,
+            'variants' => [
+                [
+                    'name' => 'Dingin',
+                    'sku' => ' kopi gula 01 dingin ',
+                    'price_adjustment' => 1_000,
+                    'stock' => 2,
+                ],
+            ],
+        ])->assertCreated()
+            ->assertJsonPath('sku', 'KOPI-GULA-01')
+            ->assertJsonPath('variants.0.sku', 'KOPI-GULA-01-DINGIN');
+
+        $this->assertDatabaseHas('products', [
+            'sku' => 'KOPI-GULA-01',
+        ]);
+        $this->assertDatabaseHas('product_variants', [
+            'sku' => 'KOPI-GULA-01-DINGIN',
+        ]);
+    }
+
+    public function test_product_sku_cannot_match_existing_variant_sku(): void
+    {
+        Sanctum::actingAs($this->admin());
+
+        $product = Product::create([
+            'sku' => 'SKU-PARENT',
+            'name' => 'Parent Product',
+            'purchase_price' => 5_000,
+            'selling_price' => 10_000,
+            'has_variants' => true,
+            'stock' => 0,
+            'minimum_stock' => 0,
+            'is_active' => true,
+        ]);
+
+        ProductVariant::create([
+            'product_id' => $product->id,
+            'name' => 'Variant',
+            'sku' => 'SKU-VARIANT-USED',
+            'price_adjustment' => 0,
+            'stock' => 2,
+        ]);
+
+        $this->postJson('/api/products', [
+            'sku' => 'sku variant used',
+            'name' => 'Conflicting Product',
+            'purchase_price' => 5_000,
+            'selling_price' => 10_000,
+            'stock' => 1,
+            'minimum_stock' => 0,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('sku');
+    }
+
+    public function test_variant_sku_cannot_match_existing_product_sku(): void
+    {
+        Sanctum::actingAs($this->admin());
+
+        Product::create([
+            'sku' => 'SKU-PRODUCT-USED',
+            'name' => 'Existing Product',
+            'purchase_price' => 5_000,
+            'selling_price' => 10_000,
+            'stock' => 1,
+            'minimum_stock' => 0,
+            'is_active' => true,
+        ]);
+
+        $this->postJson('/api/products', [
+            'sku' => 'SKU-NEW-PARENT',
+            'name' => 'Conflicting Variant Product',
+            'purchase_price' => 5_000,
+            'selling_price' => 10_000,
+            'has_variants' => true,
+            'stock' => 0,
+            'minimum_stock' => 0,
+            'variants' => [
+                [
+                    'name' => 'Variant',
+                    'sku' => 'sku product used',
+                    'price_adjustment' => 0,
+                    'stock' => 1,
+                ],
+            ],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('variants.0.sku');
+    }
+
+    public function test_variant_sku_cannot_match_its_product_sku(): void
+    {
+        Sanctum::actingAs($this->admin());
+
+        $this->postJson('/api/products', [
+            'sku' => 'SKU-SAME',
+            'name' => 'Same SKU Product',
+            'purchase_price' => 5_000,
+            'selling_price' => 10_000,
+            'has_variants' => true,
+            'stock' => 0,
+            'minimum_stock' => 0,
+            'variants' => [
+                [
+                    'name' => 'Variant',
+                    'sku' => 'sku same',
+                    'price_adjustment' => 0,
+                    'stock' => 1,
+                ],
+            ],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('variants.0.sku');
+    }
+
     private function admin(): User
     {
         $role = Role::firstOrCreate(

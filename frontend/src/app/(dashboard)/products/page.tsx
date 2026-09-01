@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Plus, Edit2, Trash2, Loader2, AlertTriangle, Search, Filter, Wand2, X } from "lucide-react"
+import { Plus, Edit2, Trash2, Loader2, AlertTriangle, Search, Filter, Wand2, X, ImageIcon, Upload, ChevronDown } from "lucide-react"
 
 interface Category {
   id: number
@@ -57,9 +57,19 @@ interface Product {
   minimum_stock: number
   is_active: boolean
   barcode?: string
+  image_path?: string | null
+  image_url?: string | null
   unit?: string
   has_variants?: boolean
-  variants?: any[]
+  variants?: ProductVariant[]
+}
+
+interface ProductVariant {
+  id: number
+  name: string
+  sku: string | null
+  price_adjustment: string | number
+  stock: number
 }
 
 interface VariantForm {
@@ -111,6 +121,13 @@ const formatIndonesianNumber = (value: string | number | null | undefined) => {
   return digits ? Number(digits).toLocaleString("id-ID") : ""
 }
 
+const formatSkuInput = (value: string) =>
+  value
+    .toUpperCase()
+    .trim()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+
 const productStock = (product: Product) => product.has_variants
   ? (product.variants || []).reduce((sum, variant) => sum + Number(variant.stock || 0), 0)
   : Number(product.stock || 0)
@@ -125,6 +142,13 @@ export default function ProductsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState("")
+  const [statusFilter, setStatusFilter] = useState("")
+  const [stockFilter, setStockFilter] = useState("")
+  const [variantFilter, setVariantFilter] = useState("")
+  const [photoFilter, setPhotoFilter] = useState("")
+  const [expandedProductIds, setExpandedProductIds] = useState<Set<number>>(new Set())
   
   // Dialog State
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -132,8 +156,12 @@ export default function ProductsPage() {
   
   // Form State
   const [formData, setFormData] = useState(initialForm)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState("")
+  const [removeImage, setRemoveImage] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isGeneratingSku, setIsGeneratingSku] = useState(false)
   const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, action: null as any, title: "", desc: "" })
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null)
   const [error, setError] = useState("")
@@ -146,14 +174,26 @@ export default function ProductsPage() {
     if (token) {
       fetchData()
     }
-  }, [token, currentPage])
+  }, [token, currentPage, searchQuery, categoryFilter, statusFilter, stockFilter, variantFilter, photoFilter])
 
   const fetchData = async () => {
     setIsLoading(true)
     try {
       const headers = { "Authorization": `Bearer ${token}` }
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        per_page: "10",
+      })
+
+      if (searchQuery.trim()) params.set("search", searchQuery.trim())
+      if (categoryFilter) params.set("category_id", categoryFilter)
+      if (statusFilter) params.set("status", statusFilter)
+      if (stockFilter) params.set("stock_status", stockFilter)
+      if (variantFilter) params.set("variant_type", variantFilter)
+      if (photoFilter) params.set("photo", photoFilter)
+
       const [prodRes, catRes] = await Promise.all([
-        fetch(apiUrl(`/api/products?page=${currentPage}&per_page=10`), { headers }),
+        fetch(apiUrl(`/api/products?${params.toString()}`), { headers }),
         fetch(apiUrl('/api/categories'), { headers })
       ])
       
@@ -175,6 +215,39 @@ export default function ProductsPage() {
     }
   }
 
+  const updateFilter = (setter: React.Dispatch<React.SetStateAction<string>>, value: string) => {
+    setCurrentPage(1)
+    setter(value)
+  }
+
+  const hasActiveFilters = Boolean(
+    searchQuery || categoryFilter || statusFilter || stockFilter || variantFilter || photoFilter
+  )
+
+  const resetFilters = () => {
+    setCurrentPage(1)
+    setSearchQuery("")
+    setCategoryFilter("")
+    setStatusFilter("")
+    setStockFilter("")
+    setVariantFilter("")
+    setPhotoFilter("")
+  }
+
+  const toggleVariantDetails = (productId: number) => {
+    setExpandedProductIds(prev => {
+      const next = new Set(prev)
+
+      if (next.has(productId)) {
+        next.delete(productId)
+      } else {
+        next.add(productId)
+      }
+
+      return next
+    })
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setConfirmConfig({
@@ -194,7 +267,7 @@ export default function ProductsPage() {
       const url = editingId 
         ? apiUrl(`/api/products/${editingId}`)
         : apiUrl('/api/products')
-        
+
       const payload = {
         ...formData,
         category_id: formData.category_id || null,
@@ -211,15 +284,49 @@ export default function ProductsPage() {
           stock: parseIndonesianNumber(variant.stock),
         })),
       }
+
+      const body = new FormData()
+      if (editingId) {
+        body.append("_method", "PUT")
+      }
+      body.append("variants_present", "1")
+      Object.entries(payload).forEach(([key, value]) => {
+        if (key === "variants") {
+          ;(value as VariantForm[]).forEach((variant, index) => {
+            if (variant.id) {
+              body.append(`variants[${index}][id]`, String(variant.id))
+            }
+            body.append(`variants[${index}][name]`, variant.name)
+            body.append(`variants[${index}][sku]`, variant.sku || "")
+            body.append(`variants[${index}][price_adjustment]`, String(variant.price_adjustment || 0))
+            body.append(`variants[${index}][stock]`, String(variant.stock || 0))
+          })
+          return
+        }
+
+        if (typeof value === "boolean") {
+          body.append(key, value ? "1" : "0")
+          return
+        }
+
+        body.append(key, value === null || value === undefined ? "" : String(value))
+      })
+
+      if (imageFile) {
+        body.append("image", imageFile)
+      }
+
+      if (removeImage) {
+        body.append("remove_image", "1")
+      }
         
       const res = await fetch(url, {
-        method: editingId ? "PUT" : "POST",
+        method: "POST",
         headers: {
-          "Content-Type": "application/json",
           "Accept": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify(payload)
+        body
       })
 
       const data = await res.json()
@@ -230,6 +337,9 @@ export default function ProductsPage() {
 
       await fetchData()
       setIsFormOpen(false)
+      setImageFile(null)
+      setImagePreview("")
+      setRemoveImage(false)
       setNotice({
         type: "success",
         message: `Produk ${formData.name} berhasil ${actionLabel}.`,
@@ -284,48 +394,70 @@ export default function ProductsPage() {
       barcode: product.barcode || "",
       unit: product.unit || "pcs",
       has_variants: product.has_variants || false,
-      variants: product.variants || []
+      variants: (product.variants || []).map((variant) => ({
+        id: variant.id,
+        name: variant.name,
+        sku: variant.sku || "",
+        price_adjustment: Number(variant.price_adjustment || 0),
+        stock: Number(variant.stock || 0),
+      }))
     })
+    setImageFile(null)
+    setImagePreview(product.image_url || "")
+    setRemoveImage(false)
     setIsFormOpen(true)
   }
 
   const openCreate = () => {
     setNotice(null)
     setEditingId(null)
-    const randomSuffix = Math.floor(100000 + Math.random() * 900000);
     setFormData({
       ...initialForm,
-      sku: `PRD-${randomSuffix}`
+      sku: ""
     })
+    setImageFile(null)
+    setImagePreview("")
+    setRemoveImage(false)
     setError("")
     setIsFormOpen(true)
   }
 
-  const handleGenerateSKU = () => {
-    let catStr = "PRD";
-    let nameStr = "ITM";
-    
-    if (formData.category_id) {
-      const cat = categories.find(c => c.id.toString() === formData.category_id.toString());
-      if (cat && cat.name) {
-        catStr = cat.name.replace(/[^a-zA-Z0-9]/g, '').substring(0, 3).toUpperCase();
-      }
+  const handleGenerateSKU = async () => {
+    if (!formData.name.trim()) {
+      setError("Isi nama produk sebelum membuat SKU otomatis.")
+      return
     }
-    
-    if (formData.name) {
-      const words = formData.name.trim().split(' ');
-      if (words.length > 1) {
-        nameStr = words.map(w => w[0]).join('').substring(0, 3).toUpperCase();
-      } else {
-        nameStr = formData.name.replace(/[^a-zA-Z0-9]/g, '').substring(0, 3).toUpperCase();
+
+    setIsGeneratingSku(true)
+    setError("")
+
+    try {
+      const params = new URLSearchParams({ name: formData.name.trim() })
+      if (formData.category_id) {
+        params.set("category_id", formData.category_id)
       }
+      if (editingId) {
+        params.set("product_id", editingId.toString())
+      }
+
+      const res = await fetch(apiUrl(`/api/products/next-sku?${params.toString()}`), {
+        headers: {
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.message || "Gagal membuat SKU otomatis")
+      }
+
+      setFormData(prev => ({ ...prev, sku: data.sku }))
+    } catch (err: any) {
+      setError(err.message || "Gagal membuat SKU otomatis")
+    } finally {
+      setIsGeneratingSku(false)
     }
-    
-    catStr = catStr || "PRD";
-    nameStr = nameStr || "ITM";
-    
-    const randomNum = String(Math.floor(1 + Math.random() * 999)).padStart(3, '0');
-    setFormData(prev => ({ ...prev, sku: `${catStr}-${nameStr}-${randomNum}` }));
   }
 
   const openDelete = (product: Product) => {
@@ -357,6 +489,54 @@ export default function ProductsPage() {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-md">{error}</div>}
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-[120px_1fr] sm:items-center">
+                <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-lg border bg-muted/30">
+                  {imagePreview ? (
+                    <img
+                      src={imagePreview}
+                      alt={formData.name ? `Foto ${formData.name}` : "Preview foto produk"}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="image">Foto Produk</Label>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      id="image"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null
+                        setImageFile(file)
+                        setRemoveImage(false)
+                        setImagePreview(file ? URL.createObjectURL(file) : imagePreview)
+                      }}
+                    />
+                    {(imagePreview || imageFile) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setImageFile(null)
+                          setImagePreview("")
+                          setRemoveImage(true)
+                        }}
+                      >
+                        <X className="mr-2 h-4 w-4" />
+                        Hapus
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Upload className="h-3.5 w-3.5" />
+                    JPG, PNG, atau WebP maksimal 2 MB.
+                  </div>
+                </div>
+              </div>
               
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
@@ -367,7 +547,7 @@ export default function ProductsPage() {
                       required
                       placeholder="cth. MIN-KOP-001"
                       value={formData.sku}
-                      onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, sku: formatSkuInput(e.target.value) })}
                     />
                     <Button 
                       type="button" 
@@ -375,9 +555,10 @@ export default function ProductsPage() {
                       size="icon" 
                       className="shrink-0"
                       onClick={handleGenerateSKU}
+                      disabled={isGeneratingSku}
                       title="Buat SKU Otomatis"
                     >
-                      <Wand2 className="w-4 h-4" />
+                      {isGeneratingSku ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
                     </Button>
                   </div>
                 </div>
@@ -489,7 +670,7 @@ export default function ProductsPage() {
                             value={variant.sku}
                             onChange={(e) => {
                               const newVariants = [...formData.variants!];
-                              newVariants[index].sku = e.target.value;
+                              newVariants[index].sku = formatSkuInput(e.target.value);
                               setFormData({ ...formData, variants: newVariants });
                             }} 
                           />
@@ -623,13 +804,66 @@ export default function ProductsPage() {
 
       <AutoDismissNotice notice={notice} onDismiss={() => setNotice(null)} />
 
-      <div className="flex flex-col sm:flex-row items-center gap-4">
-        <div className="relative w-full sm:max-w-sm">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1fr)_repeat(5,minmax(140px,180px))_auto]">
+        <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Cari produk..." className="pl-8 w-full" />
+          <Input
+            placeholder="Cari nama, SKU, barcode..."
+            className="pl-8 w-full"
+            value={searchQuery}
+            onChange={(e) => updateFilter(setSearchQuery, e.target.value)}
+          />
         </div>
-        <Button variant="secondary">
-          <Filter className="mr-2 h-4 w-4" /> Filter
+        <select
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          value={categoryFilter}
+          onChange={(e) => updateFilter(setCategoryFilter, e.target.value)}
+        >
+          <option value="">Semua kategori</option>
+          {categories.map((cat) => (
+            <option key={cat.id} value={cat.id.toString()}>{cat.name}</option>
+          ))}
+        </select>
+        <select
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          value={statusFilter}
+          onChange={(e) => updateFilter(setStatusFilter, e.target.value)}
+        >
+          <option value="">Semua status</option>
+          <option value="active">Aktif</option>
+          <option value="inactive">Nonaktif</option>
+        </select>
+        <select
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          value={stockFilter}
+          onChange={(e) => updateFilter(setStockFilter, e.target.value)}
+        >
+          <option value="">Semua stok</option>
+          <option value="safe">Stok aman</option>
+          <option value="low">Stok menipis</option>
+          <option value="out">Stok habis</option>
+        </select>
+        <select
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          value={variantFilter}
+          onChange={(e) => updateFilter(setVariantFilter, e.target.value)}
+        >
+          <option value="">Semua tipe</option>
+          <option value="with_variants">Dengan varian</option>
+          <option value="without_variants">Tanpa varian</option>
+        </select>
+        <select
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          value={photoFilter}
+          onChange={(e) => updateFilter(setPhotoFilter, e.target.value)}
+        >
+          <option value="">Semua foto</option>
+          <option value="with_photo">Ada foto</option>
+          <option value="without_photo">Belum ada foto</option>
+        </select>
+        <Button variant="secondary" onClick={resetFilters} disabled={!hasActiveFilters}>
+          {hasActiveFilters ? <X className="mr-2 h-4 w-4" /> : <Filter className="mr-2 h-4 w-4" />}
+          Reset
         </Button>
       </div>
 
@@ -643,6 +877,7 @@ export default function ProductsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>SKU</TableHead>
+                <TableHead>FOTO</TableHead>
                 <TableHead>NAMA PRODUK</TableHead>
                 <TableHead>KATEGORI</TableHead>
                 <TableHead>HARGA</TableHead>
@@ -654,7 +889,7 @@ export default function ProductsPage() {
             <TableBody>
               {products.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     Tidak ada produk yang ditemukan. Tambahkan produk untuk memulai.
                   </TableCell>
                 </TableRow>
@@ -662,54 +897,120 @@ export default function ProductsPage() {
                 products.map((product) => {
                   const stock = productStock(product)
                   const isLowStock = stock <= product.minimum_stock
+                  const variants = product.variants || []
+                  const isExpanded = expandedProductIds.has(product.id)
                   const availableVariants = product.has_variants
-                    ? (product.variants || []).filter((variant) => Number(variant.stock || 0) > 0).length
+                    ? variants.filter((variant) => Number(variant.stock || 0) > 0).length
                     : 0
 
                   return (
-                  <TableRow key={product.id}>
-                    <TableCell className="py-3 px-4 font-medium">{product.sku}</TableCell>
-                    <TableCell className="py-3 px-4">
-                      <div className="font-medium">{product.name}</div>
-                      {product.has_variants && (
-                        <div className="mt-1 flex flex-wrap gap-1.5">
-                          <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-semibold">
-                            {availableVariants}/{product.variants?.length || 0} varian aktif
+                    <React.Fragment key={product.id}>
+                      <TableRow>
+                        <TableCell className="py-3 px-4 font-medium">{product.sku}</TableCell>
+                        <TableCell className="py-3 px-4">
+                          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border bg-muted/30">
+                            {product.image_url ? (
+                              <img
+                                src={product.image_url}
+                                alt={`Foto ${product.name}`}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3 px-4">
+                          <div className="font-medium">{product.name}</div>
+                          {product.has_variants && (
+                            <div className="mt-1 flex flex-wrap gap-1.5">
+                              <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-semibold">
+                                {availableVariants}/{variants.length} varian aktif
+                              </Badge>
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-3 px-4 text-muted-foreground">{product.category?.name || '-'}</TableCell>
+                        <TableCell className="py-3 px-4">Rp {Number(product.selling_price).toLocaleString('id-ID')}</TableCell>
+                        <TableCell className="py-3 px-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={isLowStock ? "text-destructive font-bold" : ""}>
+                              {stock}
+                            </span>
+                            {product.has_variants && (
+                              <span className="text-xs text-muted-foreground">total varian</span>
+                            )}
+                            {isLowStock && (
+                              <Badge variant="destructive" className="h-5 px-1 text-[10px]">Menipis</Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3 px-4">
+                          <Badge variant={product.is_active ? "secondary" : "outline"} className={product.is_active ? "bg-green-100 text-green-700 hover:bg-green-100" : ""}>
+                            {product.is_active ? "Aktif" : "Nonaktif"}
                           </Badge>
-                        </div>
+                        </TableCell>
+                        <TableCell className="py-3 px-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={!product.has_variants || variants.length === 0}
+                              onClick={() => toggleVariantDetails(product.id)}
+                              title={isExpanded ? "Tutup detail varian" : "Lihat detail varian"}
+                            >
+                              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => openEdit(product)}>
+                              <Edit2 className="w-4 h-4 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => openDelete(product)}>
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {isExpanded && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="bg-muted/20 px-4 py-3">
+                            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                              {variants.map((variant) => {
+                                const variantStock = Number(variant.stock || 0)
+                                const variantIsLow = variantStock <= Number(product.minimum_stock || 0)
+                                const finalPrice = Number(product.selling_price || 0) + Number(variant.price_adjustment || 0)
+
+                                return (
+                                  <div key={variant.id} className="grid grid-cols-[1fr_auto] gap-3 rounded-md border bg-background p-3">
+                                    <div className="min-w-0">
+                                      <div className="truncate text-sm font-semibold text-foreground">{variant.name}</div>
+                                      <div className="mt-1 flex flex-wrap gap-1.5">
+                                        <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                                          {variant.sku || "Tanpa SKU"}
+                                        </Badge>
+                                        <Badge variant={variantStock > 0 ? "secondary" : "destructive"} className="h-5 px-1.5 text-[10px]">
+                                          Stok {variantStock}
+                                        </Badge>
+                                        {variantIsLow && variantStock > 0 && (
+                                          <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">Menipis</Badge>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-sm font-bold text-foreground">
+                                        Rp {finalPrice.toLocaleString("id-ID")}
+                                      </div>
+                                      <div className="text-[11px] text-muted-foreground">
+                                        +Rp {Number(variant.price_adjustment || 0).toLocaleString("id-ID")}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </TableCell>
+                        </TableRow>
                       )}
-                    </TableCell>
-                    <TableCell className="py-3 px-4 text-muted-foreground">{product.category?.name || '-'}</TableCell>
-                    <TableCell className="py-3 px-4">Rp {Number(product.selling_price).toLocaleString('id-ID')}</TableCell>
-                    <TableCell className="py-3 px-4">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={isLowStock ? "text-destructive font-bold" : ""}>
-                          {stock}
-                        </span>
-                        {product.has_variants && (
-                          <span className="text-xs text-muted-foreground">total varian</span>
-                        )}
-                        {isLowStock && (
-                          <Badge variant="destructive" className="h-5 px-1 text-[10px]">Menipis</Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-3 px-4">
-                      <Badge variant={product.is_active ? "secondary" : "outline"} className={product.is_active ? "bg-green-100 text-green-700 hover:bg-green-100" : ""}>
-                        {product.is_active ? "Aktif" : "Nonaktif"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-3 px-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(product)}>
-                          <Edit2 className="w-4 h-4 text-muted-foreground" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openDelete(product)}>
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                    </React.Fragment>
                   )
                 })
               )}
