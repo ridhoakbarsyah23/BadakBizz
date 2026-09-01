@@ -222,6 +222,40 @@ class TransactionTest extends TestCase
         $this->assertDatabaseCount('transactions', 0);
     }
 
+    public function test_cash_transaction_is_rejected_when_payment_amount_is_less_than_total(): void
+    {
+        Sanctum::actingAs($this->cashier());
+
+        Store::create([
+            'name' => 'BadakBizz Test',
+            'tax_rate' => 0,
+            'service_charge_rate' => 0,
+        ]);
+
+        $product = Product::create([
+            'sku' => 'SKU-UNDERPAID',
+            'name' => 'Underpaid Product',
+            'purchase_price' => 4_000,
+            'selling_price' => 10_000,
+            'stock' => 2,
+            'minimum_stock' => 1,
+            'is_active' => true,
+        ]);
+
+        $this->postJson('/api/transactions', [
+            'items' => [
+                ['product_id' => $product->id, 'quantity' => 1],
+            ],
+            'payment_method' => 'CASH',
+            'payment_amount' => 9_000,
+            'order_type' => 'takeaway',
+        ])->assertStatus(400)
+            ->assertJsonPath('error', 'Payment amount cannot be less than total amount.');
+
+        $this->assertSame(2, $product->fresh()->stock);
+        $this->assertDatabaseCount('transactions', 0);
+    }
+
     public function test_void_transaction_restores_stock_and_marks_transaction_cancelled(): void
     {
         $admin = $this->admin();

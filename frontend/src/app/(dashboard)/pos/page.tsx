@@ -437,22 +437,26 @@ export default function POSPage() {
       if (res.ok) {
         const txn = data.data
         if (paymentMethod === 'QRIS') {
-          // Hit QRIS generate API
-          const qrisRes = await fetch(apiUrl('/api/qris/generate'), {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Accept": "application/json",
-              "Authorization": `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              order_id: txn.transaction_number,
-              gross_amount: txn.total_amount
+          try {
+            const qrisRes = await fetch(apiUrl('/api/qris/generate'), {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Authorization": `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                order_id: txn.transaction_number,
+                gross_amount: txn.total_amount
+              })
             })
-          })
-          
-          const qrisData = await qrisRes.json()
-          if (qrisRes.ok && qrisData.status === 'success') {
+
+            const qrisData = await qrisRes.json()
+
+            if (!qrisRes.ok || qrisData.status !== 'success') {
+              throw new Error(qrisData.message || "Kesalahan API")
+            }
+
             setQrisString(qrisData.qr_string)
             setQrisDialogTransaction({
               ...txn,
@@ -492,10 +496,29 @@ export default function POSPage() {
               message: "Transaksi QRIS dibuat sebagai pending. Stok dan meja sudah diperbarui.",
             })
             fetchProductsAndCustomers()
-          } else {
+          } catch (qrisError: any) {
+            let rollbackMessage = "Transaksi pending dibatalkan agar stok dan meja kembali tersedia."
+
+            try {
+              const rollbackRes = await fetch(apiUrl(`/api/transactions/${txn.id}/cancel-pending-qris`), {
+                method: "POST",
+                headers: {
+                  "Accept": "application/json",
+                  "Authorization": `Bearer ${token}`
+                }
+              })
+
+              if (!rollbackRes.ok) {
+                rollbackMessage = "Pembatalan otomatis gagal. Buka Riwayat Transaksi lalu batalkan QRIS pending secara manual."
+              }
+            } catch {
+              rollbackMessage = "Pembatalan otomatis gagal. Buka Riwayat Transaksi lalu batalkan QRIS pending secara manual."
+            }
+
+            fetchProductsAndCustomers()
             setNotice({
               type: "error",
-              message: "Gagal memuat QRIS: " + (qrisData.message || "Kesalahan API"),
+              message: "Gagal memuat QRIS. " + rollbackMessage + " " + (qrisError.message || "Kesalahan API"),
             })
           }
         } else {

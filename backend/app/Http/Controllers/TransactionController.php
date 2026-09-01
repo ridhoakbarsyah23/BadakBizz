@@ -186,6 +186,10 @@ class TransactionController extends Controller
                 throw new \Exception('Open an active cashier shift before checkout.');
             }
 
+            if ($validated['payment_method'] !== 'QRIS' && (float) $validated['payment_amount'] < (float) $totalAmount) {
+                throw new \Exception('Payment amount cannot be less than total amount.');
+            }
+
             // 2. Create Transaction
             $transaction = Transaction::create([
                 'transaction_number' => $transactionNumber,

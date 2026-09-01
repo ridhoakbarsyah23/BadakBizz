@@ -22,6 +22,22 @@ class MidtransController extends Controller
             'gross_amount' => 'required|numeric|min:1',
         ]);
 
+        $transaction = Transaction::where('transaction_number', $request->order_id)
+            ->where('payment_method', 'QRIS')
+            ->first();
+
+        if (! $transaction) {
+            return response()->json(['status' => 'error', 'message' => 'QRIS transaction not found'], 404);
+        }
+
+        if ($transaction->status !== 'PENDING') {
+            return response()->json(['status' => 'error', 'message' => 'QRIS can only be generated for pending transactions'], 400);
+        }
+
+        if ((int) round($transaction->total_amount) !== (int) round($request->gross_amount)) {
+            return response()->json(['status' => 'error', 'message' => 'QRIS amount does not match transaction total'], 422);
+        }
+
         $params = [
             'payment_type' => 'gopay', // Core API uses gopay to return a QRIS URL
             'transaction_details' => [
@@ -42,12 +58,10 @@ class MidtransController extends Controller
                     }
                 }
 
-                Transaction::where('transaction_number', $request->order_id)
-                    ->where('payment_method', 'QRIS')
-                    ->update([
-                        'midtrans_transaction_id' => $response->transaction_id,
-                        'qris_string' => $qrString,
-                    ]);
+                $transaction->update([
+                    'midtrans_transaction_id' => $response->transaction_id,
+                    'qris_string' => $qrString,
+                ]);
 
                 return response()->json([
                     'status' => 'success',
@@ -95,7 +109,7 @@ class MidtransController extends Controller
                 app(TransactionStatusService::class)->complete($posTransaction);
             } elseif ($transactionStatus == 'cancel' || $transactionStatus == 'deny' || $transactionStatus == 'expire') {
                 app(TransactionStatusService::class)->cancel($posTransaction, null, 'Midtrans '.ucfirst($transactionStatus));
-            } elseif ($transactionStatus == 'pending' && $posTransaction->status !== 'COMPLETED') {
+            } elseif ($transactionStatus == 'pending' && $posTransaction->status === 'PENDING') {
                 $posTransaction->update(['status' => 'PENDING']);
             }
 

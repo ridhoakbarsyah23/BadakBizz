@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Customer;
 use App\Models\Transaction;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class MidtransWebhookTest extends TestCase
@@ -74,6 +76,48 @@ class MidtransWebhookTest extends TestCase
             'transaction_status' => 'settlement',
         ])->assertStatus(500)
             ->assertJsonPath('message', 'Midtrans server key is not configured');
+    }
+
+    public function test_qris_generate_rejects_amount_that_does_not_match_transaction_total(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['is_active' => true]));
+
+        $transaction = $this->pendingTransaction([
+            'total_amount' => 15_000,
+            'payment_amount' => 15_000,
+        ]);
+
+        $this->postJson('/api/qris/generate', [
+            'order_id' => $transaction->transaction_number,
+            'gross_amount' => 10_000,
+        ])->assertUnprocessable()
+            ->assertJsonPath('message', 'QRIS amount does not match transaction total');
+
+        $this->assertNull($transaction->fresh()->midtrans_transaction_id);
+        $this->assertNull($transaction->fresh()->qris_string);
+    }
+
+    public function test_pending_webhook_does_not_reopen_cancelled_transaction(): void
+    {
+        config(['services.midtrans.server_key' => 'server-test-key']);
+
+        $transaction = $this->pendingTransaction([
+            'status' => 'CANCELLED',
+        ]);
+
+        $payload = [
+            'order_id' => $transaction->transaction_number,
+            'status_code' => '200',
+            'gross_amount' => '10000.00',
+            'transaction_status' => 'pending',
+        ];
+        $payload['signature_key'] = $this->signature($payload, 'server-test-key');
+
+        $this->postJson('/api/midtrans/webhook', $payload)
+            ->assertOk()
+            ->assertJsonPath('message', 'Webhook received');
+
+        $this->assertSame('CANCELLED', $transaction->fresh()->status);
     }
 
     private function pendingTransaction(array $overrides = []): Transaction
