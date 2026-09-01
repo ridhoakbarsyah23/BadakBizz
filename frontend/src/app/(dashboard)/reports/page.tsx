@@ -355,6 +355,11 @@ export default function ReportsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{data?.busiestHour || "-"}</div>
+                <p className="text-xs text-muted-foreground">
+                  {Number(data?.busiestHourCount || 0) > 0
+                    ? `${Number(data.busiestHourCount).toLocaleString("id-ID")} transaksi pada periode ini`
+                    : "Belum ada transaksi selesai"}
+                </p>
               </CardContent>
             </Card>
           </div>

@@ -49,7 +49,16 @@ class DashboardController extends Controller
         $totalCustomers = Customer::count();
 
         // 4. Low Stock Products
-        $lowStockProducts = Product::whereColumn('stock', '<=', 'minimum_stock')->get();
+        $lowStockProducts = Product::with('variants')
+            ->get()
+            ->filter(function (Product $product) {
+                $stock = $product->has_variants
+                    ? $product->variants->sum('stock')
+                    : $product->stock;
+
+                return $stock <= $product->minimum_stock;
+            })
+            ->values();
 
         // 5. Sales Trend (Chart)
         // If filter is today, we still show the last 7 days trend to give context.

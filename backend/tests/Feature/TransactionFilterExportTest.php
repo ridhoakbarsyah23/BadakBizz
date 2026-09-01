@@ -115,6 +115,32 @@ class TransactionFilterExportTest extends TestCase
 
         $completedProduct = $this->createProduct('SKU-DASH-COMPLETE', 'Completed Product');
         $pendingProduct = $this->createProduct('SKU-DASH-PENDING', 'Pending Product');
+        $variantProductWithStock = $this->createProduct('SKU-DASH-VARIANT-STOCK', 'Variant Stock Product');
+        $variantProductWithStock->update([
+            'has_variants' => true,
+            'stock' => 0,
+            'minimum_stock' => 2,
+        ]);
+        ProductVariant::create([
+            'product_id' => $variantProductWithStock->id,
+            'name' => 'Large',
+            'sku' => 'SKU-DASH-VARIANT-STOCK-L',
+            'price_adjustment' => 0,
+            'stock' => 8,
+        ]);
+        $lowVariantProduct = $this->createProduct('SKU-DASH-VARIANT-LOW', 'Low Variant Product');
+        $lowVariantProduct->update([
+            'has_variants' => true,
+            'stock' => 99,
+            'minimum_stock' => 3,
+        ]);
+        ProductVariant::create([
+            'product_id' => $lowVariantProduct->id,
+            'name' => 'Small',
+            'sku' => 'SKU-DASH-VARIANT-LOW-S',
+            'price_adjustment' => 0,
+            'stock' => 1,
+        ]);
 
         $completed = $this->createTransaction('TRX-DASH-COMPLETE', '2026-08-29 10:00:00', 'CASH', 'COMPLETED', 50_000);
         $pending = $this->createTransaction('TRX-DASH-PENDING', '2026-08-29 11:00:00', 'QRIS', 'PENDING', 99_000);
@@ -148,6 +174,8 @@ class TransactionFilterExportTest extends TestCase
         $this->assertSame(2, $response->json('topProducts.0.total_sold'));
         $this->assertSame(50_000, collect($response->json('salesTrend'))->last()['revenue']);
         $this->assertSame(1, collect($response->json('salesTrend'))->last()['transactions']);
+        $this->assertContains('Low Variant Product', collect($response->json('lowStockProducts'))->pluck('name'));
+        $this->assertNotContains('Variant Stock Product', collect($response->json('lowStockProducts'))->pluck('name'));
 
         Carbon::setTestNow();
     }
@@ -190,7 +218,25 @@ class TransactionFilterExportTest extends TestCase
         $this->assertSame('Report Completed Product', $response->json('topSellingItem.name'));
         $this->assertSame(4, $response->json('topSellingItem.sold'));
         $this->assertSame('10:00 - 11:00', $response->json('busiestHour'));
+        $this->assertSame(1, $response->json('busiestHourCount'));
+        $this->assertSame(1, collect($response->json('hourlyTransactions'))->firstWhere('hour', '10')['transactions']);
+        $this->assertSame(0, collect($response->json('hourlyTransactions'))->firstWhere('hour', '09')['transactions']);
         $this->assertSame(40_000, collect($response->json('chartData'))->firstWhere('label', '29 Aug')['sales']);
+    }
+
+    public function test_report_busiest_hour_handles_midnight_transactions(): void
+    {
+        Sanctum::actingAs($this->admin());
+
+        $this->createTransaction('TRX-MIDNIGHT-1', '2026-08-29 00:05:00');
+        $this->createTransaction('TRX-MIDNIGHT-2', '2026-08-29 00:45:00');
+        $this->createTransaction('TRX-MORNING', '2026-08-29 09:15:00');
+
+        $this->getJson('/api/reports?start_date=2026-08-29&end_date=2026-08-29')
+            ->assertOk()
+            ->assertJsonPath('busiestHour', '00:00 - 01:00')
+            ->assertJsonPath('busiestHourCount', 2)
+            ->assertJsonPath('hourlyTransactions.0.transactions', 2);
     }
 
     private function createTransaction(

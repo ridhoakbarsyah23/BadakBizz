@@ -51,13 +51,35 @@ class ReportController extends Controller
             ->whereBetween('created_at', [$startDate, $endDate])
             ->get();
 
-        $busiestHourData = $transactionsTime->groupBy(function ($date) {
+        $hourlyTransactionCounts = $transactionsTime->groupBy(function ($date) {
             return Carbon::parse($date->created_at)->format('H');
         })->map(function ($row) {
             return $row->count();
-        })->sortDesc()->keys()->first();
+        });
 
-        $busiestHour = $busiestHourData ? $busiestHourData.':00 - '.str_pad((int) $busiestHourData + 1, 2, '0', STR_PAD_LEFT).':00' : 'N/A';
+        $busiestHourData = $hourlyTransactionCounts
+            ->sortByDesc(fn (int $count, string $hour) => [$count, -((int) $hour)])
+            ->keys()
+            ->first();
+
+        $busiestHourCount = $busiestHourData !== null
+            ? (int) $hourlyTransactionCounts->get($busiestHourData)
+            : 0;
+
+        $busiestHour = $busiestHourData !== null
+            ? $this->formatHourRange($busiestHourData)
+            : 'N/A';
+
+        $hourlyTransactions = collect(range(0, 23))
+            ->map(function (int $hour) use ($hourlyTransactionCounts) {
+                $hourKey = str_pad((string) $hour, 2, '0', STR_PAD_LEFT);
+
+                return [
+                    'hour' => $hourKey,
+                    'label' => $this->formatHourRange($hourKey),
+                    'transactions' => (int) $hourlyTransactionCounts->get($hourKey, 0),
+                ];
+            });
 
         // 5. Chart Data
         $diffInDays = $startDate->diffInDays($endDate);
@@ -131,8 +153,15 @@ class ReportController extends Controller
                 'sold' => $topSellingItem->total_sold,
             ] : null,
             'busiestHour' => $busiestHour,
+            'busiestHourCount' => $busiestHourCount,
+            'hourlyTransactions' => $hourlyTransactions,
             'chartData' => $chartData,
         ]);
+    }
+
+    private function formatHourRange(string $hour): string
+    {
+        return $hour.':00 - '.str_pad((int) $hour + 1, 2, '0', STR_PAD_LEFT).':00';
     }
 
     public function export(Request $request)
