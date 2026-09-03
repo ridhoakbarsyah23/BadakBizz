@@ -33,6 +33,7 @@ const variantLabel = (product: any, variant: any) => {
 
   return `${variant.name}${sku} - stok ${variant.stock} - Rp ${price.toLocaleString("id-ID")}`
 }
+const reasonPresets = ["Stock opname", "Rusak", "Hilang", "Salah input", "Retur pelanggan"]
 
 export function AdjustStockDialog({ product, onAdjusted }: AdjustStockDialogProps) {
   const { token } = useAuth()
@@ -195,6 +196,20 @@ export function AdjustStockDialog({ product, onAdjusted }: AdjustStockDialogProp
             </div>
             <div className="space-y-2">
               <Label htmlFor={`reason-${product.id}`}>Alasan</Label>
+              <div className="flex flex-wrap gap-2">
+                {reasonPresets.map((preset) => (
+                  <Button
+                    key={preset}
+                    type="button"
+                    size="xs"
+                    variant={reason === preset ? "default" : "outline"}
+                    onClick={() => setReason(preset)}
+                    disabled={isLoading}
+                  >
+                    {preset}
+                  </Button>
+                ))}
+              </div>
               <Input
                 id={`reason-${product.id}`}
                 placeholder="Misal: Stock opname / rusak / hilang"

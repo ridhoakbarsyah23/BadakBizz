@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Plus, Edit2, Trash2, Loader2, AlertTriangle, Search, Filter, Wand2, X, ImageIcon, Upload, ChevronDown } from "lucide-react"
+import { Plus, Edit2, Trash2, Loader2, AlertTriangle, Search, Filter, Wand2, X, ImageIcon, Upload, ChevronDown, History } from "lucide-react"
 
 interface Category {
   id: number
@@ -70,6 +70,18 @@ interface ProductVariant {
   sku: string | null
   price_adjustment: string | number
   stock: number
+}
+
+interface ProductChangeLog {
+  id: number
+  entity_type: "product" | "variant"
+  action: "created" | "updated" | "archived" | "restored"
+  changes: Record<string, { old: unknown; new: unknown }>
+  created_at: string
+  variant?: ProductVariant | null
+  user?: {
+    name: string
+  } | null
 }
 
 interface VariantForm {
@@ -135,6 +147,55 @@ const productStock = (product: Product) => product.has_variants
 const variantPrice = (basePrice: string | number, variant: VariantForm) =>
   parseIndonesianNumber(basePrice) + Number(variant.price_adjustment || 0)
 
+const changeActionLabel = (action: ProductChangeLog["action"]) => {
+  const labels = {
+    created: "Dibuat",
+    updated: "Diubah",
+    archived: "Diarsipkan",
+    restored: "Dipulihkan",
+  }
+
+  return labels[action] || action
+}
+
+const changeFieldLabel = (field: string) => {
+  const labels: Record<string, string> = {
+    sku: "SKU",
+    barcode: "Barcode",
+    image_path: "Foto",
+    name: "Nama",
+    category_id: "Kategori",
+    purchase_price: "Harga Beli",
+    selling_price: "Harga Jual",
+    unit: "Satuan",
+    has_variants: "Punya Varian",
+    stock: "Stok",
+    minimum_stock: "Minimum Stok",
+    is_active: "Status Aktif",
+    price_adjustment: "Penyesuaian Harga",
+  }
+
+  return labels[field] || field.replace(/_/g, " ")
+}
+
+const formatChangeValue = (value: unknown) => {
+  if (value === null || value === undefined || value === "") return "-"
+  if (typeof value === "boolean") return value ? "Ya" : "Tidak"
+  if (typeof value === "number") return value.toLocaleString("id-ID")
+
+  return String(value)
+}
+
+const formatDateTime = (value: string) => {
+  return new Date(value).toLocaleString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
 export default function ProductsPage() {
   const { token } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
@@ -153,6 +214,7 @@ export default function ProductsPage() {
   // Dialog State
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   
   // Form State
   const [formData, setFormData] = useState(initialForm)
@@ -164,6 +226,9 @@ export default function ProductsPage() {
   const [isGeneratingSku, setIsGeneratingSku] = useState(false)
   const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, action: null as any, title: "", desc: "" })
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null)
+  const [historyProduct, setHistoryProduct] = useState<Product | null>(null)
+  const [changeLogs, setChangeLogs] = useState<ProductChangeLog[]>([])
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false)
   const [error, setError] = useState("")
   const [notice, setNotice] = useState<{
     type: "success" | "error"
@@ -465,10 +530,41 @@ export default function ProductsPage() {
     setIsDeleteOpen(true)
   }
 
+  const openHistory = async (product: Product) => {
+    setHistoryProduct(product)
+    setChangeLogs([])
+    setIsHistoryOpen(true)
+    setIsHistoryLoading(true)
+
+    try {
+      const res = await fetch(apiUrl(`/api/products/${product.id}/change-logs?per_page=20`), {
+        headers: {
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.message || "Gagal memuat riwayat perubahan")
+      }
+
+      setChangeLogs(Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [])
+    } catch (err: any) {
+      setNotice({
+        type: "error",
+        message: err.message || "Gagal memuat riwayat perubahan.",
+      })
+      setIsHistoryOpen(false)
+    } finally {
+      setIsHistoryLoading(false)
+    }
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
+    <div className="min-w-0 space-y-6">
+      <div className="flex min-w-0 flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="min-w-0">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Data Produk</h1>
           <p className="text-muted-foreground">
             Kelola detail produk dan stok Anda.
@@ -477,7 +573,7 @@ export default function ProductsPage() {
         
         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
           <DialogTrigger render={
-            <Button onClick={openCreate}>
+            <Button onClick={openCreate} className="w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Tambah Produk
             </Button>
@@ -804,8 +900,8 @@ export default function ProductsPage() {
 
       <AutoDismissNotice notice={notice} onDismiss={() => setNotice(null)} />
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1fr)_repeat(5,minmax(140px,180px))_auto]">
-        <div className="relative">
+      <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[minmax(220px,1fr)_repeat(5,minmax(130px,180px))_auto]">
+        <div className="relative min-w-0 sm:col-span-2 xl:col-span-2 2xl:col-span-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Cari nama, SKU, barcode..."
@@ -815,7 +911,7 @@ export default function ProductsPage() {
           />
         </div>
         <select
-          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex h-9 min-w-0 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           value={categoryFilter}
           onChange={(e) => updateFilter(setCategoryFilter, e.target.value)}
         >
@@ -825,7 +921,7 @@ export default function ProductsPage() {
           ))}
         </select>
         <select
-          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex h-9 min-w-0 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           value={statusFilter}
           onChange={(e) => updateFilter(setStatusFilter, e.target.value)}
         >
@@ -834,7 +930,7 @@ export default function ProductsPage() {
           <option value="inactive">Nonaktif</option>
         </select>
         <select
-          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex h-9 min-w-0 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           value={stockFilter}
           onChange={(e) => updateFilter(setStockFilter, e.target.value)}
         >
@@ -844,7 +940,7 @@ export default function ProductsPage() {
           <option value="out">Stok habis</option>
         </select>
         <select
-          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex h-9 min-w-0 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           value={variantFilter}
           onChange={(e) => updateFilter(setVariantFilter, e.target.value)}
         >
@@ -853,7 +949,7 @@ export default function ProductsPage() {
           <option value="without_variants">Tanpa varian</option>
         </select>
         <select
-          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex h-9 min-w-0 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           value={photoFilter}
           onChange={(e) => updateFilter(setPhotoFilter, e.target.value)}
         >
@@ -861,19 +957,19 @@ export default function ProductsPage() {
           <option value="with_photo">Ada foto</option>
           <option value="without_photo">Belum ada foto</option>
         </select>
-        <Button variant="secondary" onClick={resetFilters} disabled={!hasActiveFilters}>
+        <Button className="w-full sm:w-auto" variant="secondary" onClick={resetFilters} disabled={!hasActiveFilters}>
           {hasActiveFilters ? <X className="mr-2 h-4 w-4" /> : <Filter className="mr-2 h-4 w-4" />}
           Reset
         </Button>
       </div>
 
-      <div className="bg-background rounded-lg border shadow-sm overflow-x-auto w-full">
+      <div className="max-w-full overflow-x-auto rounded-lg border bg-background shadow-sm">
         {isLoading ? (
           <div className="flex justify-center p-8">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : (
-          <Table className="min-w-[800px] w-full">
+          <Table className="w-full min-w-[760px]">
             <TableHeader>
               <TableRow>
                 <TableHead>SKU</TableHead>
@@ -960,6 +1056,9 @@ export default function ProductsPage() {
                               title={isExpanded ? "Tutup detail varian" : "Lihat detail varian"}
                             >
                               <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => openHistory(product)} title="Lihat riwayat perubahan">
+                              <History className="w-4 h-4 text-muted-foreground" />
                             </Button>
                             <Button variant="ghost" size="icon" onClick={() => openEdit(product)}>
                               <Edit2 className="w-4 h-4 text-muted-foreground" />
@@ -1062,6 +1161,62 @@ export default function ProductsPage() {
               Hapus
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+        <DialogContent className="max-h-[86dvh] w-[96vw] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Riwayat Perubahan</DialogTitle>
+            <DialogDescription>
+              {historyProduct ? `${historyProduct.name} (${historyProduct.sku})` : "Produk"}
+            </DialogDescription>
+          </DialogHeader>
+          {isHistoryLoading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : changeLogs.length === 0 ? (
+            <div className="rounded-lg border border-dashed bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground">
+              Belum ada riwayat perubahan.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {changeLogs.map((log) => (
+                <div key={log.id} className="rounded-lg border p-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={log.entity_type === "variant" ? "outline" : "secondary"}>
+                          {log.entity_type === "variant" ? "Varian" : "Produk"}
+                        </Badge>
+                        <Badge variant="outline">{changeActionLabel(log.action)}</Badge>
+                        {log.variant && (
+                          <span className="text-sm font-medium text-foreground">{log.variant.name}</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDateTime(log.created_at)} oleh {log.user?.name || "Sistem"}
+                      </p>
+                    </div>
+                  </div>
+                  {Object.keys(log.changes || {}).length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {Object.entries(log.changes).map(([field, value]) => (
+                        <div key={field} className="grid gap-1 rounded-md bg-muted/40 px-3 py-2 text-xs sm:grid-cols-[140px_1fr]">
+                          <div className="font-semibold text-muted-foreground">{changeFieldLabel(field)}</div>
+                          <div className="min-w-0 text-foreground">
+                            <span className="break-words text-muted-foreground">{formatChangeValue(value.old)}</span>
+                            <span className="px-2 text-muted-foreground">-&gt;</span>
+                            <span className="break-words font-semibold">{formatChangeValue(value.new)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
       <AlertDialog open={confirmConfig.isOpen} onOpenChange={(open) => setConfirmConfig(prev => ({ ...prev, isOpen: open }))}>

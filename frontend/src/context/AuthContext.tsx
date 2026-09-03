@@ -65,8 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Token might be invalid
         logout()
       }
-    } catch (error) {
-      console.error('Failed to fetch user', error)
+    } catch {
       logout()
     } finally {
       setIsLoading(false)
