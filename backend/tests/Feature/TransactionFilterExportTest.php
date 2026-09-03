@@ -141,6 +141,11 @@ class TransactionFilterExportTest extends TestCase
             'price_adjustment' => 0,
             'stock' => 1,
         ]);
+        $outProduct = $this->createProduct('SKU-DASH-OUT', 'Out Product');
+        $outProduct->update([
+            'stock' => 0,
+            'minimum_stock' => 3,
+        ]);
 
         $completed = $this->createTransaction('TRX-DASH-COMPLETE', '2026-08-29 10:00:00', 'CASH', 'COMPLETED', 50_000);
         $pending = $this->createTransaction('TRX-DASH-PENDING', '2026-08-29 11:00:00', 'QRIS', 'PENDING', 99_000);
@@ -175,6 +180,8 @@ class TransactionFilterExportTest extends TestCase
         $this->assertSame(50_000, collect($response->json('salesTrend'))->last()['revenue']);
         $this->assertSame(1, collect($response->json('salesTrend'))->last()['transactions']);
         $this->assertContains('Low Variant Product', collect($response->json('lowStockProducts'))->pluck('name'));
+        $this->assertNotContains('Out Product', collect($response->json('lowStockProducts'))->pluck('name'));
+        $this->assertContains('Out Product', collect($response->json('outOfStockProducts'))->pluck('name'));
         $this->assertNotContains('Variant Stock Product', collect($response->json('lowStockProducts'))->pluck('name'));
 
         Carbon::setTestNow();

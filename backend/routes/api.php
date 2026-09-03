@@ -72,6 +72,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Products & Categories (Create, Update, Delete)
         Route::apiResource('categories', CategoryController::class)->except(['index']);
         Route::get('/products/next-sku', [ProductController::class, 'nextSku']);
+        Route::get('/products/{product}/change-logs', [ProductController::class, 'changeLogs']);
         Route::apiResource('products', ProductController::class)->except(['index']);
 
         // Inventory

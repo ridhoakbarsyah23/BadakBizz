@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\InventoryMovement;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Role;
@@ -84,7 +85,8 @@ class InventoryTest extends TestCase
 
     public function test_inventory_movements_include_variant_metadata(): void
     {
-        Sanctum::actingAs($this->userWithRole('admin', 'Administrator'));
+        $admin = $this->userWithRole('admin', 'Administrator');
+        Sanctum::actingAs($admin);
 
         $product = Product::create([
             'sku' => 'SKU-BREAD',
@@ -115,7 +117,123 @@ class InventoryTest extends TestCase
             ->assertOk()
             ->assertJsonPath('0.product_name', 'Bread')
             ->assertJsonPath('0.variant_name', 'Wheat')
-            ->assertJsonPath('0.variant_sku', 'SKU-BREAD-WHEAT');
+            ->assertJsonPath('0.variant_sku', 'SKU-BREAD-WHEAT')
+            ->assertJsonPath('0.user_name', $admin->name);
+    }
+
+    public function test_inventory_movements_can_be_filtered_by_type_product_variant_user_and_date(): void
+    {
+        $admin = $this->userWithRole('admin', 'Administrator');
+        Sanctum::actingAs($admin);
+
+        $coffee = Product::create([
+            'sku' => 'SKU-FILTER-COFFEE',
+            'name' => 'Filter Coffee',
+            'purchase_price' => 8_000,
+            'selling_price' => 14_000,
+            'has_variants' => true,
+            'stock' => 0,
+            'minimum_stock' => 0,
+            'is_active' => true,
+        ]);
+
+        $hot = ProductVariant::create([
+            'product_id' => $coffee->id,
+            'name' => 'Hot',
+            'sku' => 'SKU-FILTER-COFFEE-HOT',
+            'price_adjustment' => 0,
+            'stock' => 5,
+        ]);
+
+        $tea = Product::create([
+            'sku' => 'SKU-FILTER-TEA',
+            'name' => 'Filter Tea',
+            'purchase_price' => 5_000,
+            'selling_price' => 9_000,
+            'stock' => 4,
+            'minimum_stock' => 0,
+            'is_active' => true,
+        ]);
+
+        InventoryMovement::create([
+            'product_id' => $tea->id,
+            'type' => 'IN',
+            'quantity' => 3,
+            'notes' => 'Older supplier stock',
+            'user_id' => $admin->id,
+            'created_at' => now()->subDays(2),
+            'updated_at' => now()->subDays(2),
+        ]);
+
+        $targetMovement = InventoryMovement::create([
+            'product_id' => $coffee->id,
+            'variant_id' => $hot->id,
+            'type' => 'ADJUSTMENT',
+            'quantity' => -2,
+            'notes' => 'Stock opname morning',
+            'user_id' => $admin->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/inventory/movements?type=ADJUSTMENT&product_id='.$coffee->id.'&variant_id='.$hot->id.'&user_id='.$admin->id.'&start_date='.now()->toDateString().'&end_date='.now()->toDateString());
+
+        $response->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.id', $targetMovement->id)
+            ->assertJsonPath('0.product_name', 'Filter Coffee')
+            ->assertJsonPath('0.variant_name', 'Hot')
+            ->assertJsonPath('0.user_name', $admin->name);
+    }
+
+    public function test_inventory_movements_can_be_searched_and_paginated(): void
+    {
+        $admin = $this->userWithRole('admin', 'Administrator');
+        Sanctum::actingAs($admin);
+
+        $product = Product::create([
+            'sku' => 'SKU-SEARCH-BEANS',
+            'name' => 'Searchable Beans',
+            'purchase_price' => 10_000,
+            'selling_price' => 18_000,
+            'has_variants' => true,
+            'stock' => 0,
+            'minimum_stock' => 0,
+            'is_active' => true,
+        ]);
+
+        $variant = ProductVariant::create([
+            'product_id' => $product->id,
+            'name' => 'Arabica',
+            'sku' => 'SKU-SEARCH-BEANS-ARABICA',
+            'price_adjustment' => 2_000,
+            'stock' => 6,
+        ]);
+
+        InventoryMovement::create([
+            'product_id' => $product->id,
+            'variant_id' => $variant->id,
+            'type' => 'IN',
+            'quantity' => 4,
+            'notes' => 'Roastery delivery',
+            'user_id' => $admin->id,
+        ]);
+
+        InventoryMovement::create([
+            'product_id' => $product->id,
+            'variant_id' => $variant->id,
+            'type' => 'ADJUSTMENT',
+            'quantity' => -1,
+            'notes' => 'Manual correction',
+            'user_id' => $admin->id,
+        ]);
+
+        $this->getJson('/api/inventory/movements?search=roastery&per_page=1')
+            ->assertOk()
+            ->assertJsonPath('per_page', 1)
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.notes', 'Roastery delivery')
+            ->assertJsonPath('data.0.variant_sku', 'SKU-SEARCH-BEANS-ARABICA');
     }
 
     public function test_admin_can_adjust_product_stock_and_record_signed_movement(): void

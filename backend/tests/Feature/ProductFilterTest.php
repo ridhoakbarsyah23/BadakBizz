@@ -139,12 +139,16 @@ class ProductFilterTest extends TestCase
         $this->getJson('/api/products?stock_status=low&per_page=10')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.sku', 'STOCK-LOW');
+            ->assertJsonPath('data.0.sku', 'STOCK-LOW')
+            ->assertJsonPath('data.0.current_stock', 2)
+            ->assertJsonPath('data.0.stock_status', 'low');
 
         $this->getJson('/api/products?stock_status=out&per_page=10')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.sku', 'STOCK-VARIANT-OUT');
+            ->assertJsonPath('data.0.sku', 'STOCK-VARIANT-OUT')
+            ->assertJsonPath('data.0.current_stock', 0)
+            ->assertJsonPath('data.0.stock_status', 'out');
     }
 
     public function test_admin_can_generate_next_sku_from_category_name_and_sequence(): void

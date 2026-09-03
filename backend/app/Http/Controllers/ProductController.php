@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductChangeLog;
 use App\Models\ProductVariant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -113,6 +114,23 @@ class ProductController extends Controller
         return response()->json($product->load(['category', 'variants']));
     }
 
+    public function changeLogs(Request $request, Product $product)
+    {
+        $query = $product->changeLogs()
+            ->with(['variant', 'user'])
+            ->latest();
+
+        if ($request->has('per_page')) {
+            $perPage = $request->validate([
+                'per_page' => 'nullable|integer|min:1|max:100',
+            ])['per_page'] ?? 10;
+
+            return response()->json($query->paginate($perPage));
+        }
+
+        return response()->json($query->get());
+    }
+
     public function nextSku(Request $request)
     {
         $validated = $request->validate([
@@ -173,6 +191,7 @@ class ProductController extends Controller
         $this->validateVariantSkus($validated['variants'] ?? [], $product, $validated['sku'] ?? $product->sku);
 
         $productData = Arr::except($validated, ['variants', 'variants_present', 'image', 'remove_image']);
+        $productOriginal = Arr::only($product->getOriginal(), array_keys($productData));
 
         if ($request->boolean('remove_image') && $product->image_path) {
             Storage::disk('public')->delete($product->image_path);
@@ -188,6 +207,15 @@ class ProductController extends Controller
         }
 
         $product->update($productData);
+        $this->recordProductChange(
+            $product,
+            null,
+            'product',
+            'updated',
+            $productOriginal,
+            Arr::only($product->getAttributes(), array_keys($productOriginal)),
+            $request->user()?->id
+        );
 
         if (($request->has('variants') || $request->boolean('variants_present')) && $request->has_variants) {
             $keptVariantIds = [];
@@ -207,9 +235,20 @@ class ProductController extends Controller
                         ]);
                     }
 
+                    $variantOriginal = Arr::only($variant->getOriginal(), array_keys($variantPayload));
+                    $wasTrashed = $variant->trashed();
                     $variant->fill($variantPayload);
                     $variant->restore();
                     $variant->save();
+                    $this->recordProductChange(
+                        $product,
+                        $variant,
+                        'variant',
+                        $wasTrashed ? 'restored' : 'updated',
+                        $variantOriginal,
+                        Arr::only($variant->getAttributes(), array_keys($variantOriginal)),
+                        $request->user()?->id
+                    );
                 } else {
                     $variant = null;
 
@@ -221,11 +260,31 @@ class ProductController extends Controller
                     }
 
                     if ($variant) {
+                        $variantOriginal = Arr::only($variant->getOriginal(), array_keys($variantPayload));
+                        $wasTrashed = $variant->trashed();
                         $variant->fill($variantPayload);
                         $variant->restore();
                         $variant->save();
+                        $this->recordProductChange(
+                            $product,
+                            $variant,
+                            'variant',
+                            $wasTrashed ? 'restored' : 'updated',
+                            $variantOriginal,
+                            Arr::only($variant->getAttributes(), array_keys($variantOriginal)),
+                            $request->user()?->id
+                        );
                     } else {
                         $variant = $product->variants()->create($variantPayload);
+                        $this->recordProductChange(
+                            $product,
+                            $variant,
+                            'variant',
+                            'created',
+                            [],
+                            Arr::only($variant->getAttributes(), array_keys($variantPayload)),
+                            $request->user()?->id
+                        );
                     }
                 }
 
@@ -233,12 +292,25 @@ class ProductController extends Controller
             }
 
             if (count($keptVariantIds) > 0) {
-                $product->variants()->whereNotIn('id', $keptVariantIds)->delete();
+                $variantsToArchive = $product->variants()->whereNotIn('id', $keptVariantIds)->get();
+
+                foreach ($variantsToArchive as $variant) {
+                    $variant->delete();
+                    $this->recordProductChange(
+                        $product,
+                        $variant,
+                        'variant',
+                        'archived',
+                        Arr::only($variant->getOriginal(), ['name', 'sku', 'price_adjustment', 'stock']),
+                        [],
+                        $request->user()?->id
+                    );
+                }
             } else {
-                $product->variants()->delete();
+                $this->archiveProductVariants($product, $request->user()?->id);
             }
         } elseif (isset($validated['has_variants']) && ! $validated['has_variants']) {
-            $product->variants()->delete();
+            $this->archiveProductVariants($product, $request->user()?->id);
         }
 
         return response()->json($product->load(['category', 'variants']));
@@ -472,6 +544,87 @@ class ProductController extends Controller
                 "variants.$index.sku" => 'Variant SKU is already in use.',
             ]);
         }
+    }
+
+    private function archiveProductVariants(Product $product, ?int $userId): void
+    {
+        $variantsToArchive = $product->variants()->get();
+
+        foreach ($variantsToArchive as $variant) {
+            $variant->delete();
+            $this->recordProductChange(
+                $product,
+                $variant,
+                'variant',
+                'archived',
+                Arr::only($variant->getOriginal(), ['name', 'sku', 'price_adjustment', 'stock']),
+                [],
+                $userId
+            );
+        }
+    }
+
+    private function recordProductChange(
+        Product $product,
+        ?ProductVariant $variant,
+        string $entityType,
+        string $action,
+        array $before,
+        array $after,
+        ?int $userId
+    ): void {
+        $changes = $this->changedValues($before, $after);
+
+        if ($changes === [] && $action === 'updated') {
+            return;
+        }
+
+        ProductChangeLog::create([
+            'product_id' => $product->id,
+            'product_variant_id' => $variant?->id,
+            'user_id' => $userId,
+            'entity_type' => $entityType,
+            'action' => $action,
+            'changes' => $changes,
+        ]);
+    }
+
+    private function changedValues(array $before, array $after): array
+    {
+        $changes = [];
+
+        foreach (array_unique([...array_keys($before), ...array_keys($after)]) as $field) {
+            $oldValue = $before[$field] ?? null;
+            $newValue = $after[$field] ?? null;
+
+            if ($this->logValue($oldValue) === $this->logValue($newValue)) {
+                continue;
+            }
+
+            $changes[$field] = [
+                'old' => $oldValue,
+                'new' => $newValue,
+            ];
+        }
+
+        return $changes;
+    }
+
+    private function logValue(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+
+        if (is_numeric($value)) {
+            return (string) (float) $value;
+        }
+
+        return (string) $value;
     }
 
     public function destroy(Product $product)

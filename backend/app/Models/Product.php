@@ -16,6 +16,8 @@ class Product extends Model
 
     protected $appends = [
         'image_url',
+        'current_stock',
+        'stock_status',
     ];
 
     protected $casts = [
@@ -32,6 +34,34 @@ class Product extends Model
         return asset('storage/'.$this->image_path);
     }
 
+    public function getCurrentStockAttribute(): int
+    {
+        if (! $this->has_variants) {
+            return (int) $this->stock;
+        }
+
+        if ($this->relationLoaded('variants')) {
+            return (int) $this->variants->sum('stock');
+        }
+
+        return (int) $this->variants()->sum('stock');
+    }
+
+    public function getStockStatusAttribute(): string
+    {
+        $stock = $this->current_stock;
+
+        if ($stock <= 0) {
+            return 'out';
+        }
+
+        if ($stock <= $this->minimum_stock) {
+            return 'low';
+        }
+
+        return 'safe';
+    }
+
     public function category()
     {
         return $this->belongsTo(Category::class);
@@ -45,5 +75,10 @@ class Product extends Model
     public function transactionItems()
     {
         return $this->hasMany(TransactionItem::class);
+    }
+
+    public function changeLogs()
+    {
+        return $this->hasMany(ProductChangeLog::class);
     }
 }

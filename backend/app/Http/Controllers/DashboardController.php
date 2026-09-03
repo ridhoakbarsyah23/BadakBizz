@@ -48,16 +48,13 @@ class DashboardController extends Controller
         // 3. Total Customers
         $totalCustomers = Customer::count();
 
-        // 4. Low Stock Products
-        $lowStockProducts = Product::with('variants')
-            ->get()
-            ->filter(function (Product $product) {
-                $stock = $product->has_variants
-                    ? $product->variants->sum('stock')
-                    : $product->stock;
-
-                return $stock <= $product->minimum_stock;
-            })
+        // 4. Inventory Alerts
+        $products = Product::with('variants')->get();
+        $lowStockProducts = $products
+            ->filter(fn (Product $product) => $product->stock_status === 'low')
+            ->values();
+        $outOfStockProducts = $products
+            ->filter(fn (Product $product) => $product->stock_status === 'out')
             ->values();
 
         // 5. Sales Trend (Chart)
@@ -113,6 +110,7 @@ class DashboardController extends Controller
             'transactionsToday' => $transactions,
             'totalCustomers' => $totalCustomers,
             'lowStockProducts' => $lowStockProducts,
+            'outOfStockProducts' => $outOfStockProducts,
             'salesTrend' => $trendData,
             'topProducts' => $topProducts,
             'filter' => $filter,

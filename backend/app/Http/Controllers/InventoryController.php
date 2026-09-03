@@ -15,20 +15,64 @@ class InventoryController extends Controller
      */
     public function movements(Request $request)
     {
+        $validated = $request->validate([
+            'type' => 'nullable|string|in:IN,OUT,ADJUSTMENT',
+            'product_id' => 'nullable|integer|exists:products,id',
+            'variant_id' => 'nullable|integer|exists:product_variants,id',
+            'user_id' => 'nullable|integer|exists:users,id',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date',
+            'search' => 'nullable|string',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+
         $query = DB::table('inventory_movements')
             ->join('products', 'inventory_movements.product_id', '=', 'products.id')
             ->leftJoin('product_variants', 'inventory_movements.variant_id', '=', 'product_variants.id')
+            ->leftJoin('users', 'inventory_movements.user_id', '=', 'users.id')
             ->select(
                 'inventory_movements.*',
                 'products.name as product_name',
                 'products.sku',
                 'product_variants.name as variant_name',
                 'product_variants.sku as variant_sku',
+                'users.name as user_name',
             )
-            ->orderBy('inventory_movements.created_at', 'desc');
+            ->when($validated['type'] ?? null, function ($query, string $type) {
+                $query->where('inventory_movements.type', $type);
+            })
+            ->when($validated['product_id'] ?? null, function ($query, int $productId) {
+                $query->where('inventory_movements.product_id', $productId);
+            })
+            ->when($validated['variant_id'] ?? null, function ($query, int $variantId) {
+                $query->where('inventory_movements.variant_id', $variantId);
+            })
+            ->when($validated['user_id'] ?? null, function ($query, int $userId) {
+                $query->where('inventory_movements.user_id', $userId);
+            })
+            ->when($validated['start_date'] ?? null, function ($query, string $startDate) {
+                $query->whereDate('inventory_movements.created_at', '>=', $startDate);
+            })
+            ->when($validated['end_date'] ?? null, function ($query, string $endDate) {
+                $query->whereDate('inventory_movements.created_at', '<=', $endDate);
+            })
+            ->when($validated['search'] ?? null, function ($query, string $search) {
+                $search = trim($search);
+
+                $query->where(function ($query) use ($search) {
+                    $query->where('products.name', 'like', "%{$search}%")
+                        ->orWhere('products.sku', 'like', "%{$search}%")
+                        ->orWhere('product_variants.name', 'like', "%{$search}%")
+                        ->orWhere('product_variants.sku', 'like', "%{$search}%")
+                        ->orWhere('inventory_movements.notes', 'like', "%{$search}%")
+                        ->orWhere('users.name', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('inventory_movements.created_at', 'desc')
+            ->orderBy('inventory_movements.id', 'desc');
 
         if ($request->has('per_page')) {
-            $perPage = $request->query('per_page', 10);
+            $perPage = $validated['per_page'] ?? 10;
 
             return response()->json($query->paginate($perPage));
         }

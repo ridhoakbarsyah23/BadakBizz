@@ -22,4 +22,9 @@ class ProductVariant extends Model
     {
         return $this->belongsTo(Product::class);
     }
+
+    public function changeLogs()
+    {
+        return $this->hasMany(ProductChangeLog::class, 'product_variant_id');
+    }
 }
