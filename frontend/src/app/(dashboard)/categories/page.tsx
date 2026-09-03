@@ -194,9 +194,9 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
+    <div className="min-w-0 space-y-6">
+      <div className="flex min-w-0 flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="min-w-0">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Kategori</h1>
           <p className="text-muted-foreground">
             Kelola kategori produk Anda.
@@ -205,7 +205,7 @@ export default function CategoriesPage() {
         
         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
           <DialogTrigger render={
-            <Button onClick={openCreate}>
+            <Button onClick={openCreate} className="w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Tambah Kategori
             </Button>
@@ -247,13 +247,13 @@ export default function CategoriesPage() {
 
       <AutoDismissNotice notice={notice} onDismiss={() => setNotice(null)} />
 
-      <div className="bg-background rounded-lg border shadow-sm overflow-x-auto w-full">
+      <div className="max-w-full overflow-x-auto rounded-lg border bg-background shadow-sm">
         {isLoading ? (
           <div className="flex justify-center p-8">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : (
-          <Table className="min-w-[800px] w-full">
+          <Table className="w-full min-w-[620px]">
             <TableHeader>
               <TableRow>
                 <TableHead>ID</TableHead>

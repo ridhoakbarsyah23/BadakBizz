@@ -103,8 +103,8 @@ export default function ShiftsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2">
+    <div className="min-w-0 space-y-6">
+      <div className="flex min-w-0 flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Laporan Shift Kasir</h1>
         <p className="text-muted-foreground">
           Pantau riwayat buka/tutup kasir dan selisih uang harian.
@@ -114,7 +114,7 @@ export default function ShiftsPage() {
       <div className="grid gap-3 md:grid-cols-4">
         <Card className="border-slate-200 shadow-sm">
           <CardContent className="flex items-center justify-between gap-3 p-4">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-bold uppercase text-slate-500">Shift Aktif</p>
               <p className="mt-1 text-2xl font-black text-slate-900">{activeShifts.length}</p>
             </div>
@@ -125,7 +125,7 @@ export default function ShiftsPage() {
         </Card>
         <Card className="border-slate-200 shadow-sm">
           <CardContent className="flex items-center justify-between gap-3 p-4">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-bold uppercase text-slate-500">Estimasi Kas Aktif</p>
               <p className="mt-1 text-xl font-black text-slate-900">{formatCurrency(activeCashTotal)}</p>
             </div>
@@ -136,7 +136,7 @@ export default function ShiftsPage() {
         </Card>
         <Card className="border-slate-200 shadow-sm">
           <CardContent className="flex items-center justify-between gap-3 p-4">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-bold uppercase text-slate-500">Shift Selesai</p>
               <p className="mt-1 text-2xl font-black text-slate-900">{closedShifts.length}</p>
             </div>
@@ -147,7 +147,7 @@ export default function ShiftsPage() {
         </Card>
         <Card className="border-slate-200 shadow-sm">
           <CardContent className="flex items-center justify-between gap-3 p-4">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-bold uppercase text-slate-500">Total Selisih</p>
               <p className={`mt-1 text-xl font-black ${totalDiscrepancy === 0 ? 'text-slate-900' : totalDiscrepancy > 0 ? 'text-amber-700' : 'text-red-700'}`}>
                 {formatCurrency(totalDiscrepancy)}
@@ -215,7 +215,7 @@ export default function ShiftsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="max-w-full overflow-x-auto">
             {isLoading ? (
               <div className="flex justify-center p-12">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />

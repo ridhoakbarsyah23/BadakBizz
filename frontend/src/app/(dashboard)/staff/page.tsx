@@ -176,15 +176,15 @@ export default function StaffPage() {
   )
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
+    <div className="min-w-0 space-y-6">
+      <div className="flex min-w-0 flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="min-w-0">
           <h1 className="text-3xl font-bold tracking-tight">Manajemen Karyawan</h1>
           <p className="text-muted-foreground">
             Kelola akun Admin dan Kasir. Anda dapat me-nonaktifkan akun karyawan yang sudah resign.
           </p>
         </div>
-        <Button onClick={() => openDialog()} className="shadow-sm">
+        <Button onClick={() => openDialog()} className="w-full shadow-sm sm:w-auto">
           <Plus className="w-4 h-4 mr-2" /> Tambah Staf
         </Button>
       </div>
@@ -206,7 +206,7 @@ export default function StaffPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="max-w-full overflow-x-auto">
             {isLoading ? (
               <div className="flex justify-center p-12">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />

@@ -278,7 +278,7 @@ export default function StaffManagementPage() {
         </Dialog>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border overflow-x-auto w-full">
+      <div className="max-w-full overflow-x-auto rounded-xl border bg-white shadow-sm">
         <Table className="min-w-[600px]">
           <TableHeader className="bg-slate-50">
             <TableRow>

@@ -208,17 +208,17 @@ export default function ReportsPage() {
   const chartData = data?.chartData || []
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2">
+    <div className="min-w-0 space-y-6">
+      <div className="flex min-w-0 flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Laporan Keuangan</h1>
         <p className="text-muted-foreground">
           Analitik dan wawasan untuk bisnis Anda.
         </p>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-          <div className="grid flex-1 gap-3 lg:grid-cols-[220px_minmax(260px,1fr)] lg:items-end">
+      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+          <div className="grid min-w-0 flex-1 gap-3 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-end">
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
                 Periode
@@ -226,7 +226,7 @@ export default function ReportsPage() {
               <select
                 value={dateRange}
                 onChange={(event) => setDateRange(event.target.value)}
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className="h-11 min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               >
                 {dateRangeOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -237,7 +237,7 @@ export default function ReportsPage() {
             </div>
 
             {(dateRange === "single" || dateRange === "custom") ? (
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
                     {dateRange === "single" ? "Tanggal" : "Dari Tanggal"}
@@ -283,11 +283,11 @@ export default function ReportsPage() {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row xl:shrink-0">
-            <Button onClick={resetFilters} variant="outline" className="h-11 rounded-xl px-4">
+            <Button onClick={resetFilters} variant="outline" className="h-11 w-full rounded-xl px-4 sm:w-auto">
               <RotateCcw className="mr-2 h-4 w-4" />
               Reset
             </Button>
-            <Button onClick={handleExport} className="h-11 rounded-xl px-5" disabled={isExporting}>
+            <Button onClick={handleExport} className="h-11 w-full rounded-xl px-5 sm:w-auto" disabled={isExporting}>
               {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               Export Excel
             </Button>

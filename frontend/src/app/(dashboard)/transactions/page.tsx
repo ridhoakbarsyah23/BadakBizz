@@ -699,8 +699,8 @@ export default function TransactionsPage() {
         </div>
       )}
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-default-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 xl:grid-cols-[minmax(260px,1fr)_220px_auto_auto_auto] xl:items-center">
+      <div className="flex min-w-0 flex-col gap-3 rounded-2xl border border-default-200 bg-white p-4 shadow-sm">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_180px_auto_auto_auto] xl:items-center">
           <div className="relative min-w-0">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
             <Input
@@ -717,7 +717,7 @@ export default function TransactionsPage() {
             />
           </div>
           <select
-            className="h-10 rounded-xl border border-default-200 bg-background px-3 text-sm font-medium shadow-sm"
+            className="h-10 min-w-0 rounded-xl border border-default-200 bg-background px-3 text-sm font-medium shadow-sm"
             value={datePreset}
             onChange={(e) => handleDatePresetChange(e.target.value)}
           >
@@ -729,7 +729,7 @@ export default function TransactionsPage() {
             <div className="relative xl:col-span-2">
               <Button
                 variant="outline"
-                className="w-full justify-start sm:w-[360px]"
+                className="w-full justify-start xl:w-[320px]"
                 onPress={() => setIsDatePickerOpen((open) => !open)}
               >
                 <CalendarDays className="h-4 w-4 mr-2" inline-block="true" />
@@ -756,17 +756,17 @@ export default function TransactionsPage() {
               )}
             </div>
           )}
-          <Button variant="outline" onPress={applySearch}>
+          <Button className="w-full xl:w-auto" variant="outline" onPress={applySearch}>
             <Search className="h-4 w-4 mr-2" inline-block="true" />
             Cari
           </Button>
           {hasActiveFilters && (
-            <Button variant="ghost" onPress={resetFilters}>
+            <Button className="w-full xl:w-auto" variant="ghost" onPress={resetFilters}>
               <RotateCcw className="h-4 w-4 mr-2" inline-block="true" />
               Reset
             </Button>
           )}
-          <Button variant="primary" onPress={exportToCSV}>
+          <Button className="w-full xl:w-auto" variant="primary" onPress={exportToCSV}>
             <Download className="h-4 w-4 mr-2" inline-block="true" />
             Export Excel
           </Button>
@@ -788,13 +788,13 @@ export default function TransactionsPage() {
         )}
       </div>
 
-      <div className="bg-background rounded-xl border border-default-200 shadow-sm overflow-x-auto w-full">
+      <div className="max-w-full overflow-x-auto rounded-xl border border-default-200 bg-background shadow-sm">
         {isLoading ? (
           <div className="flex justify-center p-8">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : (
-          <Table className="min-w-[800px] w-full">
+          <Table className="w-full min-w-[760px]">
             <TableHeader>
               <TableRow>
                 <TableHead>NO STRUK</TableHead>

@@ -14,10 +14,10 @@ export default function DashboardLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-default-50">
+    <div className="flex h-screen w-full overflow-hidden bg-default-50">
       <AppSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
-      <main className="flex flex-1 flex-col overflow-hidden relative">
+      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile Header */}
         <div className="flex h-16 items-center border-b border-slate-100 px-4 bg-white lg:hidden shrink-0 shadow-sm z-10">
           <Button
@@ -36,9 +36,9 @@ export default function DashboardLayout({
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="flex min-h-full flex-col">
-            <div className="flex-1">
+        <div className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5 md:p-8">
+          <div className="flex min-h-full min-w-0 max-w-full flex-col">
+            <div className="min-w-0 max-w-full flex-1">
               {children}
             </div>
             <AppFooter />

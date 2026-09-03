@@ -129,13 +129,13 @@ export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: 
 
   return (
     <aside
-      className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-100 shadow-sm transform transition-transform duration-300 ease-in-out flex flex-col ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+      className={`fixed lg:static inset-y-0 left-0 z-50 w-[min(20rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] lg:w-64 lg:max-w-none bg-white border-r border-slate-100 shadow-sm transform transition-transform duration-300 ease-in-out flex flex-col ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
     >
-      <div className="flex items-center justify-between h-16 px-6 border-b border-slate-100 shrink-0 bg-white">
-        <div className="flex items-center gap-2 font-black text-xl text-primary tracking-tight">
-          <img src="/BadakBizz.jpeg" alt="BadakBizz Logo" className="w-8 h-8 rounded-lg shadow-md shadow-primary/20 object-cover" />
-          <span>BadakBizz</span>
+      <div className="flex items-center justify-between h-16 px-4 sm:px-6 border-b border-slate-100 shrink-0 bg-white">
+        <div className="flex min-w-0 items-center gap-2 font-black text-xl text-primary tracking-tight">
+          <img src="/BadakBizz.jpeg" alt="BadakBizz Logo" className="w-8 h-8 shrink-0 rounded-lg shadow-md shadow-primary/20 object-cover" />
+          <span className="truncate">BadakBizz</span>
         </div>
         <Button
           isIconOnly
@@ -166,14 +166,14 @@ export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: 
                   <Button
                     key={item.title}
                     variant={isActive ? "secondary" : "tertiary"}
-                    className={`w-full justify-start font-semibold h-11 px-3 ${isActive ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:text-slate-900'}`}
+                    className={`w-full min-w-0 justify-start font-semibold h-11 px-3 ${isActive ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:text-slate-900'}`}
                     onPress={() => {
                       router.push(item.url);
                       setIsOpen(false);
                     }}
                   >
-                    <item.icon className={`w-5 h-5 mr-3 ${isActive ? 'text-primary' : 'text-slate-400'}`} />
-                    {item.title}
+                    <item.icon className={`w-5 h-5 mr-3 shrink-0 ${isActive ? 'text-primary' : 'text-slate-400'}`} />
+                    <span className="min-w-0 truncate">{item.title}</span>
                   </Button>
                 );
               })}
@@ -184,12 +184,12 @@ export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: 
 
       <div className="p-4 border-t border-slate-100 shrink-0 bg-slate-50/50">
         <div className="flex items-center gap-3 mb-4 px-2">
-          <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-600">
+          <div className="w-10 h-10 shrink-0 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-600">
             {user?.name?.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-slate-800 line-clamp-1">{user?.name}</p>
-            <p className="text-xs font-semibold text-slate-500 capitalize">{user?.role?.name}</p>
+            <p className="truncate text-xs font-semibold text-slate-500 capitalize">{user?.role?.name}</p>
           </div>
           <Button 
             variant="tertiary" 
@@ -205,23 +205,23 @@ export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: 
         {userRole === 'admin' && (
           <Button
             variant="tertiary"
-            className="w-full justify-start font-semibold h-10 text-slate-600 mb-1"
+            className="w-full min-w-0 justify-start font-semibold h-10 text-slate-600 mb-1"
             onPress={() => {
               router.push("/settings");
               setIsOpen(false);
             }}
           >
-            <Settings className="w-4 h-4 mr-3 text-slate-400" />
-            Pengaturan Toko
+            <Settings className="w-4 h-4 mr-3 shrink-0 text-slate-400" />
+            <span className="min-w-0 truncate">Pengaturan Toko</span>
           </Button>
         )}
         <Button
           variant="danger-soft"
-          className="w-full justify-start font-semibold h-10"
+          className="w-full min-w-0 justify-start font-semibold h-10"
           onPress={() => setIsLogoutOpen(true)}
         >
-          <LogOut className="w-4 h-4 mr-3" />
-          Keluar (Sign Out)
+          <LogOut className="w-4 h-4 mr-3 shrink-0" />
+          <span className="min-w-0 truncate">Keluar (Sign Out)</span>
         </Button>
       </div>
 

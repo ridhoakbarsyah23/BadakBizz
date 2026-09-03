@@ -220,9 +220,9 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="min-w-0 space-y-6">
+      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Pelanggan</h1>
           <p className="text-muted-foreground">
             Kelola basis data pelanggan dan riwayat transaksi mereka.
@@ -231,7 +231,7 @@ export default function CustomersPage() {
         
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
           <DialogTrigger render={
-            <Button onClick={openCreateModal}>
+            <Button onClick={openCreateModal} className="w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Tambah Pelanggan
             </Button>
@@ -298,8 +298,8 @@ export default function CustomersPage() {
 
       <AutoDismissNotice notice={notice} onDismiss={() => setNotice(null)} />
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex min-w-0 items-center gap-4">
+        <div className="relative w-full max-w-sm min-w-0">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
@@ -311,13 +311,13 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      <div className="bg-background rounded-xl border shadow-sm overflow-x-auto w-full">
+      <div className="max-w-full overflow-x-auto rounded-xl border bg-background shadow-sm">
         {isLoading ? (
           <div className="flex justify-center p-8">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : (
-          <Table className="min-w-[800px] w-full">
+          <Table className="w-full min-w-[760px]">
             <TableHeader>
               <TableRow>
                 <TableHead>NAMA</TableHead>

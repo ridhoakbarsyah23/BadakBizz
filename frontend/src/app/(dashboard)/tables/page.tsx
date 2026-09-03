@@ -182,9 +182,9 @@ export default function TablesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+    <div className="min-w-0 space-y-6">
+      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Manajemen Meja</h1>
           <p className="text-muted-foreground">
             Atur daftar meja dine-in yang muncul di layar kasir.
@@ -193,7 +193,7 @@ export default function TablesPage() {
 
         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
           <DialogTrigger render={
-            <Button onClick={openCreate}>
+            <Button onClick={openCreate} className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               Tambah Meja
             </Button>
@@ -269,7 +269,7 @@ export default function TablesPage() {
         ))}
       </div>
 
-      <div className="w-full overflow-x-auto rounded-lg border bg-background shadow-sm">
+      <div className="max-w-full overflow-x-auto rounded-lg border bg-background shadow-sm">
         {isLoading ? (
           <div className="flex justify-center p-8">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
