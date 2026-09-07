@@ -369,8 +369,14 @@ export default function ReportsPage() {
               <CardHeader>
                 <CardTitle>Penjualan vs Laba</CardTitle>
                 <CardDescription>
-                  Perbandingan total pendapatan dan laba bersih.
+                  Penjualan dibandingkan margin produk (harga jual dikurangi modal), sebelum diskon dan biaya operasional. Margin tidak termasuk pajak dan biaya layanan.
                 </CardDescription>
+                {data?.estimatedProfitItemCount > 0 && (
+                  <p className="text-sm text-amber-700" role="note">
+                    Laba masih mencakup estimasi untuk {data.estimatedProfitItemCount} baris item transaksi lama yang belum memiliki catatan modal.
+                    Estimasi memakai harga beli produk saat ini, atau nol jika produk sudah dihapus.
+                  </p>
+                )}
               </CardHeader>
               <CardContent>
                 <ChartContainer config={salesConfig} className="min-h-[280px] w-full">

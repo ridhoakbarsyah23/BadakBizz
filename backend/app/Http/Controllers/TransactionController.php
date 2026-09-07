@@ -223,6 +223,7 @@ class TransactionController extends Controller
                     'variant_id' => $item['variant'] ? $item['variant']->id : null,
                     'quantity' => $item['quantity'],
                     'price' => $item['price'],
+                    'purchase_price' => $product->purchase_price,
                     'subtotal' => $item['subtotal'],
                     'notes' => $item['notes'] ?: null,
                 ]);

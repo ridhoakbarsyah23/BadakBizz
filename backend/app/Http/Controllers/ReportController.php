@@ -106,7 +106,7 @@ class ReportController extends Controller
                 $profit = 0;
                 foreach ($txsInDay as $tx) {
                     foreach ($tx->items as $item) {
-                        $purchasePrice = $item->product ? $item->product->purchase_price : 0;
+                        $purchasePrice = $item->purchase_price ?? $item->product?->purchase_price ?? 0;
                         $profit += ($item->price - $purchasePrice) * $item->quantity;
                     }
                 }
@@ -132,7 +132,7 @@ class ReportController extends Controller
                 $profit = 0;
                 foreach ($txsInMonth as $tx) {
                     foreach ($tx->items as $item) {
-                        $purchasePrice = $item->product ? $item->product->purchase_price : 0;
+                        $purchasePrice = $item->purchase_price ?? $item->product?->purchase_price ?? 0;
                         $profit += ($item->price - $purchasePrice) * $item->quantity;
                     }
                 }
@@ -156,6 +156,9 @@ class ReportController extends Controller
             'busiestHourCount' => $busiestHourCount,
             'hourlyTransactions' => $hourlyTransactions,
             'chartData' => $chartData,
+            'estimatedProfitItemCount' => $chartTransactions->sum(
+                fn ($transaction) => $transaction->items->whereNull('purchase_price')->count()
+            ),
         ]);
     }
 

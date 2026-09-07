@@ -13,9 +13,14 @@ class TransactionItem extends Model
         'variant_id',
         'quantity',
         'price',
+        'purchase_price',
         'subtotal',
         'notes',
     ];
+
+    protected $hidden = ['purchase_price'];
+
+    protected $casts = ['purchase_price' => 'decimal:2'];
 
     public function transaction(): BelongsTo
     {
