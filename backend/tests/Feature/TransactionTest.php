@@ -195,7 +195,8 @@ class TransactionTest extends TestCase
 
     public function test_transaction_is_rejected_when_stock_is_insufficient(): void
     {
-        Sanctum::actingAs($this->cashier());
+        $cashier = $this->cashier();
+        Sanctum::actingAs($cashier);
 
         $product = Product::create([
             'sku' => 'SKU-TEA',
@@ -224,7 +225,8 @@ class TransactionTest extends TestCase
 
     public function test_cash_transaction_is_rejected_when_payment_amount_is_less_than_total(): void
     {
-        Sanctum::actingAs($this->cashier());
+        $cashier = $this->cashier();
+        Sanctum::actingAs($cashier);
 
         Store::create([
             'name' => 'BadakBizz Test',
@@ -691,7 +693,8 @@ class TransactionTest extends TestCase
 
     public function test_transactions_can_be_filtered_by_status_payment_and_search(): void
     {
-        Sanctum::actingAs($this->cashier());
+        $cashier = $this->cashier();
+        Sanctum::actingAs($cashier);
 
         $customer = Customer::create([
             'name' => 'Pending Member',
@@ -701,6 +704,7 @@ class TransactionTest extends TestCase
         Transaction::create([
             'transaction_number' => 'TRX-PENDING-001',
             'customer_id' => $customer->id,
+            'cashier_id' => $cashier->id,
             'subtotal' => 10_000,
             'tax' => 0,
             'service_charge' => 0,
@@ -715,6 +719,7 @@ class TransactionTest extends TestCase
 
         Transaction::create([
             'transaction_number' => 'TRX-CASH-001',
+            'cashier_id' => $cashier->id,
             'subtotal' => 8_000,
             'tax' => 0,
             'service_charge' => 0,
@@ -751,6 +756,7 @@ class TransactionTest extends TestCase
 
         $transaction = Transaction::create([
             'transaction_number' => 'TRX-CANCEL-PENDING',
+            'cashier_id' => $cashier->id,
             'subtotal' => 9_000,
             'tax' => 0,
             'service_charge' => 0,

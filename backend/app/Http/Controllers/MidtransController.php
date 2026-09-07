@@ -38,6 +38,10 @@ class MidtransController extends Controller
             return response()->json(['status' => 'error', 'message' => 'QRIS amount does not match transaction total'], 422);
         }
 
+        if (! $this->userCanAccessTransaction($request, $transaction)) {
+            return response()->json(['status' => 'error', 'message' => 'Forbidden. You do not have permission to access this resource.'], 403);
+        }
+
         $params = [
             'payment_type' => 'gopay', // Core API uses gopay to return a QRIS URL
             'transaction_details' => [
@@ -132,16 +136,26 @@ class MidtransController extends Controller
         );
     }
 
-    public function checkStatus($order_id)
+    public function checkStatus(Request $request, $order_id)
     {
         $posTransaction = Transaction::where('transaction_number', $order_id)->first();
         if (! $posTransaction) {
             return response()->json(['status' => 'error', 'message' => 'Not found'], 404);
         }
 
+        if (! $this->userCanAccessTransaction($request, $posTransaction)) {
+            return response()->json(['status' => 'error', 'message' => 'Forbidden. You do not have permission to access this resource.'], 403);
+        }
+
         return response()->json([
             'status' => 'success',
             'transaction_status' => $posTransaction->status,
         ]);
+    }
+
+    private function userCanAccessTransaction(Request $request, Transaction $transaction): bool
+    {
+        return $request->user()?->role?->slug === 'admin'
+            || (int) $transaction->cashier_id === (int) $request->user()?->id;
     }
 }

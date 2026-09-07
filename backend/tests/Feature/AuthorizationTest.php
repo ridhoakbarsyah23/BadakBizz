@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\Category;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Role;
 use App\Models\Store;
 use App\Models\Table;
+use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -33,6 +35,7 @@ class AuthorizationTest extends TestCase
             'is_active' => true,
         ]);
         $table = Table::create(['name' => 'A1']);
+        $customer = Customer::create(['name' => 'Blocked Customer']);
 
         $adminRequests = [
             ['GET', '/api/dashboard'],
@@ -49,6 +52,7 @@ class AuthorizationTest extends TestCase
                 'role_id' => Role::where('slug', 'cashier')->value('id'),
             ]],
             ['GET', '/api/roles'],
+            ['GET', "/api/customers/{$customer->id}"],
             ['POST', '/api/categories', ['name' => 'Blocked']],
             ['PUT', "/api/categories/{$category->id}", ['name' => 'Blocked']],
             ['DELETE', "/api/categories/{$category->id}"],
@@ -73,6 +77,63 @@ class AuthorizationTest extends TestCase
 
             $this->json($method, $uri, $payload)->assertForbidden();
         }
+    }
+
+    public function test_cashier_cannot_update_or_delete_customers(): void
+    {
+        Sanctum::actingAs($this->userWithRole('cashier', 'Cashier'));
+
+        $customer = Customer::create([
+            'name' => 'Protected Customer',
+            'phone' => '08123456789',
+            'email' => 'customer@example.test',
+        ]);
+
+        $this->putJson("/api/customers/{$customer->id}", [
+            'name' => 'Changed Customer',
+        ])->assertForbidden();
+
+        $this->deleteJson("/api/customers/{$customer->id}")
+            ->assertForbidden();
+    }
+
+    public function test_cashier_only_sees_own_transactions(): void
+    {
+        $cashier = $this->userWithRole('cashier', 'Cashier');
+        $otherCashier = $this->userWithRole('cashier-other', 'Other Cashier');
+
+        Transaction::create($this->transactionPayload('TRX-OWN', $cashier->id));
+        Transaction::create($this->transactionPayload('TRX-OTHER', $otherCashier->id));
+
+        Sanctum::actingAs($cashier);
+
+        $response = $this->getJson('/api/transactions');
+
+        $response->assertOk();
+        $numbers = collect($response->json())->pluck('transaction_number');
+
+        $this->assertTrue($numbers->contains('TRX-OWN'));
+        $this->assertFalse($numbers->contains('TRX-OTHER'));
+    }
+
+    public function test_cashier_cannot_access_other_cashiers_qris_transaction(): void
+    {
+        $cashier = $this->userWithRole('cashier', 'Cashier');
+        $otherCashier = $this->userWithRole('cashier-other', 'Other Cashier');
+        $transaction = Transaction::create($this->transactionPayload(
+            'TRX-OTHER-QRIS',
+            $otherCashier->id,
+            'QRIS',
+            'PENDING',
+        ));
+
+        Sanctum::actingAs($cashier);
+
+        $this->getJson("/api/qris/status/{$transaction->transaction_number}")
+            ->assertForbidden();
+
+        $this->postJson("/api/transactions/{$transaction->id}/cancel-pending-qris")
+            ->assertForbidden();
     }
 
     public function test_cashier_can_still_use_pos_read_and_transaction_routes(): void
@@ -104,5 +165,26 @@ class AuthorizationTest extends TestCase
             'role_id' => $role->id,
             'is_active' => true,
         ]);
+    }
+
+    private function transactionPayload(
+        string $transactionNumber,
+        int $cashierId,
+        string $paymentMethod = 'CASH',
+        string $status = 'COMPLETED',
+    ): array {
+        return [
+            'transaction_number' => $transactionNumber,
+            'cashier_id' => $cashierId,
+            'subtotal' => 10_000,
+            'tax' => 0,
+            'service_charge' => 0,
+            'discount' => 0,
+            'total_amount' => 10_000,
+            'payment_amount' => $paymentMethod === 'QRIS' ? 0 : 10_000,
+            'payment_method' => $paymentMethod,
+            'status' => $status,
+            'order_type' => 'takeaway',
+        ];
     }
 }

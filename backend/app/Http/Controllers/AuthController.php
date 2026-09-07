@@ -14,6 +14,12 @@ class AuthController extends Controller
      */
     public function register(Request $request)
     {
+        if (! config('auth.public_registration_enabled')) {
+            return response()->json([
+                'message' => 'Public registration is disabled.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',

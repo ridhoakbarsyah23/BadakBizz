@@ -25,6 +25,10 @@ class TransactionController extends Controller
         $query = Transaction::with(['items.product', 'items.variant', 'customer', 'cashier', 'table'])
             ->latest();
 
+        if (! $this->userIsAdmin($request)) {
+            $query->where('cashier_id', $request->user()->id);
+        }
+
         if ($request->filled('status') && $request->status !== 'ALL') {
             $query->where('status', $request->status);
         }
@@ -312,6 +316,10 @@ class TransactionController extends Controller
                 return response()->json(['message' => 'Only pending QRIS transactions can be cancelled from this action'], 400);
             }
 
+            if (! $this->userCanAccessTransaction($request, $transaction)) {
+                return response()->json(['message' => 'Forbidden. You do not have permission to access this resource.'], 403);
+            }
+
             $transaction = app(TransactionStatusService::class)->cancel(
                 $transaction,
                 $request->user() ? $request->user()->id : null,
@@ -349,5 +357,16 @@ class TransactionController extends Controller
             }, 0);
 
         return $prefix.str_pad((string) ($lastSequence + 1), 4, '0', STR_PAD_LEFT);
+    }
+
+    private function userCanAccessTransaction(Request $request, Transaction $transaction): bool
+    {
+        return $this->userIsAdmin($request)
+            || (int) $transaction->cashier_id === (int) $request->user()->id;
+    }
+
+    private function userIsAdmin(Request $request): bool
+    {
+        return $request->user()?->role?->slug === 'admin';
     }
 }

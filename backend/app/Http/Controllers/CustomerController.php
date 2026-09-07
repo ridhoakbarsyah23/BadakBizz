@@ -13,9 +13,15 @@ class CustomerController extends Controller
     public function index(Request $request)
     {
         $query = Customer::latest();
+
         if ($request->has('per_page')) {
-            return $query->paginate($request->per_page);
+            $validated = $request->validate([
+                'per_page' => 'nullable|integer|min:1|max:100',
+            ]);
+
+            return $query->paginate($validated['per_page'] ?? 10);
         }
+
         return $query->get();
     }
 
@@ -24,17 +30,17 @@ class CustomerController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
             'phone' => 'nullable|string|max:255',
             'email' => 'nullable|email|max:255',
         ]);
 
-        $customer = Customer::create($request->all());
+        $customer = Customer::create($validated);
 
         return response()->json([
             'message' => 'Customer created successfully.',
-            'data' => $customer
+            'data' => $customer,
         ], 201);
     }
 
@@ -51,17 +57,17 @@ class CustomerController extends Controller
      */
     public function update(Request $request, Customer $customer)
     {
-        $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
             'phone' => 'nullable|string|max:255',
             'email' => 'nullable|email|max:255',
         ]);
 
-        $customer->update($request->all());
+        $customer->update($validated);
 
         return response()->json([
             'message' => 'Customer updated successfully.',
-            'data' => $customer
+            'data' => $customer,
         ]);
     }
 
@@ -73,7 +79,7 @@ class CustomerController extends Controller
         $customer->delete();
 
         return response()->json([
-            'message' => 'Customer deleted successfully.'
+            'message' => 'Customer deleted successfully.',
         ]);
     }
 }

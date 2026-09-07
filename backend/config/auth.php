@@ -114,4 +114,9 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    'public_registration_enabled' => env(
+        'AUTH_PUBLIC_REGISTRATION',
+        env('APP_ENV', 'production') !== 'production',
+    ),
+
 ];

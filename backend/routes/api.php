@@ -20,8 +20,10 @@ use Illuminate\Support\Facades\Route;
 Route::post('/midtrans/webhook', [MidtransController::class, 'webhook']);
 
 // Authentication Routes
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/register', [AuthController::class, 'register']);
+Route::middleware('throttle:auth')->group(function () {
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/register', [AuthController::class, 'register']);
+});
 
 // Protected API Routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -41,7 +43,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/categories', [CategoryController::class, 'index']);
     Route::get('/settings', [SettingController::class, 'show']);
     Route::get('/tables', [TableController::class, 'index']);
-    Route::apiResource('customers', CustomerController::class);
+    Route::get('/customers', [CustomerController::class, 'index']);
+    Route::post('/customers', [CustomerController::class, 'store']);
 
     // Transactions
     Route::get('/transactions', [TransactionController::class, 'index']);
@@ -68,6 +71,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/staff', [StaffController::class, 'store']);
         Route::put('/staff/{id}', [StaffController::class, 'update']);
         Route::get('/roles', [RoleController::class, 'index']);
+        Route::apiResource('customers', CustomerController::class)->except(['index', 'store']);
 
         // Products & Categories (Create, Update, Delete)
         Route::apiResource('categories', CategoryController::class)->except(['index']);

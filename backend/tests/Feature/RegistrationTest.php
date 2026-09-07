@@ -58,4 +58,35 @@ class RegistrationTest extends TestCase
 
         $response->assertUnprocessable();
     }
+
+    public function test_register_can_be_disabled_by_configuration(): void
+    {
+        config(['auth.public_registration_enabled' => false]);
+
+        $response = $this->postJson('/api/register', [
+            'name' => 'Blocked Register',
+            'email' => 'blocked-register@example.test',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ]);
+
+        $response
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Public registration is disabled.');
+    }
+
+    public function test_login_is_rate_limited(): void
+    {
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $this->postJson('/api/login', [
+                'email' => 'missing@example.test',
+                'password' => 'wrong-password',
+            ])->assertUnauthorized();
+        }
+
+        $this->postJson('/api/login', [
+            'email' => 'missing@example.test',
+            'password' => 'wrong-password',
+        ])->assertTooManyRequests();
+    }
 }
