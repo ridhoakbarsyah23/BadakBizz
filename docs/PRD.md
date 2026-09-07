@@ -2,6 +2,7 @@
 
 Tanggal: 30 Agustus 2026
 Status: Draft v1
+Catatan pengembangan terbaru: 7 September 2026 (lihat bagian 16).
 Pemilik produk: BadakBizz
 Platform: Web application, Next.js frontend dan Laravel REST API backend
 
@@ -363,3 +364,30 @@ Kebutuhan utama:
 - Sistem menolak dine-in dengan meja occupied.
 - Admin dapat mengekspor laporan CSV dan XLSX berdasarkan filter.
 - Pengaturan pajak, service charge, dan struk dipakai dalam perhitungan POS dan tampilan struk.
+
+## 16. Pembaruan Pengembangan: 7 September 2026
+
+### Akurasi modal transaksi
+
+- Checkout menyimpan `transaction_items.purchase_price` dari harga beli produk di server pada saat transaksi dibuat. Varian mengikuti modal produk induk karena belum memiliki harga modal tersendiri.
+- QRIS menyimpan modal saat transaksi PENDING dibuat; konfirmasi pembayaran tidak mengambil ulang harga modal.
+- Grafik harian dan bulanan memakai modal tersimpan untuk transaksi COMPLETED. Perubahan harga atau penghapusan produk tidak mengubah margin transaksi yang sudah memiliki catatan modal. Void mengeluarkan transaksi dari perhitungan.
+- Nilai modal nol valid. Nilai null menandakan modal historis belum diketahui.
+- Transaksi lama tidak diisi otomatis dengan harga saat ini sebagai modal historis. Perhitungan lama tetap digunakan sebagai estimasi: harga beli produk saat laporan dibuka, atau nol jika produk sudah dihapus. UI menampilkan jumlah baris item yang menggunakan estimasi dalam periode aktif.
+- Angka grafik adalah margin produk sebelum diskon dan biaya operasional, tidak termasuk pajak serta biaya layanan; bukan laba bersih. Definisi ini diperjelas pada halaman laporan.
+- Kolom modal baru disembunyikan dari serialisasi item transaksi; perhitungan laporan tetap dilakukan di server.
+
+### Aktivasi dan verifikasi
+
+- Jalankan `php artisan migrate` dari direktori `backend` setelah database tersedia, sebelum melayani checkout dengan kode baru. Migrasi hanya menambah kolom nullable tanpa mengubah nilai transaksi lama.
+- Pengujian otomatis mencakup harga berubah, produk dihapus, modal nol, varian, QRIS, void, estimasi data lama, filter periode, dan grafik harian/bulanan.
+- Saat pemeriksaan lokal 7 September 2026, seluruh 84 tes backend serta lint, TypeScript, dan build frontend lolos. Pint lolos untuk file PHP yang diubah; pemeriksaan seluruh backend masih menemukan masalah format di file lain.
+- Migrasi ke database operasional lokal dan uji runtime MySQL belum dilakukan karena koneksi ke `127.0.0.1:3306` ditolak. Pengujian backend memakai SQLite in-memory.
+
+### Urutan tahap berikutnya
+
+1. Simpan dan lanjutkan pesanan: simpan keranjang per kasir, buka kembali, hapus pesanan tersimpan, serta validasi ulang harga dan stok saat checkout. Pesanan tersimpan belum merupakan transaksi pembayaran dan belum mengurangi stok.
+2. Pesanan meja dan status dapur untuk F&B, atau supplier dan pembelian stok jika fokus operasional retail.
+3. Backup dan uji pemulihan data, verifikasi pembayaran, serta uji alur kasir lengkap pada lingkungan deployment sebelum digunakan operasional.
+
+Roadmap bagian 13 merupakan rencana awal. Shift aktif, laporan COMPLETED, catatan order/item, kitchen receipt, adjustment stok, arsip varian, serta riwayat perubahan produk sudah memiliki implementasi di kode saat ini.
