@@ -14,12 +14,12 @@ export default function DashboardLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-default-50">
+    <div className="flex h-dvh w-full overflow-hidden bg-slate-100/70">
       <AppSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
       <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile Header */}
-        <div className="flex h-16 items-center border-b border-slate-100 px-4 bg-white lg:hidden shrink-0 shadow-sm z-10">
+        <div className="z-30 flex h-16 shrink-0 items-center border-b border-slate-200/70 bg-white/95 px-4 shadow-sm backdrop-blur lg:hidden">
           <Button
             isIconOnly
             variant="tertiary"
@@ -27,17 +27,25 @@ export default function DashboardLayout({
           >
             <Menu className="w-6 h-6 text-slate-700" />
           </Button>
-          <div className="flex items-center gap-2 font-black text-lg text-primary tracking-tight ml-4">
-            <div className="w-7 h-7 bg-primary rounded-md flex items-center justify-center shadow-md shadow-primary/20">
-              <span className="text-white text-xs">K</span>
+          <div className="ml-3 flex min-w-0 items-center gap-2.5">
+            <img
+              src="/BadakBizz.jpeg"
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              decoding="async"
+              className="h-8 w-8 shrink-0 rounded-lg object-cover shadow-md shadow-blue-500/20"
+            />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black tracking-tight text-slate-900">BadakBizz</p>
+              <p className="truncate text-[10px] font-semibold text-slate-400">Sistem Operasional</p>
             </div>
-            <span>BadakBizz</span>
           </div>
         </div>
 
         {/* Main Content Area */}
-        <div className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5 md:p-8">
-          <div className="flex min-h-full min-w-0 max-w-full flex-col">
+        <div className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 xl:p-7">
+          <div className="mx-auto flex min-h-full w-full min-w-0 max-w-[1680px] flex-col">
             <div className="min-w-0 max-w-full flex-1">
               {children}
             </div>
@@ -49,7 +57,7 @@ export default function DashboardLayout({
       {/* Overlay for mobile */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-[2px] lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}

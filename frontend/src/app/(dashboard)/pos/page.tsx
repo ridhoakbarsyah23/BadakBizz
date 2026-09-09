@@ -2,7 +2,7 @@
 
 import { apiUrl } from "@/lib/api"
 import { AutoDismissNotice } from "@/components/auto-dismiss-notice"
-import { useState, useEffect, type CSSProperties } from "react"
+import { useCallback, useEffect, useState, type CSSProperties } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -87,23 +87,25 @@ export default function POSPage() {
   const [isQrisCancelling, setIsQrisCancelling] = useState(false)
   const [isCartModalOpen, setIsCartModalOpen] = useState(false)
 
-  const fetchProductsAndCustomers = async () => {
+  const fetchProductsAndCustomers = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true)
     try {
       const headers = { "Authorization": `Bearer ${token}` }
       const [productsRes, customersRes, settingsRes, tablesRes, currentShiftRes] = await Promise.all([
-        fetch(apiUrl('/api/products'), { headers }),
-        fetch(apiUrl('/api/customers'), { headers }),
-        fetch(apiUrl('/api/settings'), { headers }),
-        fetch(apiUrl('/api/tables'), { headers }),
-        fetch(apiUrl('/api/shifts/current'), { headers })
+        fetch(apiUrl('/api/products'), { headers, signal }),
+        fetch(apiUrl('/api/customers'), { headers, signal }),
+        fetch(apiUrl('/api/settings'), { headers, signal }),
+        fetch(apiUrl('/api/tables'), { headers, signal }),
+        fetch(apiUrl('/api/shifts/current'), { headers, signal })
       ])
-      
-      const productsData = await productsRes.json()
-      const customersData = await customersRes.json()
-      const settingsData = await settingsRes.json()
-      const tablesData = await tablesRes.json()
-      const currentShiftData = currentShiftRes.ok ? await currentShiftRes.json() : null
+
+      const [productsData, customersData, settingsData, tablesData, currentShiftData] = await Promise.all([
+        productsRes.json(),
+        customersRes.json(),
+        settingsRes.json(),
+        tablesRes.json(),
+        currentShiftRes.ok ? currentShiftRes.json() : Promise.resolve(null),
+      ])
       
       setProducts(Array.isArray(productsData) ? productsData : [])
       setCustomers(Array.isArray(customersData) ? customersData : [])
@@ -113,21 +115,25 @@ export default function POSPage() {
         setStoreSettings(settingsData)
       }
     } catch (error) {
-      console.error("Failed to fetch data:", error)
+      if (error instanceof DOMException && error.name === "AbortError") return
+
       setNotice({
         type: "error",
         message: "Gagal memuat data POS. Periksa koneksi backend lalu coba refresh.",
       })
     } finally {
-      setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (token) {
-      fetchProductsAndCustomers()
+      if (!signal?.aborted) setIsLoading(false)
     }
   }, [token])
+
+  useEffect(() => {
+    if (!token) return
+
+    const controller = new AbortController()
+    fetchProductsAndCustomers(controller.signal)
+
+    return () => controller.abort()
+  }, [fetchProductsAndCustomers, token])
 
   useEffect(() => {
     if (orderType !== "dine_in") {
@@ -961,17 +967,8 @@ export default function POSPage() {
               <p className="text-sm">Coba sesuaikan pencarian atau filter kategori Anda.</p>
             </div>
           ) : (
-            <AnimatePresence>
-              {filteredProducts.map(product => (
-                <motion.div
-                  layout
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  whileHover={{ y: -5 }}
-                  whileTap={{ scale: 0.95 }}
-                  key={product.id}
-                >
+            filteredProducts.map(product => (
+                <div key={product.id} className="min-w-0">
                   <Card 
                     className="cursor-pointer border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-1 hover:border-primary/30 transition-all duration-300 flex flex-col bg-white overflow-hidden rounded-2xl h-full group"
                     onClick={() => handleProductSelect(product)}
@@ -985,6 +982,9 @@ export default function POSPage() {
                           <img
                             src={product.image_url}
                             alt={`Foto ${product.name}`}
+                            loading="lazy"
+                            decoding="async"
+                            fetchPriority="low"
                             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                           />
                         ) : (
@@ -1013,9 +1013,8 @@ export default function POSPage() {
                       </div>
                     </CardContent>
                   </Card>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+                </div>
+              ))
           )}
         </div>
       </div>

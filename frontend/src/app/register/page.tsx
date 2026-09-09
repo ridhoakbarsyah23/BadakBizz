@@ -77,6 +77,8 @@ export default function RegisterPage() {
             <img
               src="/BadakBizz.jpeg"
               alt="BadakBizz Logo"
+              loading="lazy"
+              decoding="async"
               className="mb-3 h-12 w-12 rounded-2xl object-cover shadow-xl shadow-primary/30 sm:h-14 sm:w-14"
             />
             <h2 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
