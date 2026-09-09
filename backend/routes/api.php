@@ -9,6 +9,7 @@ use App\Http\Controllers\MidtransController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SavedOrderController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\StaffController;
@@ -45,6 +46,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/tables', [TableController::class, 'index']);
     Route::get('/customers', [CustomerController::class, 'index']);
     Route::post('/customers', [CustomerController::class, 'store']);
+
+    // Saved orders are private drafts owned by the active cashier.
+    Route::apiResource('saved-orders', SavedOrderController::class);
 
     // Transactions
     Route::get('/transactions', [TransactionController::class, 'index']);

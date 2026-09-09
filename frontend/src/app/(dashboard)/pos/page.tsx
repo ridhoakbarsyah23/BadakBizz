@@ -35,6 +35,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { useAuth } from "@/context/AuthContext"
+import { SavedOrdersDialog, type SavedOrder } from "./saved-orders-dialog"
 
 export default function POSPage() {
   const { token, user } = useAuth()
@@ -52,6 +53,8 @@ export default function POSPage() {
   const [orderType, setOrderType] = useState<string>("dine_in")
   const [orderNotes, setOrderNotes] = useState("")
   const [customDiscountPercent, setCustomDiscountPercent] = useState("")
+  const [activeSavedOrderId, setActiveSavedOrderId] = useState<number | null>(null)
+  const [activeSavedOrderName, setActiveSavedOrderName] = useState("")
   const [storeSettings, setStoreSettings] = useState<any>({
     name: "BadakBizz",
     tax_rate: 11,
@@ -225,6 +228,68 @@ export default function POSPage() {
     qty: 1,
   })
 
+  const handleRestoreSavedOrder = (order: SavedOrder) => {
+    const restoredItems: any[] = []
+    let unavailableCount = 0
+    let priceChangeCount = 0
+    let stockIssueCount = 0
+
+    order.items.forEach((savedItem) => {
+      const product = products.find((item) => item.id === savedItem.product_id)
+      const variant = savedItem.variant_id
+        ? product?.variants?.find((item: any) => item.id === savedItem.variant_id)
+        : undefined
+      const canRestore = savedItem.is_available
+        && product?.is_active
+        && (!product.has_variants || Boolean(variant))
+
+      if (!canRestore) {
+        unavailableCount += 1
+        return
+      }
+
+      const cartItem = buildCartItem(product, variant)
+      restoredItems.push({
+        ...cartItem,
+        qty: savedItem.quantity,
+        notes: savedItem.notes || "",
+      })
+
+      if (savedItem.price_changed) priceChangeCount += 1
+      if (savedItem.quantity > cartItem.stock) stockIssueCount += 1
+    })
+
+    if (restoredItems.length === 0) {
+      setNotice({
+        type: "error",
+        message: "Pesanan tidak dapat dibuka karena semua produknya sudah tidak tersedia.",
+      })
+      return
+    }
+
+    setCart(restoredItems)
+    setSelectedCustomerId(order.customer_id ? String(order.customer_id) : "")
+    setSelectedTableId(order.table_id ? String(order.table_id) : "")
+    setOrderType(order.order_type)
+    setOrderNotes(order.notes || "")
+    setCustomDiscountPercent(order.custom_discount_percent ? String(order.custom_discount_percent) : "")
+    setActiveSavedOrderId(order.id)
+    setActiveSavedOrderName(order.name)
+    setIsCartModalOpen(true)
+
+    const warnings = []
+    if (priceChangeCount > 0) warnings.push(`${priceChangeCount} harga diperbarui`)
+    if (stockIssueCount > 0) warnings.push(`${stockIssueCount} item melebihi stok saat ini`)
+    if (unavailableCount > 0) warnings.push(`${unavailableCount} item tidak tersedia dilewati`)
+
+    setNotice({
+      type: warnings.length > 0 ? "info" : "success",
+      message: warnings.length > 0
+        ? `Pesanan "${order.name}" dibuka. ${warnings.join(", ")}.`
+        : `Pesanan "${order.name}" siap dilanjutkan.`,
+    })
+  }
+
   const handleProductSelect = (product: any) => {
     if (product.has_variants) {
       setVariantProduct(product)
@@ -313,6 +378,19 @@ export default function POSPage() {
   const currentShiftExpectedCash = Number(currentShift?.expected_cash || currentShift?.starting_cash || 0)
   const closeShiftCashAmount = Number(shiftCashAmount || 0)
   const closeShiftDiscrepancy = closeShiftCashAmount - currentShiftExpectedCash
+  const savedOrderDraft = {
+    customer_id: selectedCustomerId || null,
+    table_id: tableManagementEnabled && orderType === "dine_in" && selectedTableId ? selectedTableId : null,
+    order_type: orderType,
+    custom_discount_percent: additionalDiscountPercent,
+    notes: orderNotes.trim() || undefined,
+    items: cart.map(item => ({
+      product_id: item.product_id,
+      variant_id: item.variant_id || undefined,
+      quantity: item.qty,
+      notes: item.notes?.trim() || undefined,
+    })),
+  }
 
   const formatCurrency = (value: number | string | null | undefined) => {
     return Math.round(Number(value || 0)).toLocaleString("id-ID")
@@ -397,6 +475,29 @@ export default function POSPage() {
     }
   }
 
+  const removeConsumedSavedOrder = async () => {
+    const orderId = activeSavedOrderId
+    if (!orderId || !token) return true
+
+    try {
+      const response = await fetch(apiUrl(`/api/saved-orders/${orderId}`), {
+        method: "DELETE",
+        headers: {
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) return false
+
+      setActiveSavedOrderId(null)
+      setActiveSavedOrderName("")
+      return true
+    } catch {
+      return false
+    }
+  }
+
   const handleCheckout = async (paymentMethod: string, paymentAmount: number) => {
     if (!canCheckout) {
       setNotice({
@@ -457,6 +558,8 @@ export default function POSPage() {
               throw new Error(qrisData.message || "Kesalahan API")
             }
 
+            const savedOrderRemoved = await removeConsumedSavedOrder()
+
             setQrisString(qrisData.qr_string)
             setQrisDialogTransaction({
               ...txn,
@@ -492,8 +595,10 @@ export default function POSPage() {
             setIsCheckoutOpen(false)
             setIsQrisOpen(true)
             setNotice({
-              type: "info",
-              message: "Transaksi QRIS dibuat sebagai pending. Stok dan meja sudah diperbarui.",
+              type: savedOrderRemoved ? "info" : "error",
+              message: savedOrderRemoved
+                ? "Transaksi QRIS dibuat sebagai pending. Stok dan meja sudah diperbarui."
+                : "Transaksi QRIS dibuat, tetapi draft lama gagal dihapus. Hapus manual dari pesanan tersimpan.",
             })
             fetchProductsAndCustomers()
           } catch (qrisError: any) {
@@ -522,6 +627,7 @@ export default function POSPage() {
             })
           }
         } else {
+          const savedOrderRemoved = await removeConsumedSavedOrder()
           setReceiptData({
             transaction_number: txn?.transaction_number || "TRX-PENDING",
             items: [...cart],
@@ -550,8 +656,10 @@ export default function POSPage() {
           setIsReceiptOpen(true)
           setCashAmount("")
           setNotice({
-            type: "success",
-            message: "Transaksi tunai berhasil disimpan.",
+            type: savedOrderRemoved ? "success" : "error",
+            message: savedOrderRemoved
+              ? "Transaksi tunai berhasil disimpan."
+              : "Transaksi tunai berhasil, tetapi draft lama gagal dihapus. Hapus manual dari pesanan tersimpan.",
           })
           fetchProductsAndCustomers() // refresh stock
           
@@ -941,19 +1049,39 @@ export default function POSPage() {
       {/* Right side: Persistent Cart (Desktop) & Slide-over (Mobile) */}
       <div className={`fixed inset-y-0 right-0 z-50 w-full sm:w-[400px] md:relative md:w-[380px] lg:w-[420px] shrink-0 bg-white flex flex-col shadow-2xl md:shadow-xl md:rounded-[2rem] border-l md:border border-slate-100/50 overflow-hidden h-[100dvh] md:h-full transition-transform duration-300 ease-in-out ${isCartModalOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}`}>
         <div className="flex flex-col min-w-0 flex-1 overflow-y-auto">
-               <div className="p-6 bg-white border-b border-slate-100 flex items-center justify-between shadow-sm z-20 sticky top-0 shrink-0">
-                  <div className="flex items-center gap-3 font-bold text-xl text-slate-900">
-                    <Button variant="ghost" size="icon" className="md:hidden -ml-2 text-slate-500 hover:bg-slate-100" onClick={() => setIsCartModalOpen(false)}>
-                      <Minus className="w-6 h-6 rotate-90" />
-                    </Button>
-                    <div className="p-2.5 bg-primary/10 rounded-xl text-primary hidden md:block">
-                      <ShoppingCart className="w-6 h-6" />
+               <div className="sticky top-0 z-20 shrink-0 space-y-3 border-b border-slate-100 bg-white p-4 shadow-sm sm:p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3 font-bold text-xl text-slate-900">
+                      <Button variant="ghost" size="icon" className="md:hidden -ml-2 text-slate-500 hover:bg-slate-100" onClick={() => setIsCartModalOpen(false)}>
+                        <Minus className="w-6 h-6 rotate-90" />
+                      </Button>
+                      <div className="p-2.5 bg-primary/10 rounded-xl text-primary hidden md:block">
+                        <ShoppingCart className="w-6 h-6" />
+                      </div>
+                      <span className="truncate">Detail Pesanan</span>
                     </div>
-                    Detail Pesanan
+                    <Badge variant="default" className="rounded-full px-3 py-1.5 bg-primary font-bold shadow-sm">
+                      {cart.reduce((sum, item) => sum + item.qty, 0)} item
+                    </Badge>
                   </div>
-                  <Badge variant="default" className="rounded-full px-4 py-1.5 bg-primary font-bold shadow-sm">
-                    {cart.reduce((sum, item) => sum + item.qty, 0)} items
-                  </Badge>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="truncate text-xs font-semibold text-slate-500">
+                      {activeSavedOrderName ? `Draft aktif: ${activeSavedOrderName}` : "Pesanan baru"}
+                    </p>
+                    <SavedOrdersDialog
+                      token={token}
+                      draft={savedOrderDraft}
+                      activeOrderId={activeSavedOrderId}
+                      activeOrderName={activeSavedOrderName}
+                      disabled={isProcessing}
+                      onRestore={handleRestoreSavedOrder}
+                      onActiveOrderChange={(id, name = "") => {
+                        setActiveSavedOrderId(id)
+                        setActiveSavedOrderName(name)
+                      }}
+                      onNotice={setNotice}
+                    />
+                  </div>
                </div>
 
                <div className="p-6 flex flex-col gap-3 shrink-0">
