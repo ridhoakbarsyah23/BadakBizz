@@ -391,3 +391,25 @@ Kebutuhan utama:
 3. Backup dan uji pemulihan data, verifikasi pembayaran, serta uji alur kasir lengkap pada lingkungan deployment sebelum digunakan operasional.
 
 Roadmap bagian 13 merupakan rencana awal. Shift aktif, laporan COMPLETED, catatan order/item, kitchen receipt, adjustment stok, arsip varian, serta riwayat perubahan produk sudah memiliki implementasi di kode saat ini.
+
+## 17. Pembaruan Pengembangan: 8 September 2026
+
+### Simpan dan lanjutkan pesanan
+
+- Kasir dapat menyimpan keranjang sebagai draft bernama, membuka kembali, memperbarui, dan menghapus draft miliknya sendiri.
+- Draft menyimpan pelanggan, meja, tipe pesanan, diskon tambahan, catatan order, catatan item, produk, dan varian. Draft tidak membuat transaksi, mengubah status meja, mengurangi stok, atau menambah laporan penjualan.
+- Nama dan harga saat penyimpanan dicatat sebagai snapshot. Saat draft dibuka, POS menggunakan harga dan stok terbaru, memperingatkan perubahan harga atau kekurangan stok, dan melewati produk yang sudah tidak tersedia.
+- Checkout tetap menghitung harga dan memvalidasi stok secara otoritatif di server. Draft aktif dihapus setelah transaksi tunai berhasil atau QRIS berhasil dibuat.
+- API `saved-orders` dibatasi ke user terautentikasi dan setiap query difilter berdasarkan kasir pemilik untuk mencegah akses silang.
+
+### Aktivasi dan verifikasi
+
+- Migrasi `saved_orders` dan `saved_order_items` telah dijalankan pada database lokal tanpa menghapus data lama.
+- Seluruh 88 tes backend dengan 537 assertion, Pint untuk file terkait, lint, TypeScript, dan build produksi frontend lolos.
+- Smoke test API lokal membuktikan draft dapat dibuat, muncul pada daftar kasir, dihapus, dan tidak mengubah stok.
+- Verifikasi visual browser otomatis belum tersedia karena koneksi browser sesi tidak menyediakan kebijakan sandbox yang dibutuhkan.
+
+### Urutan tahap berikutnya
+
+1. Pesanan meja dan status dapur untuk F&B, atau supplier dan pembelian stok jika fokus operasional retail.
+2. Backup dan uji pemulihan data, verifikasi pembayaran, serta uji alur kasir lengkap pada lingkungan deployment sebelum digunakan operasional.
