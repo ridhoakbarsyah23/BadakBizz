@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppFooter } from "@/components/app-footer";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@heroui/react";
 import { Menu } from "lucide-react";
 
@@ -14,6 +15,7 @@ export default function DashboardLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
+    <TooltipProvider>
     <div className="flex h-dvh w-full overflow-hidden bg-slate-100/70">
       <AppSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
@@ -62,5 +64,6 @@ export default function DashboardLayout({
         />
       )}
     </div>
+    </TooltipProvider>
   );
 }

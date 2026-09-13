@@ -2,8 +2,6 @@
 
 import { apiUrl } from "@/lib/api"
 import React, { useState } from "react"
-import Link from "next/link"
-import { motion } from "framer-motion"
 import { AppFooter } from "@/components/app-footer"
 import { useAuth } from "@/context/AuthContext"
 import { Input } from "@/components/ui/input"
@@ -19,25 +17,44 @@ import {
   Mail,
   PackageCheck,
   ShieldCheck,
+  ShoppingCart,
   Sparkles,
+  UserRoundCog,
   Zap,
 } from "lucide-react"
 
 const featureHighlights = [
   {
     icon: Zap,
-    title: "Transaksi lebih cepat",
-    description: "Alur kasir ringkas untuk pelayanan tanpa hambatan.",
+    title: "Transaksi lebih efisien",
+    description: "Proses transaksi yang ringkas untuk mendukung pelayanan pelanggan.",
   },
   {
     icon: PackageCheck,
-    title: "Stok selalu terpantau",
-    description: "Perubahan persediaan tercatat di setiap transaksi.",
+    title: "Persediaan terpantau",
+    description: "Setiap perubahan persediaan tercatat secara sistematis.",
   },
   {
     icon: BarChart3,
-    title: "Laporan siap dibaca",
-    description: "Pantau penjualan dan performa bisnis dengan mudah.",
+    title: "Laporan terstruktur",
+    description: "Informasi penjualan tersaji untuk mendukung evaluasi bisnis.",
+  },
+]
+
+const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true"
+
+const demoAccounts = [
+  {
+    label: "Demo Administrator",
+    description: "Dashboard dan laporan",
+    email: "admin@badakbiz.com",
+    icon: UserRoundCog,
+  },
+  {
+    label: "Demo Kasir",
+    description: "Transaksi dan operasional",
+    email: "cashier@badakbiz.com",
+    icon: ShoppingCart,
   },
 ]
 
@@ -48,6 +65,12 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const { login } = useAuth()
+
+  const fillDemoAccount = (demoEmail: string) => {
+    setEmail(demoEmail)
+    setPassword("password")
+    setError("")
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -69,10 +92,10 @@ export default function LoginPage() {
       if (res.ok) {
         login(data.access_token || data.token, data.user)
       } else {
-        setError(data.message || "Email atau kata sandi tidak sesuai.")
+        setError(data.message || "Email atau kata sandi yang Anda masukkan tidak sesuai.")
       }
     } catch {
-      setError("Terjadi kesalahan jaringan. Silakan coba lagi.")
+      setError("Tidak dapat terhubung ke layanan. Periksa koneksi Anda, lalu coba kembali.")
     } finally {
       setIsSubmitting(false)
     }
@@ -91,41 +114,37 @@ export default function LoginPage() {
         <div className="absolute -right-24 -top-20 h-80 w-80 rounded-full bg-cyan-300/10 blur-3xl" />
         <div className="absolute bottom-0 right-0 h-72 w-72 translate-x-1/3 translate-y-1/3 rounded-full bg-blue-400/20 blur-3xl" />
 
-        <motion.div
-          initial={{ opacity: 0, x: -24 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.55, ease: "easeOut" }}
-          className="relative z-10 flex w-full max-w-2xl flex-col"
-        >
+        <div className="relative z-10 flex w-full max-w-2xl flex-col">
           <div className="flex items-center gap-3">
             <div className="rounded-2xl border border-white/15 bg-white/10 p-1.5 shadow-2xl shadow-blue-950/30 backdrop-blur [@media(max-height:700px)]:p-1">
               <img
                 src="/BadakBizz.jpeg"
                 alt="Logo BadakBizz"
-                loading="lazy"
+                loading="eager"
+                fetchPriority="high"
                 decoding="async"
                 className="h-12 w-12 rounded-xl object-cover [@media(max-height:700px)]:h-10 [@media(max-height:700px)]:w-10"
               />
             </div>
             <div>
               <p className="text-lg font-black tracking-tight">BadakBizz POS</p>
-              <p className="text-xs font-semibold text-blue-100/75">Your Biz, But Stronger</p>
+              <p className="text-xs font-semibold text-blue-100/75">Solusi Andal untuk Bisnis Anda</p>
             </div>
           </div>
 
           <div className="my-auto py-8 [@media(max-height:800px)]:py-4 [@media(max-height:680px)]:py-2">
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-cyan-200/20 bg-cyan-200/10 px-3 py-1.5 text-xs font-bold text-cyan-100 backdrop-blur [@media(max-height:800px)]:mb-3 [@media(max-height:680px)]:py-1">
               <Sparkles className="h-3.5 w-3.5" />
-              Sistem operasional terintegrasi
+              Platform operasional bisnis terintegrasi
             </div>
             <h1 className="max-w-xl text-4xl font-black leading-[1.08] tracking-[-0.04em] xl:text-5xl [@media(max-height:800px)]:text-4xl [@media(max-height:680px)]:text-3xl">
-              Kasir lebih cepat.
+              Transaksi lebih efisien.
               <span className="block bg-gradient-to-r from-cyan-200 to-blue-200 bg-clip-text text-transparent">
-                Bisnis lebih terkontrol.
+                Bisnis lebih terukur.
               </span>
             </h1>
             <p className="mt-5 max-w-lg text-sm font-medium leading-6 text-blue-100/75 xl:text-base xl:leading-7 [@media(max-height:800px)]:mt-3 [@media(max-height:800px)]:text-sm [@media(max-height:800px)]:leading-6">
-              Jalankan penjualan, pantau stok, dan baca laporan harian dari ruang kerja yang dirancang untuk operasional toko Anda.
+              Kelola transaksi, persediaan, dan laporan bisnis melalui satu sistem yang dirancang untuk mendukung operasional usaha Anda.
             </p>
 
             <div className="mt-8 grid max-w-xl grid-cols-3 gap-3 [@media(max-height:800px)]:mt-4 [@media(max-height:700px)]:gap-2">
@@ -143,30 +162,25 @@ export default function LoginPage() {
 
           <div className="flex items-center gap-2 text-xs font-semibold text-blue-100/60">
             <ShieldCheck className="h-4 w-4 text-cyan-200" />
-            Akses aman untuk setiap peran di toko Anda
+            Keamanan akses disesuaikan dengan peran setiap pengguna
           </div>
-        </motion.div>
+        </div>
       </section>
 
       <section className="relative z-10 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-slate-50/95 px-4 sm:px-8 lg:bg-slate-50 xl:px-12 [@media(max-height:560px)]:min-h-[560px]">
         <div className="flex min-h-0 flex-1 items-center justify-center py-3 sm:py-5 [@media(max-height:800px)]:py-2">
-          <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: "easeOut", delay: 0.08 }}
-            className="w-full max-w-md"
-          >
+          <div className="w-full max-w-md">
             <div className="mb-4 flex items-center justify-center gap-3 lg:hidden [@media(max-height:760px)]:mb-2">
               <img
                 src="/BadakBizz.jpeg"
                 alt="Logo BadakBizz"
-                loading="lazy"
+                loading="eager"
                 decoding="async"
                 className="h-11 w-11 rounded-xl object-cover shadow-lg shadow-blue-500/25 [@media(max-height:700px)]:h-9 [@media(max-height:700px)]:w-9"
               />
               <div className="text-left">
                 <p className="font-black tracking-tight text-slate-900">BadakBizz POS</p>
-                <p className="text-[11px] font-semibold text-slate-500">Your Biz, But Stronger</p>
+                <p className="text-[11px] font-semibold text-slate-500">Solusi Andal untuk Bisnis Anda</p>
               </div>
             </div>
 
@@ -174,27 +188,52 @@ export default function LoginPage() {
               <div className="mb-5 sm:mb-6 [@media(max-height:800px)]:mb-4 [@media(max-height:650px)]:mb-3">
                 <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.14em] text-blue-700 [@media(max-height:800px)]:mb-2 [@media(max-height:650px)]:py-1">
                   <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
-                  Akses BadakBizz
+                  Masuk ke BadakBizz
                 </div>
                 <h2 className="text-2xl font-black tracking-[-0.035em] text-slate-950 sm:text-3xl [@media(max-height:800px)]:text-2xl">
-                  Selamat datang kembali
+                  Masuk ke akun Anda
                 </h2>
                 <p className="mt-1.5 text-sm font-medium leading-6 text-slate-500 [@media(max-height:650px)]:mt-1 [@media(max-height:650px)]:text-xs [@media(max-height:650px)]:leading-5">
-                  Masuk menggunakan akun yang telah terdaftar untuk mengakses sistem.
+                  Masukkan email dan kata sandi yang terdaftar untuk melanjutkan.
                 </p>
               </div>
 
               {error && (
-                <motion.div
+                <div
                   id="login-error"
                   role="alert"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
                   className="mb-4 flex items-start gap-2.5 rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-sm font-semibold text-red-700"
                 >
                   <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{error}</span>
-                </motion.div>
+                </div>
+              )}
+
+              {isDemoMode && (
+                <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50/70 p-3 [@media(max-height:760px)]:mb-3 [@media(max-height:760px)]:p-2.5">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-blue-700" />
+                    <p className="text-xs font-black text-blue-950">Pilih peran untuk demonstrasi</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {demoAccounts.map(({ label, description, email: demoEmail, icon: Icon }) => (
+                      <button
+                        key={demoEmail}
+                        type="button"
+                        onClick={() => fillDemoAccount(demoEmail)}
+                        className="flex min-w-0 items-center gap-2 rounded-xl border border-blue-100 bg-white px-2.5 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                      >
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                          <Icon className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-xs font-black text-slate-900">{label}</span>
+                          <span className="block truncate text-[10px] font-semibold text-slate-500">{description}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
 
               <form onSubmit={handleSubmit} className="space-y-4 [@media(max-height:800px)]:space-y-3">
@@ -226,7 +265,7 @@ export default function LoginPage() {
                     <label htmlFor="password" className="text-sm font-bold text-slate-700">
                       Kata sandi
                     </label>
-                    <span className="text-[11px] font-semibold text-slate-400">Peka huruf besar/kecil</span>
+                    <span className="text-[11px] font-semibold text-slate-400">Peka terhadap huruf besar dan kecil</span>
                   </div>
                   <div className="relative">
                     <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -265,11 +304,11 @@ export default function LoginPage() {
                   {isSubmitting ? (
                     <>
                       <Loader2 className="h-4.5 w-4.5 animate-spin" />
-                      Memproses akses...
+                      Memverifikasi akun...
                     </>
                   ) : (
                     <>
-                      Masuk ke sistem
+                      Masuk
                       <ArrowRight className="h-4.5 w-4.5" />
                     </>
                   )}
@@ -278,17 +317,11 @@ export default function LoginPage() {
 
               <div className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-[11px] font-semibold text-slate-500 [@media(max-height:800px)]:mt-3">
                 <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                Akses sistem dibatasi sesuai peran pengguna
+                Hak akses diberikan sesuai peran pengguna
               </div>
 
-              <p className="mt-4 text-center text-xs font-semibold text-slate-500 [@media(max-height:800px)]:mt-3">
-                Belum memiliki akun?{" "}
-                <Link href="/register" className="font-black text-blue-700 transition-colors hover:text-blue-900 hover:underline">
-                  Daftar sekarang
-                </Link>
-              </p>
             </div>
-          </motion.div>
+          </div>
         </div>
 
         <div className="mx-auto w-full max-w-md shrink-0 pb-1">

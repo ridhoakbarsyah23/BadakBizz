@@ -89,6 +89,42 @@ export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: 
   const [showEditPassword, setShowEditPassword] = React.useState(false);
   const [profileError, setProfileError] = React.useState("");
   const [isSavingProfile, setIsSavingProfile] = React.useState(false);
+  const prefetchedRoutes = React.useRef(new Set<string>());
+
+  const prefetchRoute = React.useCallback((url: string) => {
+    if (url === pathname || prefetchedRoutes.current.has(url)) return;
+
+    prefetchedRoutes.current.add(url);
+    router.prefetch(url);
+  }, [pathname, router]);
+
+  React.useEffect(() => {
+    if (!user) return;
+
+    const routeTimers: ReturnType<typeof setTimeout>[] = [];
+    const routes = navGroups
+      .flatMap((group) => group.items)
+      .filter((item) => item.roles.includes(userRole))
+      .map((item) => item.url)
+      .filter((url) => url !== pathname);
+
+    const warmRoutes = () => {
+      routes.forEach((url, index) => {
+        routeTimers.push(setTimeout(() => prefetchRoute(url), index * 250));
+      });
+    };
+
+    const idleCallback = window.requestIdleCallback?.(warmRoutes, { timeout: 1500 });
+    const fallbackTimer = idleCallback === undefined
+      ? setTimeout(warmRoutes, 600)
+      : undefined;
+
+    return () => {
+      if (idleCallback !== undefined) window.cancelIdleCallback?.(idleCallback);
+      if (fallbackTimer !== undefined) clearTimeout(fallbackTimer);
+      routeTimers.forEach(clearTimeout);
+    };
+  }, [pathname, prefetchRoute, user, userRole]);
   
   // Update form when user data is available
   React.useEffect(() => {
@@ -182,6 +218,8 @@ export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: 
                     key={item.title}
                     variant="tertiary"
                     className={`h-10 w-full min-w-0 justify-start rounded-xl px-3 text-sm font-bold transition-all ${isActive ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-600/15' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'}`}
+                    onPointerEnter={() => prefetchRoute(item.url)}
+                    onFocus={() => prefetchRoute(item.url)}
                     onPress={() => {
                       router.push(item.url);
                       setIsOpen(false);
@@ -206,7 +244,7 @@ export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: 
             <p className="line-clamp-1 text-sm font-black text-slate-800">{user?.name}</p>
             <p className="truncate text-[11px] font-semibold capitalize text-slate-500">{user?.role?.name}</p>
           </div>
-          <Button 
+          <Button
             variant="tertiary" 
             isIconOnly 
             size="sm" 
@@ -221,6 +259,8 @@ export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: 
           <Button
             variant="tertiary"
             className="mb-1 h-9 w-full min-w-0 justify-start rounded-xl px-3 text-sm font-bold text-slate-600 hover:bg-slate-100"
+            onPointerEnter={() => prefetchRoute("/settings")}
+            onFocus={() => prefetchRoute("/settings")}
             onPress={() => {
               router.push("/settings");
               setIsOpen(false);

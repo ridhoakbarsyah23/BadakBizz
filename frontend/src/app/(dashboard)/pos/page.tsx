@@ -2,13 +2,12 @@
 
 import { apiUrl } from "@/lib/api"
 import { AutoDismissNotice } from "@/components/auto-dismiss-notice"
-import { useCallback, useEffect, useState, type CSSProperties } from "react"
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { motion, AnimatePresence } from "framer-motion"
 import { 
   Search, 
   ShoppingCart, 
@@ -36,6 +35,8 @@ import {
 } from "@/components/ui/dialog"
 import { useAuth } from "@/context/AuthContext"
 import { SavedOrdersDialog, type SavedOrder } from "./saved-orders-dialog"
+
+const POS_PRODUCTS_CACHE_KEY = "badakbizz:pos-products"
 
 export default function POSPage() {
   const { token, user } = useAuth()
@@ -86,54 +87,93 @@ export default function POSPage() {
   const [isQrisChecking, setIsQrisChecking] = useState(false)
   const [isQrisCancelling, setIsQrisCancelling] = useState(false)
   const [isCartModalOpen, setIsCartModalOpen] = useState(false)
+  const hasProductsRef = useRef(false)
 
   const fetchProductsAndCustomers = useCallback(async (signal?: AbortSignal) => {
-    setIsLoading(true)
+    if (!hasProductsRef.current) setIsLoading(true)
+
     try {
       const headers = { "Authorization": `Bearer ${token}` }
-      const [productsRes, customersRes, settingsRes, tablesRes, currentShiftRes] = await Promise.all([
-        fetch(apiUrl('/api/products'), { headers, signal }),
-        fetch(apiUrl('/api/customers'), { headers, signal }),
-        fetch(apiUrl('/api/settings'), { headers, signal }),
-        fetch(apiUrl('/api/tables'), { headers, signal }),
-        fetch(apiUrl('/api/shifts/current'), { headers, signal })
-      ])
+      const productsRes = await fetch(apiUrl('/api/products?status=active'), { headers, signal })
+      if (!productsRes.ok) throw new Error("Gagal memuat katalog produk.")
 
-      const [productsData, customersData, settingsData, tablesData, currentShiftData] = await Promise.all([
-        productsRes.json(),
-        customersRes.json(),
-        settingsRes.json(),
-        tablesRes.json(),
-        currentShiftRes.ok ? currentShiftRes.json() : Promise.resolve(null),
-      ])
-      
-      setProducts(Array.isArray(productsData) ? productsData : [])
-      setCustomers(Array.isArray(customersData) ? customersData : [])
-      setTables(Array.isArray(tablesData) ? tablesData : [])
-      setCurrentShift(currentShiftData?.shift ?? null)
-      if (settingsData && settingsData.name) {
-        setStoreSettings(settingsData)
+      const productsData = await productsRes.json()
+      const nextProducts = Array.isArray(productsData) ? productsData : []
+      hasProductsRef.current = true
+      setProducts(nextProducts)
+      try {
+        sessionStorage.setItem(POS_PRODUCTS_CACHE_KEY, JSON.stringify(nextProducts))
+      } catch {
+        sessionStorage.removeItem(POS_PRODUCTS_CACHE_KEY)
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return
 
       setNotice({
         type: "error",
-        message: "Gagal memuat data POS. Periksa koneksi backend lalu coba refresh.",
+        message: "Katalog produk belum dapat dimuat. Periksa koneksi backend, lalu coba kembali.",
       })
     } finally {
       if (!signal?.aborted) setIsLoading(false)
     }
   }, [token])
 
+  const fetchSupportingData = useCallback(async (signal?: AbortSignal) => {
+    const headers = { "Authorization": `Bearer ${token}` }
+    const fetchJson = async (path: string) => {
+      const response = await fetch(apiUrl(path), { headers, signal })
+      if (!response.ok) throw new Error(`Request ${path} gagal.`)
+
+      return response.json()
+    }
+
+    const [customersResult, settingsResult, tablesResult, shiftResult] = await Promise.allSettled([
+      fetchJson('/api/customers'),
+      fetchJson('/api/settings'),
+      fetchJson('/api/tables'),
+      fetchJson('/api/shifts/current'),
+    ])
+
+    if (customersResult.status === "fulfilled") {
+      const customersData = customersResult.value
+      setCustomers(Array.isArray(customersData) ? customersData : [])
+    }
+    if (tablesResult.status === "fulfilled") {
+      const tablesData = tablesResult.value
+      setTables(Array.isArray(tablesData) ? tablesData : [])
+    }
+    if (shiftResult.status === "fulfilled") {
+      setCurrentShift(shiftResult.value?.shift ?? null)
+    }
+    if (settingsResult.status === "fulfilled") {
+      const settingsData = settingsResult.value
+      if (settingsData && settingsData.name) setStoreSettings(settingsData)
+    }
+  }, [token])
+
   useEffect(() => {
     if (!token) return
 
+    const cachedProducts = sessionStorage.getItem(POS_PRODUCTS_CACHE_KEY)
+    if (cachedProducts) {
+      try {
+        const parsedProducts = JSON.parse(cachedProducts)
+        if (Array.isArray(parsedProducts)) {
+          hasProductsRef.current = true
+          setProducts(parsedProducts)
+          setIsLoading(false)
+        }
+      } catch {
+        sessionStorage.removeItem(POS_PRODUCTS_CACHE_KEY)
+      }
+    }
+
     const controller = new AbortController()
-    fetchProductsAndCustomers(controller.signal)
+    void fetchProductsAndCustomers(controller.signal)
+    void fetchSupportingData(controller.signal)
 
     return () => controller.abort()
-  }, [fetchProductsAndCustomers, token])
+  }, [fetchProductsAndCustomers, fetchSupportingData, token])
 
   useEffect(() => {
     if (orderType !== "dine_in") {
@@ -1084,11 +1124,8 @@ export default function POSPage() {
                </div>
 
                <div className="p-6 flex flex-col gap-3 shrink-0">
-                  <AnimatePresence>
                     {cart.length === 0 ? (
-                      <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
+                      <div
                         className="flex-1 flex flex-col items-center justify-center text-muted-foreground mt-10"
                       >
                         <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4">
@@ -1096,15 +1133,11 @@ export default function POSPage() {
                         </div>
                         <p className="font-medium text-lg">Keranjang belanja kosong</p>
                         <p className="text-sm">Klik produk untuk menambahkannya.</p>
-                      </motion.div>
+                      </div>
                     ) : (
                       cart.map(item => (
-                        <motion.div 
+                        <div
                           key={item.cart_key}
-                          layout
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
                           className="flex flex-col gap-3 bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow group"
                         >
                           <div className="flex items-center gap-3">
@@ -1139,10 +1172,9 @@ export default function POSPage() {
                             placeholder="Catatan item, cth. tanpa gula"
                             className="h-9 rounded-xl border-slate-200 bg-slate-50 text-xs"
                           />
-                        </motion.div>
+                        </div>
                       ))
                     )}
-                  </AnimatePresence>
                 </div>
 
                 {/* Summary & Pay */}
@@ -1614,14 +1646,11 @@ export default function POSPage() {
           <Dialog open={isReceiptOpen} onOpenChange={setIsReceiptOpen}>
             <DialogContent className="flex h-[min(92dvh,860px)] !max-w-[min(96vw,440px)] w-[96vw] max-h-[calc(100dvh-1rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0">
               <div className="shrink-0 px-5 pt-5 pb-3 text-center sm:pt-6">
-                <motion.div 
-                  initial={{ scale: 0, rotate: -180 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                <div
                   className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 sm:mb-4 sm:h-16 sm:w-16"
                 >
                   <CheckCircle2 className="h-7 w-7 sm:h-10 sm:w-10" />
-                </motion.div>
+                </div>
                 <h2 className="text-xl font-black text-default-900 sm:text-2xl">
                   {receiptData?.status === "PENDING" ? "Menunggu Pembayaran" : "Pembayaran Berhasil!"}
                 </h2>

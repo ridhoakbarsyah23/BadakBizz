@@ -38,7 +38,7 @@ export function AppFooter({ compact = false }: AppFooterProps) {
           />
           <div className="min-w-0">
             <p className="truncate font-bold text-slate-700">BadakBizz POS</p>
-            <p className="truncate">Your Biz, But Stronger</p>
+            <p className="truncate">Solusi Andal untuk Bisnis Anda</p>
           </div>
         </div>
 

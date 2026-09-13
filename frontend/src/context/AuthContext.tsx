@@ -1,7 +1,7 @@
 "use client"
 
 import { apiUrl } from "@/lib/api"
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Cookies from 'js-cookie'
 
@@ -32,8 +32,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
   const pathname = usePathname()
+  const hasInitialized = useRef(false)
 
   useEffect(() => {
+    if (hasInitialized.current) return
+    hasInitialized.current = true
+
     // Check for token in cookies on mount
     const storedToken = Cookies.get('token')
     if (storedToken) {
@@ -41,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       fetchUser(storedToken)
     } else {
       setIsLoading(false)
-      if (pathname !== '/login' && pathname !== '/register') {
+      if (pathname !== '/login') {
         router.push('/login')
       }
     }
