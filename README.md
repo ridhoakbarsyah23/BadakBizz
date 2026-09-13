@@ -78,6 +78,22 @@ Seeder membuat akun demo, role, toko, dan meja. Seeder tidak membuat produk,
 pelanggan, atau transaksi. Jika sudah memiliki data bisnis, impor backup
 database dan jangan menjalankan seeder sebagai penggantinya.
 
+Untuk menyiapkan database khusus presentasi dengan produk, pelanggan, stok, dan
+riwayat transaksi contoh selama tujuh hari terakhir, jalankan:
+
+```powershell
+docker compose exec backend php artisan db:seed --class=DemoSeeder --force
+```
+
+`DemoSeeder` memakai SKU/nomor transaksi `DEMO-` dan email pelanggan khusus
+sebagai identitas data, sehingga aman dijalankan ulang tanpa menggandakan
+dataset. Tetap gunakan database terpisah untuk presentasi; jangan mencampurkan
+data demo dengan database usaha utama.
+
+Untuk demo yang dapat dikembalikan ke kondisi awal, ikuti
+[panduan presentasi BadakBizz](docs/DEMO.md). Fitur reset harus diaktifkan secara
+eksplisit dan akan ditolak pada environment production.
+
 ### 4. Buka aplikasi
 
 - Aplikasi: <http://localhost:3000>
