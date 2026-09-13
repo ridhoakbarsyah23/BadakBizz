@@ -81,7 +81,7 @@ export default function Dashboard() {
         if (!res.ok) throw new Error("Ringkasan bisnis belum dapat dimuat.")
         setData(await res.json())
       } catch (requestError) {
-        setError(requestError instanceof Error ? requestError.message : "Terjadi kesalahan saat memuat dashboard.")
+        setError(requestError instanceof Error ? requestError.message : "Terjadi kesalahan saat memuat dasbor.")
       } finally {
         setIsLoading(false)
       }
@@ -119,7 +119,7 @@ export default function Dashboard() {
             </div>
             <h1 className="text-2xl font-black tracking-[-0.035em] sm:text-3xl lg:text-4xl">Analitik Bisnis</h1>
             <p className="mt-2 max-w-xl text-sm font-medium leading-6 text-blue-100/80 sm:text-base">
-              Pantau performa penjualan, pelanggan, dan kondisi stok dari satu tampilan.
+              Pantau kinerja penjualan, pelanggan, dan kondisi stok dari satu tampilan.
             </p>
           </div>
 

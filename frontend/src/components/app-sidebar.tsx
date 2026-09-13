@@ -44,12 +44,12 @@ const navGroups = [
   {
     label: "Menu Utama",
     items: [
-      { title: "Dashboard", url: "/", icon: LayoutDashboard, roles: ['admin'] },
-      { title: "Kasir (POS)", url: "/pos", icon: ShoppingBag, roles: ['admin', 'cashier'] },
+      { title: "Dasbor", url: "/", icon: LayoutDashboard, roles: ['admin'] },
+      { title: "Kasir", url: "/pos", icon: ShoppingBag, roles: ['admin', 'cashier'] },
     ]
   },
   {
-    label: "Katalog & Stok",
+    label: "Katalog dan Stok",
     items: [
       { title: "Data Produk", url: "/products", icon: Package, roles: ['admin'] },
       { title: "Kategori", url: "/categories", icon: Tags, roles: ['admin'] },
@@ -58,7 +58,7 @@ const navGroups = [
     ]
   },
   {
-    label: "Orang",
+    label: "Pelanggan dan Karyawan",
     items: [
       { title: "Pelanggan", url: "/customers", icon: Users, roles: ['admin', 'cashier'] },
       { title: "Data Karyawan", url: "/staff", icon: UserCog, roles: ['admin'] },
@@ -68,8 +68,8 @@ const navGroups = [
     label: "Laporan",
     items: [
       { title: "Riwayat Transaksi", url: "/transactions", icon: History, roles: ['admin', 'cashier'] },
-      { title: "Shift Kasir", url: "/shifts", icon: CalendarClock, roles: ['admin'] },
-      { title: "Laporan Keuangan", url: "/reports", icon: BarChart3, roles: ['admin'] },
+      { title: "Sesi Kerja Kasir", url: "/shifts", icon: CalendarClock, roles: ['admin'] },
+      { title: "Laporan Penjualan", url: "/reports", icon: BarChart3, roles: ['admin'] },
     ]
   }
 ];
@@ -185,7 +185,7 @@ export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: 
           />
           <div className="min-w-0">
             <p className="truncate text-base font-black tracking-tight text-slate-900">BadakBizz</p>
-            <p className="truncate text-[10px] font-extrabold uppercase tracking-[0.14em] text-blue-600">Point of Sale</p>
+            <p className="truncate text-[10px] font-extrabold uppercase tracking-[0.14em] text-blue-600">Sistem Kasir</p>
           </div>
         </div>
         <Button
@@ -283,9 +283,9 @@ export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: 
       <AlertDialog open={isLogoutOpen} onOpenChange={setIsLogoutOpen}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Konfirmasi Keluar</AlertDialogTitle>
+            <AlertDialogTitle>Konfirmasi keluar</AlertDialogTitle>
             <AlertDialogDescription>
-              Apakah Anda yakin ingin keluar dari aplikasi? Anda harus login kembali untuk masuk.
+              Apakah Anda yakin ingin keluar dari aplikasi? Anda harus masuk kembali untuk mengakses aplikasi.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -297,7 +297,7 @@ export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: 
                 logout()
               }}
             >
-              Ya, Keluar
+              Ya, keluar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
