@@ -94,6 +94,7 @@ class ReportProfitTest extends TestCase
             $this->getJson('/api/reports?start_date='.$range)
                 ->assertOk()
                 ->assertJsonPath('chartData.0.profit', $profit)
+                ->assertJsonPath('totalProductMargin', $profit)
                 ->assertJsonPath('estimatedProfitItemCount', $estimatedItems);
         }
     }

@@ -29,6 +29,10 @@ class ReportController extends Controller
             ->whereBetween('created_at', [$startDate, $endDate])
             ->sum('total_amount');
 
+        $totalTransactions = Transaction::where('status', 'COMPLETED')
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->count();
+
         // 2. Average Transaction
         $averageTransaction = Transaction::where('status', 'COMPLETED')
             ->whereBetween('created_at', [$startDate, $endDate])
@@ -68,7 +72,7 @@ class ReportController extends Controller
 
         $busiestHour = $busiestHourData !== null
             ? $this->formatHourRange($busiestHourData)
-            : 'N/A';
+            : null;
 
         $hourlyTransactions = collect(range(0, 23))
             ->map(function (int $hour) use ($hourlyTransactionCounts) {
@@ -147,6 +151,7 @@ class ReportController extends Controller
 
         return response()->json([
             'totalRevenue' => $totalRevenue,
+            'totalTransactions' => $totalTransactions,
             'averageTransaction' => $averageTransaction,
             'topSellingItem' => $topSellingItem ? [
                 'name' => $topSellingItem->name,
@@ -156,6 +161,7 @@ class ReportController extends Controller
             'busiestHourCount' => $busiestHourCount,
             'hourlyTransactions' => $hourlyTransactions,
             'chartData' => $chartData,
+            'totalProductMargin' => $chartData->sum('profit'),
             'estimatedProfitItemCount' => $chartTransactions->sum(
                 fn ($transaction) => $transaction->items->whereNull('purchase_price')->count()
             ),
@@ -205,8 +211,8 @@ class ReportController extends Controller
             ->get();
 
         $filenameDate = $startDateStr && $endDateStr
-            ? Carbon::parse($startDateStr)->format('Ymd').'_to_'.Carbon::parse($endDateStr)->format('Ymd')
-            : 'all';
+            ? Carbon::parse($startDateStr)->format('Ymd').'_sampai_'.Carbon::parse($endDateStr)->format('Ymd')
+            : 'semua';
 
         if ($request->query('format') === 'excel') {
             return $this->exportModernExcel($transactions, $filenameDate);
@@ -214,16 +220,16 @@ class ReportController extends Controller
 
         $headers = [
             'Content-type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename=BadakBizzPOS_Report_'.$filenameDate.'.csv',
+            'Content-Disposition' => 'attachment; filename=Laporan_Penjualan_BadakBizz_'.$filenameDate.'.csv',
             'Pragma' => 'no-cache',
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
             'Expires' => '0',
         ];
 
         $columns = [
-            'Date', 'Transaction Number', 'Cashier', 'Customer', 'Payment Method',
-            'Subtotal', 'Discount', 'Tax', 'Service Charge', 'Total Amount', 'Status',
-            'Order Notes', 'Items', 'Item Notes',
+            'Tanggal', 'Nomor Transaksi', 'Kasir', 'Pelanggan', 'Metode Pembayaran',
+            'Subtotal', 'Diskon', 'Pajak', 'Biaya Layanan', 'Total', 'Status',
+            'Catatan Pesanan', 'Item', 'Catatan Item',
         ];
 
         $callback = function () use ($transactions, $columns) {
@@ -234,8 +240,8 @@ class ReportController extends Controller
                 $row = [
                     $tx->created_at->format('Y-m-d H:i:s'),
                     $tx->transaction_number,
-                    $tx->cashier ? $tx->cashier->name : 'N/A',
-                    $tx->customer ? $tx->customer->name : 'Walk-in',
+                    $tx->cashier ? $tx->cashier->name : 'Tidak tersedia',
+                    $tx->customer ? $tx->customer->name : 'Pelanggan umum',
                     $tx->payment_method,
                     $tx->subtotal,
                     $tx->discount,
@@ -269,7 +275,7 @@ class ReportController extends Controller
             'Biaya Layanan',
             'Total',
             'Status',
-            'Catatan Order',
+            'Catatan Pesanan',
             'Item',
             'Catatan Item',
         ]];
@@ -278,8 +284,8 @@ class ReportController extends Controller
             $rows[] = [
                 $tx->created_at->format('Y-m-d H:i:s'),
                 $tx->transaction_number,
-                $tx->cashier ? $tx->cashier->name : 'N/A',
-                $tx->customer ? $tx->customer->name : 'Walk-in',
+                $tx->cashier ? $tx->cashier->name : 'Tidak tersedia',
+                $tx->customer ? $tx->customer->name : 'Pelanggan umum',
                 $tx->payment_method,
                 (float) $tx->subtotal,
                 (float) $tx->discount,
@@ -307,7 +313,7 @@ class ReportController extends Controller
         $content = $this->createZipFromStrings($files);
         $headers = [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename=BadakBizzPOS_Report_'.$filenameDate.'.xlsx',
+            'Content-Disposition' => 'attachment; filename=Laporan_Penjualan_BadakBizz_'.$filenameDate.'.xlsx',
             'Content-Length' => (string) strlen($content),
             'Pragma' => 'no-cache',
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',

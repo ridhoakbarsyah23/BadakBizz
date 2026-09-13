@@ -86,9 +86,9 @@ class TransactionFilterExportTest extends TestCase
 
         $content = $response->streamedContent();
 
-        $this->assertStringContainsString('Order Notes', $content);
-        $this->assertStringContainsString('Items', $content);
-        $this->assertStringContainsString('Item Notes', $content);
+        $this->assertStringContainsString('Catatan Pesanan', $content);
+        $this->assertStringContainsString('Item', $content);
+        $this->assertStringContainsString('Catatan Item', $content);
         $this->assertStringContainsString('Antar ke meja luar', $content);
         $this->assertStringContainsString('Noodle Special - Pedas x2', $content);
         $this->assertStringContainsString('Noodle Special - Pedas: Tanpa daun bawang', $content);
@@ -221,7 +221,9 @@ class TransactionFilterExportTest extends TestCase
             ->assertOk();
 
         $this->assertSame(40_000, $response->json('totalRevenue'));
+        $this->assertSame(1, $response->json('totalTransactions'));
         $this->assertSame(40_000, $response->json('averageTransaction'));
+        $this->assertSame(20_000, $response->json('totalProductMargin'));
         $this->assertSame('Report Completed Product', $response->json('topSellingItem.name'));
         $this->assertSame(4, $response->json('topSellingItem.sold'));
         $this->assertSame('10:00 - 11:00', $response->json('busiestHour'));
