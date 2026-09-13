@@ -149,6 +149,10 @@ export default function SettingsPage() {
   const hasChanges = savedSettings
     ? JSON.stringify(settings) !== JSON.stringify(savedSettings)
     : false
+  const previewSubtotal = 31_000
+  const previewServiceCharge = Math.round(previewSubtotal * (Number(settings.service_charge_rate || 0) / 100))
+  const previewTax = Math.round((previewSubtotal + previewServiceCharge) * (Number(settings.tax_rate || 0) / 100))
+  const previewTotal = previewSubtotal + previewServiceCharge + previewTax
 
   if (isLoading) {
     return (
@@ -342,17 +346,17 @@ export default function SettingsPage() {
               <CardTitle>Keuangan & Pajak</CardTitle>
             </div>
             <CardDescription>
-              Atur mata uang dan tarif pajak standar Anda.
+              Atur mata uang, tarif pajak sesuai ketentuan daerah, dan biaya layanan dine-in.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="currency">Mata Uang</Label>
                 <Input id="currency" value="IDR (Rp)" disabled />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="tax">Pajak Default (%)</Label>
+                <Label htmlFor="tax">Tarif Pajak atau PBJT (%)</Label>
                 <Input 
                   id="tax" 
                   type="number" 
@@ -362,13 +366,14 @@ export default function SettingsPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="serviceCharge">Biaya Layanan (Service Charge) (%)</Label>
+              <Label htmlFor="serviceCharge">Biaya Layanan Dine-in (%)</Label>
               <Input 
                 id="serviceCharge" 
                 type="number" 
                 value={settings.service_charge_rate} 
                 onChange={(e) => setSettings({...settings, service_charge_rate: e.target.value})} 
               />
+              <p className="text-xs text-muted-foreground">Biaya ini hanya diterapkan pada pesanan yang menggunakan layanan meja.</p>
             </div>
           </CardContent>
         </Card>
@@ -461,15 +466,21 @@ export default function SettingsPage() {
                 <div className="my-3 border-b-2 border-dashed border-black" />
                 <div className="receipt-row">
                   <span>Subtotal</span>
-                  <span className="receipt-value receipt-money">Rp 31.000</span>
+                  <span className="receipt-value receipt-money">Rp {previewSubtotal.toLocaleString("id-ID")}</span>
                 </div>
+                {previewServiceCharge > 0 && (
+                  <div className="receipt-row">
+                    <span>Biaya Layanan ({settings.service_charge_rate || 0}%)</span>
+                    <span className="receipt-value receipt-money">Rp {previewServiceCharge.toLocaleString("id-ID")}</span>
+                  </div>
+                )}
                 <div className="receipt-row">
                   <span>Pajak ({settings.tax_rate || 0}%)</span>
-                  <span className="receipt-value receipt-money">Rp 3.410</span>
+                  <span className="receipt-value receipt-money">Rp {previewTax.toLocaleString("id-ID")}</span>
                 </div>
                 <div className="receipt-row mt-2 text-[13px] font-black">
                   <span>TOTAL</span>
-                  <span className="receipt-value receipt-money">Rp 34.410</span>
+                  <span className="receipt-value receipt-money">Rp {previewTotal.toLocaleString("id-ID")}</span>
                 </div>
                 <div className="my-3 border-b-2 border-dashed border-black" />
                 <div className="receipt-text text-center text-[9px] italic">

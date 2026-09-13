@@ -10,6 +10,7 @@ use App\Models\ProductVariant;
 use App\Models\Store;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\TransactionTotalCalculator;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -165,21 +166,27 @@ class DemoSeeder extends Seeder
             });
 
             $subtotal = $lines->sum(fn (array $line) => $line['price'] * $line['quantity']);
-            $tax = round($subtotal * 0.10);
-            $serviceCharge = $sale['type'] === 'dine_in' ? round($subtotal * 0.05) : 0;
-            $total = $subtotal + $tax + $serviceCharge;
+            $totals = app(TransactionTotalCalculator::class)->calculate(
+                (float) $subtotal,
+                0,
+                10,
+                5,
+                $sale['type'],
+            );
             $transaction = Transaction::updateOrCreate(
                 ['transaction_number' => sprintf('DEMO-%03d', $index + 1)],
                 [
                     'customer_id' => $sale['customer'] ? $customers[$sale['customer']]->id : null,
                     'cashier_id' => $cashier->id,
                     'cashier_shift_id' => null,
-                    'subtotal' => $subtotal,
-                    'tax' => $tax,
-                    'service_charge' => $serviceCharge,
-                    'discount' => 0,
-                    'total_amount' => $total,
-                    'payment_amount' => $sale['method'] === 'CASH' ? ceil($total / 10000) * 10000 : $total,
+                    'subtotal' => $totals['subtotal'],
+                    'tax' => $totals['tax'],
+                    'service_charge' => $totals['service_charge'],
+                    'discount' => $totals['discount'],
+                    'total_amount' => $totals['total_amount'],
+                    'payment_amount' => $sale['method'] === 'CASH'
+                        ? ceil($totals['total_amount'] / 10000) * 10000
+                        : $totals['total_amount'],
                     'payment_method' => $sale['method'],
                     'status' => 'COMPLETED',
                     'order_type' => $sale['type'],

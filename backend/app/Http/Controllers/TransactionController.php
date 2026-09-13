@@ -11,6 +11,7 @@ use App\Models\Table;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
 use App\Services\TransactionStatusService;
+use App\Services\TransactionTotalCalculator;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -155,27 +156,18 @@ class TransactionController extends Controller
                 ];
             }
 
-            // Discount calculation
-            $discount = 0;
-            if (isset($validated['discount'])) {
-                $discount = $validated['discount'];
-            } elseif (isset($validated['customer_id']) && $validated['customer_id']) {
-                $discount = $subtotal * 0.05; // 5% discount default for members
-            }
-
-            if ($discount > $subtotal) {
-                throw new \Exception('Discount cannot be greater than subtotal.');
-            }
-
             $store = Store::first();
             $taxRatePercent = $store?->tax_rate ?? 11;
             $serviceChargeRatePercent = $store?->service_charge_rate ?? 0;
             $shiftManagementEnabled = $store?->enable_shift_management ?? true;
-
-            $netAfterDiscount = $subtotal - $discount;
-            $serviceCharge = $netAfterDiscount * ($serviceChargeRatePercent / 100);
-            $tax = ($netAfterDiscount + $serviceCharge) * ($taxRatePercent / 100);
-            $totalAmount = $netAfterDiscount + $serviceCharge + $tax;
+            $orderType = $validated['order_type'] ?? 'dine_in';
+            $totals = app(TransactionTotalCalculator::class)->calculate(
+                (float) $subtotal,
+                (float) ($validated['discount'] ?? 0),
+                (float) $taxRatePercent,
+                (float) $serviceChargeRatePercent,
+                $orderType,
+            );
 
             $transactionNumber = $this->generateTransactionNumber();
 
@@ -190,7 +182,7 @@ class TransactionController extends Controller
                 throw new \Exception('Open an active cashier shift before checkout.');
             }
 
-            if ($validated['payment_method'] !== 'QRIS' && (float) $validated['payment_amount'] < (float) $totalAmount) {
+            if ($validated['payment_method'] !== 'QRIS' && (float) $validated['payment_amount'] < $totals['total_amount']) {
                 throw new \Exception('Payment amount cannot be less than total amount.');
             }
 
@@ -200,15 +192,15 @@ class TransactionController extends Controller
                 'customer_id' => $validated['customer_id'] ?? null,
                 'cashier_id' => $request->user() ? $request->user()->id : null,
                 'cashier_shift_id' => $activeShift?->id,
-                'subtotal' => $subtotal,
-                'tax' => $tax,
-                'service_charge' => $serviceCharge,
-                'discount' => $discount,
-                'total_amount' => $totalAmount,
+                'subtotal' => $totals['subtotal'],
+                'tax' => $totals['tax'],
+                'service_charge' => $totals['service_charge'],
+                'discount' => $totals['discount'],
+                'total_amount' => $totals['total_amount'],
                 'payment_amount' => $validated['payment_amount'],
                 'payment_method' => $validated['payment_method'],
                 'status' => $validated['payment_method'] === 'QRIS' ? 'PENDING' : 'COMPLETED',
-                'order_type' => $validated['order_type'] ?? 'dine_in',
+                'order_type' => $orderType,
                 'table_id' => $validated['table_id'] ?? null,
                 'notes' => isset($validated['notes']) ? trim((string) $validated['notes']) ?: null : null,
             ]);

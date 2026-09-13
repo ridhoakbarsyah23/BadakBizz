@@ -49,7 +49,7 @@ class TransactionTest extends TestCase
             'payment_method' => 'CASH',
             'payment_amount' => 23_100,
             'discount' => 0,
-            'order_type' => 'takeaway',
+            'order_type' => 'dine_in',
         ]);
 
         $response->assertCreated()
@@ -67,6 +67,39 @@ class TransactionTest extends TestCase
             'quantity' => 2,
             'user_id' => $cashier->id,
         ]);
+    }
+
+    public function test_takeaway_transaction_does_not_include_dine_in_service_charge(): void
+    {
+        Sanctum::actingAs($this->cashier());
+
+        Store::create([
+            'name' => 'BadakBizz Test',
+            'tax_rate' => 10,
+            'service_charge_rate' => 5,
+        ]);
+
+        $product = Product::create([
+            'sku' => 'SKU-TAKEAWAY',
+            'name' => 'Takeaway Product',
+            'purchase_price' => 5_000,
+            'selling_price' => 10_000,
+            'stock' => 10,
+            'minimum_stock' => 2,
+            'is_active' => true,
+        ]);
+
+        $this->postJson('/api/transactions', [
+            'items' => [['product_id' => $product->id, 'quantity' => 2]],
+            'payment_method' => 'CASH',
+            'payment_amount' => 22_000,
+            'discount' => 0,
+            'order_type' => 'takeaway',
+        ])->assertCreated()
+            ->assertJsonPath('data.subtotal', 20_000)
+            ->assertJsonPath('data.service_charge', 0)
+            ->assertJsonPath('data.tax', 2_000)
+            ->assertJsonPath('data.total_amount', 22_000);
     }
 
     public function test_transaction_number_uses_daily_sequence(): void
@@ -332,6 +365,8 @@ class TransactionTest extends TestCase
         $transaction = Transaction::find($response->assertCreated()->json('data.id'));
 
         $this->assertSame('PENDING', $transaction->status);
+        $this->assertEquals(0, $transaction->discount);
+        $this->assertEquals(11_100, $transaction->total_amount);
         $this->assertSame(3, $product->fresh()->stock);
         $this->assertSame(0, $customer->fresh()->total_transactions);
         $this->assertEquals(0, $customer->fresh()->total_spending);
@@ -342,7 +377,7 @@ class TransactionTest extends TestCase
         $this->assertSame('COMPLETED', $transaction->fresh()->status);
         $this->assertSame(3, $product->fresh()->stock);
         $this->assertSame(1, $customer->fresh()->total_transactions);
-        $this->assertEquals(10_545, $customer->fresh()->total_spending);
+        $this->assertEquals(11_100, $customer->fresh()->total_spending);
     }
 
     public function test_cancelled_qris_transaction_restores_stock_once_without_customer_spending(): void

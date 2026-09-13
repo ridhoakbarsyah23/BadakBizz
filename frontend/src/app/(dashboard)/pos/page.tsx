@@ -391,7 +391,7 @@ export default function POSPage() {
     ))
   }
 
-  const subtotal = cart.reduce((sum, item) => sum + (item.selling_price * item.qty), 0)
+  const subtotal = Math.round(cart.reduce((sum, item) => sum + (item.selling_price * item.qty), 0))
   const selectedCustomer = customers.find(c => c.id.toString() === selectedCustomerId)
   const selectedTable = tables.find(t => t.id.toString() === selectedTableId)
   const tableManagementEnabled = storeSettings.enable_table_management == 1 || storeSettings.enable_table_management === true
@@ -409,13 +409,12 @@ export default function POSPage() {
       ? "Pilih meja terlebih dahulu untuk pesanan dine-in."
       : null
   
-  const memberDiscountPercent = selectedCustomer ? 5 : 0
   const additionalDiscountPercent = Number(customDiscountPercent) || 0
-  const totalDiscountPercent = Math.min(100, memberDiscountPercent + additionalDiscountPercent)
+  const totalDiscountPercent = Math.min(100, additionalDiscountPercent)
   const discount = Math.round(subtotal * (totalDiscountPercent / 100))
   const netAfterDiscount = subtotal - discount
-  // Biaya Layanan hanya diterapkan jika tipe pesanan = takeaway
-  const serviceChargeRate = (storeSettings.service_charge_rate && orderType === 'takeaway') ? (Number(storeSettings.service_charge_rate) / 100) : 0
+  // Biaya layanan hanya diterapkan untuk pesanan yang menggunakan layanan meja.
+  const serviceChargeRate = (storeSettings.service_charge_rate && orderType === 'dine_in') ? (Number(storeSettings.service_charge_rate) / 100) : 0
   const serviceCharge = Math.round(netAfterDiscount * serviceChargeRate)
   const taxRate = storeSettings.tax_rate ? (Number(storeSettings.tax_rate) / 100) : 0
   const tax = Math.round((netAfterDiscount + serviceCharge) * taxRate)
@@ -1245,7 +1244,7 @@ export default function POSPage() {
                 type="number"
                 min="0"
                 max="100"
-                placeholder="e.g. 10" 
+                placeholder="Contoh: 10"
                 value={customDiscountPercent}
                 onChange={(e) => setCustomDiscountPercent(e.target.value)}
                 className="h-10 text-sm rounded-xl"
@@ -1253,7 +1252,7 @@ export default function POSPage() {
             </div>
 
             <div className="flex flex-col gap-1.5 mb-2">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Catatan Order</label>
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Catatan Pesanan</label>
               <textarea
                 value={orderNotes}
                 onChange={(event) => setOrderNotes(event.target.value)}
@@ -1750,12 +1749,12 @@ export default function POSPage() {
                     )}
                     {receiptData?.service_charge > 0 && (
                       <div className="receipt-row text-xs print:text-[9px] print:text-black">
-                        <span className="receipt-text">Service Charge ({storeSettings.service_charge_rate}%)</span>
+                        <span className="receipt-text">Biaya Layanan ({storeSettings.service_charge_rate}%)</span>
                         <span className="receipt-value receipt-money">Rp {formatCurrency(receiptData?.service_charge)}</span>
                       </div>
                     )}
                     <div className="receipt-row text-xs print:text-[9px] print:text-black">
-                      <span>Tax ({storeSettings.tax_rate}%)</span>
+                      <span>Pajak ({storeSettings.tax_rate}%)</span>
                       <span className="receipt-value receipt-money">Rp {formatCurrency(receiptData?.tax)}</span>
                     </div>
                   </div>
@@ -1828,7 +1827,7 @@ export default function POSPage() {
 
                     {receiptData?.notes && (
                       <div className="receipt-section rounded-md border border-dashed border-black/50 p-2 print:rounded-none">
-                        <div className="receipt-text text-[10px] font-black uppercase print:text-[8px]">Catatan Order</div>
+                        <div className="receipt-text text-[10px] font-black uppercase print:text-[8px]">Catatan Pesanan</div>
                         <div className="receipt-text mt-1 text-sm font-bold leading-snug print:text-[10px]">
                           {receiptData.notes}
                         </div>

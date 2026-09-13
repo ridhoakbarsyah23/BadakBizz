@@ -1107,7 +1107,7 @@ export default function TransactionsPage() {
                   </div>
                   {selectedTransaction.notes && (
                     <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
-                      <p className="mb-1 font-bold text-amber-800">Catatan Order</p>
+                      <p className="mb-1 font-bold text-amber-800">Catatan Pesanan</p>
                       <p className="font-medium text-amber-700">{selectedTransaction.notes}</p>
                     </div>
                   )}
